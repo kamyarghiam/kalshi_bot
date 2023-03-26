@@ -1,4 +1,4 @@
-from kalshi_bot.exchange.auth import Auth
+from src.exchange.auth import Auth
 
 
 class Connection:
@@ -6,5 +6,5 @@ class Connection:
     exhcange and provide low level control over our connection"""
 
     def __init__(self, auth: Auth):
-        self.auth = auth
+        self._auth = auth
         # TODO: connect here, refresh cookies, and rate limit

@@ -1,4 +1,4 @@
-This library provides an interface with the Kalshi exchange. There are strategies under the /strategies folder
+This library provides an interface with the Kalshi exchange. There are strategies under the src/strategies folder
 
 ### SETUP ###
 * Make sure you have python `3.11.2`
@@ -11,3 +11,14 @@ This library provides an interface with the Kalshi exchange. There are strategie
 * Install poetry with pipx. To install pipx do, `brew install pipx`, then do `pipx install poetry`
 * Run `pipx ensurepath` to add it to your path
 * Run `poetry install` to install the dependencies to your venv
+
+
+### DESIGN ###
+
+All the soure code is under the `/src` folder. Under the `/exchange` repository,
+we have our interface with the exchange. This helps us keep track of information
+locally vs on the exchange. We put all of our strategies under the strategies folder.
+
+### RUNNING TESTS ###
+
+To run tests, simply run `pytest`
