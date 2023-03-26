@@ -9,6 +9,15 @@ packages = [{include = "kalshi_bot"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 pytest = "^7.2.2"
+pathlib = "^1.0.1"
+pydantic = "^1.10.7"
+mock = "^5.0.1"
+requests = "^2.28.2"
+fastapi = "^0.95.0"
+httpx = "^0.23.3"
+types-mock = "^5.0.0.5"
+types-requests = "^2.28.11.16"
+mypy = "^1.1.1"
 
 
 [build-system]

@@ -1,6 +1,6 @@
 import pytest
 
-from src.types.money import Price
+from src.helpers.types.money import Price
 
 
 def test_prices():

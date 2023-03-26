@@ -1,5 +1,5 @@
 from src.exchange.interface import ExchangeInterface
-from src.types.money import Price
+from src.helpers.types.money import Price
 
 
 class HighProbabilityStrategy:

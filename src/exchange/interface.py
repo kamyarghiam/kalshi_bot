@@ -1,7 +1,16 @@
+from typing import Optional
+
+from fastapi.testclient import TestClient
+
 from src.exchange.connection import Connection
+from src.helpers.constants import EXCHANGE_STATUS_URL
+from src.helpers.types.exchange import ExchangeStatus
 
 
 class ExchangeInterface:
-    def __init__(self, connection: Connection):
+    def __init__(self, test_client: Optional[TestClient] = None):
+        self._connection = Connection(test_client)
         """This class provides a high level interace with the exchange"""
-        self._connection = connection
+
+    def get_exchange_status(self):
+        return ExchangeStatus.parse_obj(self._connection.get(EXCHANGE_STATUS_URL))
