@@ -31,4 +31,4 @@ locally vs on the exchange. We put all of our strategies under the strategies fo
 
 ### RUNNING TESTS
 
-To run tests, simply run `pytest`
+To run tests, simply run `pytest`. If you want to test against the demo env, add `--functional`

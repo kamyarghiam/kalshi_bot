@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from src.helpers.constants import KALSHI_PROD_BASE_URL
 from src.helpers.types.url import URL
 
 
@@ -59,6 +60,9 @@ class Auth:
         self._base_url: URL = URL(os.environ.get(url_env_var))
         self._api_version = URL(os.environ.get(api_version_env_var))
 
+        if KALSHI_PROD_BASE_URL in self._base_url:
+            raise ValueError("You're running against prod. Are you sure?")
+
         # Filled after getting info from exchange
         self._member_id: Optional[MemberId] = None
         self._token: Optional[Token] = None
@@ -73,10 +77,6 @@ class Auth:
         thirty_days_ago = now - timedelta(days=30)
         time_signed_in = typing.cast(datetime, self._sign_in_time)
         return time_signed_in > thirty_days_ago
-
-    @property
-    def full_url(self) -> URL:
-        return self._base_url.join(self._api_version)
 
     def refresh(self, login_response: LogInResponse):
         self._member_id = login_response.member_id

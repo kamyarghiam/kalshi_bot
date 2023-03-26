@@ -28,28 +28,33 @@ class Connection:
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         if connection_adapter:
             self._connection_adapter = connection_adapter
-            self._auth._base_url = URL(str(connection_adapter._base_url))
         else:
-            self._connection_adapter = SessionsWrapper(base_url=self._base_url)
-        self._base_url: URL = self._auth.full_url
+            self._connection_adapter = SessionsWrapper(base_url=self._auth._base_url)
+        self._api_version = self._auth._api_version
 
     def _request(
         self,
         method: Method,
         url: URL,
-        body=None,
-        headers=None,
-        check_auth=True,
+        body: Optional[Dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        check_auth: bool = True,
         **kwargs
     ):
         if check_auth and not self._auth.is_fresh():
             self.sign_in()
+        if headers is None:
+            headers = {}
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
-            url=self._base_url.join(url),
+            url=self._api_version.join(url),
             params=kwargs,
-            data=body,
-            headers=headers,
+            json=body,
+            headers={  # type:ignore[operator]
+                "accept": "application/json",
+                "content-type": "application/json",
+            }
+            | headers,
         )
         resp.raise_for_status()
 
@@ -76,7 +81,7 @@ class Connection:
                 url=LOGIN_URL,
                 body=LogInRequest(
                     email=self._auth._username, password=self._auth._password
-                ).json(),
+                ).dict(),
                 check_auth=False,
             )
         )
