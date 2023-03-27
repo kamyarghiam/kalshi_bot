@@ -28,7 +28,11 @@ def test_missing_creds():
     # Missing username
     with patch(
         "os.environ",
-        {"API_PASSWORD": "PASS", "API_URL": "URL", "API_VERSION": "VERSION"},
+        {
+            "API_PASSWORD": "PASS",
+            "API_URL": "URL",
+            "API_VERSION": "VERSION",
+        },
     ):
         with pytest.raises(ValueError):
             Auth()
@@ -36,7 +40,11 @@ def test_missing_creds():
     # Missing password
     with patch(
         "os.environ",
-        {"API_USERNAME": "NAME", "API_URL": "URL", "API_VERSION": "VERSION"},
+        {
+            "API_USERNAME": "NAME",
+            "API_URL": "URL",
+            "API_VERSION": "VERSION",
+        },
     ):
         with pytest.raises(ValueError):
             Auth()
@@ -44,14 +52,23 @@ def test_missing_creds():
     # Missing url
     with patch(
         "os.environ",
-        {"API_USERNAME": "NAME", "API_PASSWORD": "PASS", "API_VERSION": "VERSION"},
+        {
+            "API_USERNAME": "NAME",
+            "API_PASSWORD": "PASS",
+            "API_VERSION": "VERSION",
+        },
     ):
         with pytest.raises(ValueError):
             Auth()
 
     # Missing api version
     with patch(
-        "os.environ", {"API_USERNAME": "NAME", "API_PASSWORD": "PASS", "API_URL": "URL"}
+        "os.environ",
+        {
+            "API_USERNAME": "NAME",
+            "API_PASSWORD": "PASS",
+            "API_URL": "URL",
+        },
     ):
         with pytest.raises(ValueError):
             Auth()
@@ -81,3 +98,17 @@ def test_fresh_auth():
 
     auth._sign_in_time = datetime.now() - timedelta(days=30)
     assert not auth.is_fresh()
+
+
+@patch(
+    "os.environ",
+    {
+        "API_USERNAME": "NAME",
+        "API_PASSWORD": "PASS",
+        "API_URL": "https://trading-api.kalshi.com/trade-api/v2/events",
+        "API_VERSION": "VERSION",
+    },
+)
+def test_using_prod():
+    with pytest.raises(ValueError):
+        Auth()

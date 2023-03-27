@@ -5,7 +5,14 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from src.helpers.constants import KALSHI_PROD_BASE_URL
+from src.helpers.constants import (
+    API_VERSION_ENV_VAR,
+    ENV_VARS,
+    KALSHI_PROD_BASE_URL,
+    PASSWORD_ENV_VAR,
+    URL_ENV_VAR,
+    USERNAME_ENV_VAR,
+)
 from src.helpers.types.url import URL
 
 
@@ -40,25 +47,14 @@ class Auth:
     information to connect to the exchange"""
 
     def __init__(self):
-        username_env_var = "API_USERNAME"
-        password_env_var = "API_PASSWORD"
-        url_env_var = "API_URL"
-        api_version_env_var = "API_VERSION"
-        env_vars = [
-            username_env_var,
-            password_env_var,
-            url_env_var,
-            api_version_env_var,
-        ]
-
-        for env_var in env_vars:
+        for env_var in ENV_VARS:
             if env_var not in os.environ:
                 raise ValueError(f"{env_var} not set in env vars")
 
-        self._username: Username = os.environ.get(username_env_var)
-        self._password: Password = os.environ.get(password_env_var)
-        self._base_url: URL = URL(os.environ.get(url_env_var))
-        self._api_version = URL(os.environ.get(api_version_env_var))
+        self._username: Username = os.environ.get(USERNAME_ENV_VAR)
+        self._password: Password = os.environ.get(PASSWORD_ENV_VAR)
+        self._base_url: URL = URL(os.environ.get(URL_ENV_VAR))
+        self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
 
         if KALSHI_PROD_BASE_URL in self._base_url:
             raise ValueError("You're running against prod. Are you sure?")

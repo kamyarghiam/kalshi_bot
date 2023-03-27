@@ -1,6 +1,8 @@
+import os
+
 from fastapi import FastAPI
 
-from src.helpers.constants import EXCHANGE_STATUS_URL, LOGIN_URL
+from src.helpers.constants import API_VERSION_ENV_VAR, EXCHANGE_STATUS_URL, LOGIN_URL
 from src.helpers.types.auth import LogInRequest, LogInResponse
 from src.helpers.types.exchange import ExchangeStatus
 from src.helpers.types.url import URL
@@ -8,8 +10,7 @@ from src.helpers.types.url import URL
 
 def kalshi_test_exchange_factory():
     app = FastAPI()
-    # assumes API version v2
-    api_version = URL("/v2")
+    api_version = URL("/" + os.environ.get(API_VERSION_ENV_VAR))
 
     @app.post(api_version.add(LOGIN_URL))
     def login(log_in_request: LogInRequest):
