@@ -63,9 +63,6 @@ class Connection:
     def get(self, url: URL, **kwargs):
         return self._request(Method.GET, url, **kwargs)
 
-    def delete(self, url: URL, **kwargs):
-        return self._request(Method.DELETE, url, **kwargs)
-
     def post(
         self,
         url: URL,

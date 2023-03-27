@@ -50,9 +50,8 @@ To run tests, simply run `pytest`. If you want to test against the demo env, add
 You can also get a coverage report with missed lines by running:
 
 ```
-coverage erase
-pytest --cov=src/ tests/ --cov-append
-pytest --functional --cov=src/ tests/ --cov-append
-# Then see the final results with:
+coverage erase &&
+pytest --cov=src/ tests/ --cov-append &&
+pytest --functional --cov=src/ tests/ --cov-append &&
 coverage report --show-missing --skip-covered
 ```
