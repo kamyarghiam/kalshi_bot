@@ -47,7 +47,7 @@ class Connection:
             headers = {}
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
-            url=self._api_version.join(url),
+            url=self._api_version.add(url),
             params=kwargs,
             json=body,
             headers={  # type:ignore[operator]
@@ -80,7 +80,8 @@ class Connection:
             self.post(
                 url=LOGIN_URL,
                 body=LogInRequest(
-                    email=self._auth._username, password=self._auth._password
+                    email=self._auth._username,
+                    password=self._auth._password,
                 ).dict(),
                 check_auth=False,
             )
@@ -94,4 +95,4 @@ class SessionsWrapper:
         self._session = Session()
 
     def request(self, method, url: URL, *args, **kwargs):
-        return self._session.request(method, self.base_url.join(url), *args, **kwargs)
+        return self._session.request(method, self.base_url.add(url), *args, **kwargs)

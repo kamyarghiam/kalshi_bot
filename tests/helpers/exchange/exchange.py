@@ -11,7 +11,7 @@ def kalshi_test_exchange_factory():
     # assumes API version v1
     api_version = URL("/v2")
 
-    @app.post(api_version.join(LOGIN_URL))
+    @app.post(api_version.add(LOGIN_URL))
     def login(log_in_request: LogInRequest):
         # TODO: maybe store these in a mini database and retrieve them
         return LogInResponse(
@@ -23,7 +23,7 @@ def kalshi_test_exchange_factory():
             ),
         )
 
-    @app.get(api_version.join(EXCHANGE_STATUS_URL))
+    @app.get(api_version.add(EXCHANGE_STATUS_URL))
     def exchange_status():
         return ExchangeStatus(exchange_active=True, trading_active=True)
 

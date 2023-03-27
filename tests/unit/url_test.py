@@ -5,4 +5,4 @@ def test_urls():
     a = URL("hi")
     b = URL("bye")
 
-    assert a.join(b) == URL("hi/bye")
+    assert a.add(b) == URL("hi/bye")
