@@ -36,7 +36,9 @@ export API_USERNAME='your-email@email.com'
 export API_PASSWORD='some-password'
 ```
 
-And then adding the following to your bash / zsh profile: `source path/to /your/script.sh`
+And then adding the following to your bash / zsh profile: `source path/to /your/script.sh`.
+In order for functional tests to pass, your username and passowrd should coorespond to
+an actual username and password on Kalshi's demo website
 
 ### DESIGN
 
@@ -55,3 +57,5 @@ pytest --cov=src/ tests/ --cov-append &&
 pytest --functional --cov=src/ tests/ --cov-append &&
 coverage report --show-missing --skip-covered
 ```
+
+Note: functional tests do make a call to the kalshi exchange, so use this sparingly.
