@@ -49,8 +49,10 @@ locally vs on the exchange. We put all of our strategies under the strategies fo
 To run tests, simply run `pytest`. If you want to test against the demo env, add `--functional`.
 You can also get a coverage report with missed lines by running:
 
-`coverage erase`
-`pytest --cov=src/ tests/ --cov-append`
-`pytest --functional --cov=src/ tests/ --cov-append`
-Then see the final results with:
-`coverage report --show-missing --skip-covered`
+```
+coverage erase
+pytest --cov=src/ tests/ --cov-append
+pytest --functional --cov=src/ tests/ --cov-append
+# Then see the final results with:
+coverage report --show-missing --skip-covered
+```
