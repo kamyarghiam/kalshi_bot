@@ -8,7 +8,7 @@ from src.helpers.types.url import URL
 
 def kalshi_test_exchange_factory():
     app = FastAPI()
-    # assumes API version v1
+    # assumes API version v2
     api_version = URL("/v2")
 
     @app.post(api_version.add(LOGIN_URL))
