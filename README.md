@@ -14,7 +14,7 @@ This library provides an interface with the Kalshi exchange. There are strategie
 - Run `poetry install` to install the dependencies to your venv
 - Set up some default formatters. I'd recommend black and isort. Also set up autoformat on save (https://stackoverflow.com/questions/59433286/vs-code-prettier-format-on-save-doesnt-work)
 
-#### Credentials
+### CREDENTIALS
 
 To setup your credentials, export the three variables in your local environment:
 
