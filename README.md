@@ -116,3 +116,7 @@ instead for regular testing.
   pushes to teh branch branch, please use `git commit --amend` and `git push --force-with-lease`. This will push it to the same commit to the same branch.
   The purpose of doing `git commit --amend` instead of a new commit is so that we don't have a large number of commits per PR.
 - Once your PR is ready for review, open a pull request, and everything should be automatically filled. Wait for the PR to be reviewed, fix the issues, then merge.
+
+### DEPENDENCIES
+
+If you need to add a new third party library, please use `poetry add <library_name>`. To remove it, use `poetry remove <library_name>`.
