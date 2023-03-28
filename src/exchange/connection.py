@@ -24,7 +24,6 @@ class Connection:
 
     def __init__(self, connection_adapter: Optional[TestClient]):
         self._auth = Auth()
-        # TODO: connect here, refresh cookies, and rate limit
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         if connection_adapter:
             # This is a test connection

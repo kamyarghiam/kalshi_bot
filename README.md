@@ -20,7 +20,7 @@ direction of the project.
 ```
 {
     "python.formatting.provider": "black",
-    "python.formatting.blackArgs": ["--line-length=70"],
+    "python.formatting.blackArgs": ["--line-length=88"],
     "editor.formatOnSave": true,
     "python.analysis.autoImportCompletions": true,
     "python.autoComplete.extraPaths": [
