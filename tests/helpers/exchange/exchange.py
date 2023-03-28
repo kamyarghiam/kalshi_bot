@@ -4,11 +4,14 @@ from fastapi import FastAPI
 
 from src.helpers.constants import API_VERSION_ENV_VAR, EXCHANGE_STATUS_URL, LOGIN_URL
 from src.helpers.types.auth import LogInRequest, LogInResponse
-from src.helpers.types.exchange import ExchangeStatus
+from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.url import URL
 
 
 def kalshi_test_exchange_factory():
+    """This is the fake Kalshi exchange. The endpoints below are
+    for testing purposes and mimic the real exchange."""
+
     app = FastAPI()
     api_version = URL("/" + os.environ.get(API_VERSION_ENV_VAR))
 
@@ -26,6 +29,6 @@ def kalshi_test_exchange_factory():
 
     @app.get(api_version.add(EXCHANGE_STATUS_URL))
     def exchange_status():
-        return ExchangeStatus(exchange_active=True, trading_active=True)
+        return ExchangeStatusResponse(exchange_active=True, trading_active=True)
 
     return app

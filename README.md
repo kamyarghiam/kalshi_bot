@@ -1,9 +1,11 @@
-This library provides an interface with the Kalshi exchange. We hope to use this interface for
-research and trading. Kalshi has a demo env (https://demo.kalshi.co) where we can test our code.
+This library provides an interface with the Kalshi exchange. You can find the Kalshi API
+documentation here: https://trading-api.readme.io/reference/getting-started/.
+Kalshi has a demo env (https://demo.kalshi.co) where we can test our code.
 We also currently have a local "fake" instance of the Kalshi exchange that mocks the Kalshi
 endpoints. Please do not use production credentials unless we are legally cleared for trading.
-We do not have any intention of trading real money in the near future, and this repository
-is currently only for educational and research purposes.
+We do not intend to trade real money for the forseeable future; therefore, this repository
+is currently only for educational and research purposes unless there is a change in the
+direction of the project.
 
 ### SETUP
 
@@ -111,5 +113,6 @@ instead for regular testing.
   will need to manually fix some of the other errors. After you fix your pre-commit issues, run the following again: `git add .` and `git commit`
   (or `git commit --amend`, explained later). In the commit message, the top line will be the title of your pull request. The next few lines
   are a description for the pull request. Then do `git push` -- you might have to copy and paste the command that it says. For subsequent
-  pushes to this branch, please use `git commit --amend` and `git push --force-with-lease`. This will push it to the same commit to the same branch.
+  pushes to teh branch branch, please use `git commit --amend` and `git push --force-with-lease`. This will push it to the same commit to the same branch.
+  The purpose of doing `git commit --amend` instead of a new commit is so that we don't have a large number of commits per PR.
 - Once your PR is ready for review, open a pull request, and everything should be automatically filled. Wait for the PR to be reviewed, fix the issues, then merge.

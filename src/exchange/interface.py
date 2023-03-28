@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from src.exchange.connection import Connection
 from src.helpers.constants import EXCHANGE_STATUS_URL
-from src.helpers.types.exchange import ExchangeStatus
+from src.helpers.types.exchange import ExchangeStatusResponse
 
 
 class ExchangeInterface:
@@ -13,4 +13,6 @@ class ExchangeInterface:
         """This class provides a high level interace with the exchange"""
 
     def get_exchange_status(self):
-        return ExchangeStatus.parse_obj(self._connection.get(EXCHANGE_STATUS_URL))
+        return ExchangeStatusResponse.parse_obj(
+            self._connection.get(EXCHANGE_STATUS_URL)
+        )

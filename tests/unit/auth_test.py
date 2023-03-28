@@ -84,6 +84,7 @@ def test_missing_creds():
     },
 )
 def test_fresh_auth():
+    # Test whether the auth class is fresh
     auth = Auth()
     assert not auth.is_fresh()
 
@@ -110,5 +111,6 @@ def test_fresh_auth():
     },
 )
 def test_using_prod():
+    # Test that we can't use pro credentials
     with pytest.raises(ValueError):
         Auth()

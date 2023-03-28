@@ -27,6 +27,7 @@ class Connection:
         # TODO: connect here, refresh cookies, and rate limit
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         if connection_adapter:
+            # This is a test connection
             self._connection_adapter = connection_adapter
         else:
             self._connection_adapter = SessionsWrapper(base_url=self._auth._base_url)
@@ -41,6 +42,7 @@ class Connection:
         check_auth: bool = True,
         **kwargs
     ):
+        """All HTTP requests go through this function."""
         if check_auth and not self._auth.is_fresh():
             self.sign_in()
         if headers is None:
