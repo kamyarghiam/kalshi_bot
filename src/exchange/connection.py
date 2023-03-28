@@ -38,25 +38,23 @@ class Connection:
         method: Method,
         url: URL,
         body: Optional[Dict[str, str]] = None,
-        headers: Optional[Dict[str, str]] = None,
         check_auth: bool = True,
         **kwargs
     ):
-        """All HTTP requests go through this function."""
+        """All HTTP requests go through this function. We automatically
+        check if the auth credentials are valid and fresh before sending
+        the request. If they are not, we re-sign in."""
         if check_auth and not self._auth.is_fresh():
             self.sign_in()
-        if headers is None:
-            headers = {}
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
             url=self._api_version.add(url),
             params=kwargs,
             json=body,
-            headers={  # type:ignore[operator]
+            headers={
                 "accept": "application/json",
                 "content-type": "application/json",
-            }
-            | headers,
+            },
         )
         resp.raise_for_status()
 
@@ -65,14 +63,8 @@ class Connection:
     def get(self, url: URL, **kwargs):
         return self._request(Method.GET, url, **kwargs)
 
-    def post(
-        self,
-        url: URL,
-        body: Optional[Dict[str, str]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs
-    ):
-        return self._request(Method.POST, url, body=body, headers=headers, **kwargs)
+    def post(self, url: URL, body: Optional[Dict[str, str]] = None, **kwargs):
+        return self._request(Method.POST, url, body=body, **kwargs)
 
     def sign_in(self):
         response = LogInResponse.parse_obj(
