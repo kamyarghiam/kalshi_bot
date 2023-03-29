@@ -3,8 +3,6 @@ import typing
 from datetime import datetime, timedelta
 from typing import Optional
 
-from pydantic import BaseModel
-
 from src.helpers.constants import (
     API_VERSION_ENV_VAR,
     ENV_VARS,
@@ -13,6 +11,7 @@ from src.helpers.constants import (
     URL_ENV_VAR,
     USERNAME_ENV_VAR,
 )
+from src.helpers.types.api import ExternalApi
 from src.helpers.types.url import URL
 
 
@@ -32,12 +31,12 @@ class Username(str):
     """Type that encapsulates username"""
 
 
-class LogInResponse(BaseModel):
+class LogInResponse(ExternalApi):
     member_id: MemberId
     token: Token
 
 
-class LogInRequest(BaseModel):
+class LogInRequest(ExternalApi):
     email: Username
     password: Password
 

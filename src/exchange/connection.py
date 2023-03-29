@@ -1,11 +1,12 @@
 from enum import Enum
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
 from requests import Session
 
 from src.helpers.constants import LOGIN_URL
+from src.helpers.types.api import ExternalApi
 from src.helpers.types.auth import Auth, LogInRequest, LogInResponse
 from src.helpers.types.url import URL
 
@@ -36,7 +37,7 @@ class Connection:
         self,
         method: Method,
         url: URL,
-        body: Optional[Dict[str, str]] = None,
+        body: Optional[ExternalApi] = None,
         check_auth: bool = True,
         **kwargs
     ):
@@ -62,7 +63,7 @@ class Connection:
     def get(self, url: URL, **kwargs):
         return self._request(Method.GET, url, **kwargs)
 
-    def post(self, url: URL, body: Optional[Dict[str, str]] = None, **kwargs):
+    def post(self, url: URL, body: Optional[ExternalApi] = None, **kwargs):
         return self._request(Method.POST, url, body=body, **kwargs)
 
     def sign_in(self):
