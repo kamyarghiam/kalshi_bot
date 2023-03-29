@@ -86,19 +86,19 @@ def test_missing_creds():
 def test_fresh_auth():
     # Test whether the auth class is fresh
     auth = Auth()
-    assert not auth.is_fresh()
+    assert not auth.is_valid()
 
     auth._member_id = MemberId("some id")
-    assert not auth.is_fresh()
+    assert not auth.is_valid()
 
     auth._token = Token("some token")
-    assert not auth.is_fresh()
+    assert not auth.is_valid()
 
     auth._sign_in_time = datetime.now()
-    assert auth.is_fresh()
+    assert auth.is_valid()
 
     auth._sign_in_time = datetime.now() - timedelta(days=30)
-    assert not auth.is_fresh()
+    assert not auth.is_valid()
 
 
 @patch(
