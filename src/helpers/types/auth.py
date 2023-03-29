@@ -77,3 +77,8 @@ class Auth:
         self._member_id = login_response.member_id
         self._token = login_response.token
         self._sign_in_time = datetime.now()
+
+    def get_authorization_header(self) -> str:
+        if self._member_id is None or self._token is None:
+            raise ValueError("The member id and the token must be filled out!")
+        return str(self._member_id) + " " + str(self._token)

@@ -54,6 +54,7 @@ class Connection:
             headers={
                 "accept": "application/json",
                 "content-type": "application/json",
+                "Authorization": self._auth.get_authorization_header(),
             },
         )
         resp.raise_for_status()
