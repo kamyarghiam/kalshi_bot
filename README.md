@@ -14,7 +14,7 @@ direction of the project.
 - Create a directory for your venv `mkdir venv`
 - Create a venv `cd venv && python3.11 -m venv . && cd ..`
 - Activate the venv with `source venv/bin/activate`. From now on, you will need to activate the venv before development. You can add this command to your zsh/bash profile so you don't have to do it everytime you log in
-- Install poetry with pipx. For mac: to install pipx do, `brew install pipx`, then do `pipx install poetry`. Run `pipx ensurepath` to add it to your path. Run `poetry install` to install the dependencies to your venv. If you're on a different OS: the purpose of pipx is to intall poetry, so just find a way to install poetry. Here are the docs: https://python-poetry.org/docs/
+- Install poetry with pipx. For mac: to install pipx do, `brew install pipx`, then do `pipx install poetry`. Run `pipx ensurepath` to add it to your path. First run 'poetry init' to create a pyproject.toml file. Then run `poetry install` to install the dependencies to your venv. If you're on a different OS: the purpose of pipx is to intall poetry, so just find a way to install poetry. Here are the docs: https://python-poetry.org/docs/
 - Set up some default formatters in vs code. This will help keep your code clean. I'd recommend black and isort. Also set up autoformat on save (https://stackoverflow.com/questions/59433286/vs-code-prettier-format-on-save-doesnt-work). This is an example of what my user settings.json looks like in vs code:
 
 ```
