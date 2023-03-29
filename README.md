@@ -61,7 +61,7 @@ Next, you will need to export these three variables in your local environment (e
 - API_USERNAME
 - API_PASSWORD
 
-In order for tests to pass, you need these env vars. These vars are used for functioanl
+In order for tests to pass, you need these env vars. These vars are used for functional
 tests and some regular testing. You can automatically add these env vars
 by creating a bash script like so:
 
