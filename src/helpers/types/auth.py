@@ -63,7 +63,7 @@ class Auth:
         self._token: Optional[Token] = None
         self._sign_in_time: Optional[datetime] = None
 
-    def is_fresh(self):
+    def is_valid(self):
         """Checks that we are signed in and that the token is not stale"""
         if not (self._member_id and self._token and self._sign_in_time):
             return False

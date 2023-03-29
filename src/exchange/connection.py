@@ -44,18 +44,20 @@ class Connection:
         """All HTTP requests go through this function. We automatically
         check if the auth credentials are valid and fresh before sending
         the request. If they are not, we re-sign in."""
-        if check_auth and not self._auth.is_fresh():
-            self.sign_in()
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+        }
+        if check_auth:
+            if not self._auth.is_valid():
+                self.sign_in()
+            headers["Authorization"] = self._auth.get_authorization_header()
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
             url=self._api_version.add(url),
             params=kwargs,
             json=body,
-            headers={
-                "accept": "application/json",
-                "content-type": "application/json",
-                "Authorization": self._auth.get_authorization_header(),
-            },
+            headers=headers,
         )
         resp.raise_for_status()
 
