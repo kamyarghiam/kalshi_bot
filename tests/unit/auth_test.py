@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 from mock import patch  # type:ignore
 
-from src.helpers.types.auth import Auth, MemberId, Token
+from src.helpers.types.auth import Auth, LogInResponse, MemberId, Token
 from src.helpers.types.url import URL
 
 
@@ -88,10 +88,19 @@ def test_fresh_auth():
     auth = Auth()
     assert not auth.is_valid()
 
+    with pytest.raises(ValueError):
+        auth.member_id
+
     auth._member_id = MemberId("some id")
+    # Does not raise error
+    auth.member_id
     assert not auth.is_valid()
 
+    with pytest.raises(ValueError):
+        auth.token
     auth._token = Token("some token")
+    # Does not raise error
+    auth.token
     assert not auth.is_valid()
 
     auth._sign_in_time = datetime.now()
@@ -114,3 +123,11 @@ def test_using_prod():
     # Test that we can't use pro credentials
     with pytest.raises(ValueError):
         Auth()
+
+
+def test_log_in_response():
+    login = LogInResponse(member_id="WRONG", token="WRONG")
+    with pytest.raises(ValueError):
+        login.token
+    login = LogInResponse(member_id="MEMBER_ID", token="MEMBER_ID:TOKEN")
+    assert login.token == Token("TOKEN")
