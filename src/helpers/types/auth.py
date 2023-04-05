@@ -3,6 +3,8 @@ import typing
 from datetime import datetime, timedelta
 from typing import Optional
 
+from pydantic import Field
+
 from src.helpers.constants import (
     API_VERSION_ENV_VAR,
     ENV_VARS,
@@ -23,6 +25,10 @@ class Token(str):
     """Auth token used for sending requests"""
 
 
+class MemberIdAndToken(str):
+    """The exchange responds with memberid:token"""
+
+
 class Password(str):
     """Type that encapsulates password"""
 
@@ -31,9 +37,21 @@ class Username(str):
     """Type that encapsulates username"""
 
 
-class LogInResponse(ExternalApi):
+class LogInResponse(
+    ExternalApi, allow_population_by_field_name=True
+):  # type:ignore[call-arg]
     member_id: MemberId
-    token: Token
+    member_id_and_token: MemberIdAndToken = Field(alias="token")
+
+    @property
+    def token(self) -> Token:
+        """Extract token field because the exchange combines it with the member id"""
+        start_string = self.member_id + ":"
+        if not self.member_id_and_token.startswith(start_string):
+            raise ValueError(
+                "The member_id_and_token does not start with the member id"
+            )
+        return Token(self.member_id_and_token[len(start_string) :])
 
 
 class LogInRequest(ExternalApi):
@@ -63,6 +81,18 @@ class Auth:
         self._token: Optional[Token] = None
         self._sign_in_time: Optional[datetime] = None
 
+    @property
+    def member_id(self) -> MemberId:
+        if self._member_id is None:
+            raise ValueError("Member id is null")
+        return self._member_id
+
+    @property
+    def token(self) -> Token:
+        if self._token is None:
+            raise ValueError("Token is null")
+        return self._token
+
     def is_valid(self):
         """Checks that we are signed in and that the token is not stale"""
         if not (self._member_id and self._token and self._sign_in_time):
@@ -79,6 +109,4 @@ class Auth:
         self._sign_in_time = datetime.now()
 
     def get_authorization_header(self) -> str:
-        if self._member_id is None or self._token is None:
-            raise ValueError("The member id and the token must be filled out!")
-        return str(self._member_id) + " " + str(self._token)
+        return str(self.member_id) + " " + str(self.token)

@@ -13,13 +13,13 @@ def kalshi_test_exchange_factory():
     for testing purposes and mimic the real exchange."""
 
     app = FastAPI()
-    api_version = URL("/" + os.environ.get(API_VERSION_ENV_VAR))
+    api_version = URL(os.environ.get(API_VERSION_ENV_VAR))
 
-    @app.post(api_version.add(LOGIN_URL))
+    @app.post(api_version.add(LOGIN_URL).add_leading_forward_slash())
     def login(log_in_request: LogInRequest):
         # TODO: maybe store these in a mini database and retrieve them
         return LogInResponse(
-            member_id="a9a5dce6-cc09-11ed-b864-fe373b25ee1e",
+            member_id="78cD6d05-dF57-4f0e-90b2-87d9d1801f03",
             token=(
                 "78cD6d05-dF57-4f0e-90b2-87d9d1801f03:"
                 + "0nzHpJJBTDwb6NEPmGg0Lcg0FmzIEuP6"
@@ -27,8 +27,17 @@ def kalshi_test_exchange_factory():
             ),
         )
 
-    @app.get(api_version.add(EXCHANGE_STATUS_URL))
+    @app.get(api_version.add(EXCHANGE_STATUS_URL).add_leading_forward_slash())
     def exchange_status():
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
+
+    from fastapi import WebSocket
+
+    @app.websocket(URL("trade-api/ws/").add(api_version).add_leading_forward_slash())
+    async def websocket_endpoint(websocket: WebSocket):
+        await websocket.accept()
+        while True:
+            data = await websocket.receive_text()
+            websocket.send_text(data)
 
     return app
