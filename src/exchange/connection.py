@@ -50,24 +50,23 @@ class WebsocketWrapper:
 
         self._ws: Optional[Union[WebSocket, WebSocketTestSession]] = None
 
-    # TODO: work on these
-    # def send(self, payload: str):
-    #     if self._ws is None:
-    #         raise ValueError("Send: Did not intialize the websocket")
-    #     if isinstance(self._ws, WebSocket):
-    #         self._ws.send(payload)
-    #     elif isinstance(self._ws, WebSocketTestSession):
-    #         self._ws.send_text(payload)
+    def send(self, payload: str):
+        if self._ws is None:
+            raise ValueError("Send: Did not intialize the websocket")
+        if isinstance(self._ws, WebSocket):
+            self._ws.send(payload)
+        elif isinstance(self._ws, WebSocketTestSession):
+            self._ws.send_text(payload)
 
-    # def receive(self) -> str:
-    #     if self._ws is None:
-    #         raise ValueError("Receive: Did not intialize the websocket")
-    #     if isinstance(self._ws, WebSocket):
-    #         return self._ws.recv()
-    #     elif isinstance(self._ws, WebSocketTestSession):
-    #         return self._ws.receive_text()
-    #     else:
-    #         raise ValueError("Receive: websocket wrong type")
+    def receive(self) -> str:
+        if self._ws is None:
+            raise ValueError("Receive: Did not intialize the websocket")
+        if isinstance(self._ws, WebSocket):
+            return self._ws.recv()
+        elif isinstance(self._ws, WebSocketTestSession):
+            return self._ws.receive_text()
+        else:
+            raise ValueError("Receive: websocket wrong type")
 
     @contextmanager
     def websocket_connect(
@@ -107,7 +106,7 @@ class Connection:
             self._connection_adapter = connection_adapter
         else:
             self._connection_adapter = SessionsWrapper(base_url=self._auth._base_url)
-        self.sign_in()
+        self._check_auth()
 
     def _request(
         self,
@@ -125,8 +124,7 @@ class Connection:
             "content-type": "application/json",
         }
         if check_auth:
-            if not self._auth.is_valid():
-                self.sign_in()
+            self._check_auth()
             headers["Authorization"] = self._auth.get_authorization_header()
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
@@ -160,8 +158,7 @@ class Connection:
 
     @contextmanager
     def get_websocket_session(self) -> Generator[WebsocketWrapper, None, None]:
-        if not self._auth.is_valid():
-            self.sign_in()
+        self._check_auth()
         websocket = WebsocketWrapper(self._connection_adapter)
         websock_url = URL("/trade-api/ws/").add(self._api_version)
         with websocket.websocket_connect(
@@ -171,3 +168,8 @@ class Connection:
                 yield ws
             finally:
                 pass
+
+    def _check_auth(self):
+        """Checks to make sure we're signed in"""
+        if not self._auth.is_valid():
+            self.sign_in()
