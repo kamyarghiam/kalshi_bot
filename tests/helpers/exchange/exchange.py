@@ -55,7 +55,7 @@ def kalshi_test_exchange_factory():
                     if channel == WebsocketChannels.INVALID_CHANNEL:
                         await websocket.send_text(
                             WebsocketResponse(
-                                id=123,
+                                id=data.id,
                                 type=WebsocketType.ERROR,
                                 msg=INVALID_WEBSOCKET_CHANNEL_MESSAGE,
                             ).json()

@@ -6,6 +6,7 @@ from src.helpers.types.websockets import (
     WebsocketRequest,
     WebsocketRequestParams,
     WebsocketResponse,
+    WebsocketType,
 )
 
 
@@ -26,3 +27,5 @@ def test_invalid_channel(exchange: ExchangeInterface):
         )
         response = WebsocketResponse.parse_raw(ws.receive())
         assert response.msg == INVALID_WEBSOCKET_CHANNEL_MESSAGE
+        assert response.id == 1
+        assert response.type == WebsocketType.ERROR
