@@ -2,21 +2,17 @@ import os
 
 from fastapi import FastAPI
 
-from src.helpers.constants import (
-    API_VERSION_ENV_VAR,
-    EXCHANGE_STATUS_URL,
-    INVALID_WEBSOCKET_CHANNEL_MESSAGE,
-    LOGIN_URL,
-)
+from src.helpers.constants import API_VERSION_ENV_VAR, EXCHANGE_STATUS_URL, LOGIN_URL
 from src.helpers.types.auth import LogInRequest, LogInResponse
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.url import URL
 from src.helpers.types.websockets import (
-    WebsocketChannels,
-    WebsocketCommand,
+    Channel,
+    Command,
+    ResponseMessage,
+    Type,
     WebsocketRequest,
     WebsocketResponse,
-    WebsocketType,
 )
 
 
@@ -50,14 +46,14 @@ def kalshi_test_exchange_factory():
         await websocket.accept()
         while True:
             data = WebsocketRequest.parse_raw(await websocket.receive_text())
-            if data.cmd == WebsocketCommand.SUBSCRIBE:
+            if data.cmd == Command.SUBSCRIBE:
                 for channel in data.params.channels:
-                    if channel == WebsocketChannels.INVALID_CHANNEL:
+                    if channel == Channel.INVALID_CHANNEL:
                         await websocket.send_text(
                             WebsocketResponse(
                                 id=data.id,
-                                type=WebsocketType.ERROR,
-                                msg=INVALID_WEBSOCKET_CHANNEL_MESSAGE,
+                                type=Type.ERROR,
+                                msg=ResponseMessage(code=8, msg="Unknown channel name"),
                             ).json()
                         )
 

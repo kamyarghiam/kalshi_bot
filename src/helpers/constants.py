@@ -17,5 +17,3 @@ ENV_VARS = [
     URL_ENV_VAR,
     API_VERSION_ENV_VAR,
 ]
-
-INVALID_WEBSOCKET_CHANNEL_MESSAGE = {"code": 8, "msg": "Unknown channel name"}
