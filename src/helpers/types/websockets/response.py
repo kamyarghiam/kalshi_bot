@@ -3,8 +3,8 @@ from typing import List, Optional
 from pydantic import BaseModel, Extra, validator
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.orderbook import Level
-from src.helpers.types.orders import Quantity
+from src.helpers.types.orderbook import OrderbookSide
+from src.helpers.types.orders import Quantity, Side
 from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
 from tests.unit.prices_test import Price
 
@@ -41,16 +41,23 @@ class ErrorResponse(ResponseMessage):
 
 class OrderbookSnapshot(ResponseMessage):
     market_ticker: MarketTicker
-    yes: List[Level] = []
-    no: List[Level] = []
+    yes: OrderbookSide = OrderbookSide()
+    no: OrderbookSide = OrderbookSide()
 
-    @validator("yes", "no", pre=True)
+    @validator("yes", pre=True)
     @classmethod
-    def level_validator(cls, levels: List[List[int]]):
-        internal_levels: List[Level] = []
+    def yes_validator(cls, levels: List[List[int]]):
+        return cls._level_validator_helper(levels, Side.YES)
+
+    @validator("no", pre=True)
+    @classmethod
+    def no_validator(cls, levels: List[List[int]]):
+        return cls._level_validator_helper(levels, Side.NO)
+
+    @classmethod
+    def _level_validator_helper(cls, levels: List[List[int]], side: Side):
+        orderbook_side = OrderbookSide(side=side)
         for level in levels:
             assert len(level) == 2
-            internal_levels.append(
-                Level(price=Price(level[0]), quantity=Quantity(level[1]))
-            )
-        return internal_levels
+            orderbook_side.add_level(Price(level[0]), Quantity(level[1]))
+        return orderbook_side

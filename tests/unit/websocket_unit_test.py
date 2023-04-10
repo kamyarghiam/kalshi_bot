@@ -5,8 +5,8 @@ from pydantic import ValidationError
 
 from src.exchange.connection import WebsocketWrapper
 from src.helpers.types.money import Price
-from src.helpers.types.orderbook import Level
-from src.helpers.types.orders import Quantity
+from src.helpers.types.orderbook import OrderbookSide
+from src.helpers.types.orders import Quantity, Side
 from src.helpers.types.websockets.common import Id, Type
 from src.helpers.types.websockets.response import (
     ErrorResponse,
@@ -67,14 +67,20 @@ def test_orderbook_snapshot_validation():
     )
 
     assert orderbook_snapshot.market_ticker == "hi"
-    assert orderbook_snapshot.yes == [
-        Level(price=Price(40), quantity=Quantity(100)),
-        Level(price=Price(20), quantity=Quantity(200)),
-    ]
-    assert orderbook_snapshot.no == [
-        Level(price=Price(50), quantity=Quantity(200)),
-        Level(price=Price(60), quantity=Quantity(700)),
-    ]
+    assert orderbook_snapshot.yes == OrderbookSide(
+        side=Side.YES,
+        levels={
+            Price(40): Quantity(100),
+            Price(20): Quantity(200),
+        },
+    )
+    assert orderbook_snapshot.no == OrderbookSide(
+        side=Side.NO,
+        levels={
+            Price(50): Quantity(200),
+            Price(60): Quantity(700),
+        },
+    )
 
     # Error in yes price (over 99)
     with pytest.raises(ValidationError):

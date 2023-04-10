@@ -1,6 +1,6 @@
 from src.helpers.types.money import Price
-from src.helpers.types.orderbook import Level, Orderbook
-from src.helpers.types.orders import Quantity
+from src.helpers.types.orderbook import Orderbook, OrderbookSide
+from src.helpers.types.orders import Quantity, Side
 from src.helpers.types.websockets.response import OrderbookSnapshot
 
 
@@ -10,5 +10,9 @@ def test_from_snapshot():
     )
     orderbook = Orderbook.parse_obj(orderbook_snapshot)
     assert orderbook.market_ticker == "hi"
-    assert orderbook.yes == [Level(price=Price(10), quantity=Quantity(100))]
-    assert orderbook.no == [Level(price=Price(20), quantity=Quantity(200))]
+    assert orderbook.yes == OrderbookSide(
+        side=Side.YES, levels={Price(10): Quantity(100)}
+    )
+    assert orderbook.no == OrderbookSide(
+        side=Side.NO, levels={Price(20): Quantity(200)}
+    )
