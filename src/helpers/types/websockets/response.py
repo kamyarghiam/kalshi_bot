@@ -41,8 +41,8 @@ class ErrorResponse(ResponseMessage):
 
 class OrderbookSnapshot(ResponseMessage):
     market_ticker: MarketTicker
-    yes: OrderbookSide = OrderbookSide()
-    no: OrderbookSide = OrderbookSide()
+    yes: OrderbookSide = OrderbookSide(side=Side.YES)
+    no: OrderbookSide = OrderbookSide(side=Side.NO)
 
     @validator("yes", pre=True)
     @classmethod

@@ -11,11 +11,15 @@ class OrderbookSide(BaseModel):
     side: Side
     levels: Dict[Price, Quantity] = {}
 
-    def add_level(self, price: Price, quantiy: Quantity):
-        self.levels[price] = quantiy
+    def add_level(self, price: Price, quantity: Quantity):
+        if price in self.levels:
+            raise ValueError(
+                f"Price {price} to quntity {quantity} already exists in {self.levels}"
+            )
+        self.levels[price] = quantity
 
 
 class Orderbook(BaseModel):
     market_ticker: MarketTicker
-    yes: OrderbookSide = OrderbookSide()
-    no: OrderbookSide = OrderbookSide()
+    yes: OrderbookSide = OrderbookSide(side=Side.YES)
+    no: OrderbookSide = OrderbookSide(side=Side.NO)

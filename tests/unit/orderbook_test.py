@@ -1,3 +1,5 @@
+import pytest
+
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, Side
@@ -16,3 +18,12 @@ def test_from_snapshot():
     assert orderbook.no == OrderbookSide(
         side=Side.NO, levels={Price(20): Quantity(200)}
     )
+
+
+def test_add_level():
+    orderbook_side = OrderbookSide(side=Side.NO)
+    orderbook_side.add_level(Price(10), Quantity(100))
+
+    with pytest.raises(ValueError):
+        # Can't add the same level twice
+        orderbook_side.add_level(Price(10), Quantity(100))
