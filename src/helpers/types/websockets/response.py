@@ -1,8 +1,12 @@
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, Extra, validator
 
+from src.helpers.types.markets import MarketTicker
+from src.helpers.types.orderbook import Level
+from src.helpers.types.orders import Quantity
 from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
+from tests.unit.prices_test import Price
 
 
 class ResponseMessage(BaseModel):
@@ -33,3 +37,20 @@ class WebsocketResponse(BaseModel):
 class ErrorResponse(ResponseMessage):
     code: int
     msg: str
+
+
+class OrderbookSnapshot(ResponseMessage):
+    market_ticker: MarketTicker
+    yes: List[Level] = []
+    no: List[Level] = []
+
+    @validator("yes", "no", pre=True)
+    @classmethod
+    def level_validator(cls, levels: List[List[int]]):
+        internal_levels: List[Level] = []
+        for level in levels:
+            assert len(level) == 2
+            internal_levels.append(
+                Level(price=Price(level[0]), quantity=Quantity(level[1]))
+            )
+        return internal_levels
