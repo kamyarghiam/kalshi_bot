@@ -1,33 +1,10 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel
 
 from src.helpers.types.markets import MarketTicker
-
-
-class Id(int):
-    """Websocket id"""
-
-    LAST_ID = 0
-
-    @classmethod
-    def get_new_id(cls):
-        cls.LAST_ID += 1
-        return cls(cls.LAST_ID)
-
-
-class Command(str, Enum):
-    """Command sent to the websocket"""
-
-    SUBSCRIBE = "subscribe"
-
-
-class Type(str, Enum):
-    """Command received from websockets"""
-
-    SUBSCRIBED = "subscribed"
-    ERROR = "error"
+from src.helpers.types.websockets.common import Command, Id
 
 
 class Channel(str, Enum):
@@ -56,22 +33,6 @@ class WebsocketRequest(BaseModel):
     id: Id
     cmd: Command
     params: RequestParams
-
-    class Config:
-        use_enum_values = True
-
-
-class ResponseMessage(BaseModel):
-    """Message part of the websocket response"""
-
-    class Config:
-        extra = Extra.allow
-
-
-class WebsocketResponse(BaseModel):
-    id: Id
-    type: Type
-    msg: ResponseMessage
 
     class Config:
         use_enum_values = True

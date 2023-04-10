@@ -1,14 +1,11 @@
 from src.exchange.interface import ExchangeInterface
-from src.helpers.types.websockets import (
+from src.helpers.types.websockets.common import Command, Id, Type
+from src.helpers.types.websockets.request import (
     Channel,
-    Command,
-    Id,
     RequestParams,
-    ResponseMessage,
-    Type,
     WebsocketRequest,
-    WebsocketResponse,
 )
+from src.helpers.types.websockets.response import ResponseMessage
 
 
 def test_invalid_channel(exchange: ExchangeInterface):
@@ -22,9 +19,9 @@ def test_invalid_channel(exchange: ExchangeInterface):
                 id=Id.get_new_id(),
                 cmd=Command.SUBSCRIBE,
                 params=RequestParams(channels=[Channel.INVALID_CHANNEL]),
-            ).json()
+            )
         )
-        response = WebsocketResponse.parse_raw(ws.receive())
+        response = ws.receive()
         assert response.msg == ResponseMessage(code=8, msg="Unknown channel name")
         assert response.id == 1
         assert response.type == Type.ERROR

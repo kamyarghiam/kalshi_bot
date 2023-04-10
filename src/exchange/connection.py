@@ -13,6 +13,9 @@ from src.helpers.constants import LOGIN_URL
 from src.helpers.types.api import ExternalApi
 from src.helpers.types.auth import Auth, LogInRequest, LogInResponse, MemberId, Token
 from src.helpers.types.url import URL
+from src.helpers.types.websockets.common import Type
+from src.helpers.types.websockets.request import WebsocketRequest
+from src.helpers.types.websockets.response import ErrorResponse, WebsocketResponse
 
 
 class Method(Enum):
@@ -50,23 +53,31 @@ class WebsocketWrapper:
 
         self._ws: Optional[Union[WebSocket, WebSocketTestSession]] = None
 
-    def send(self, payload: str):
+    def send(self, request: WebsocketRequest):
         if self._ws is None:
             raise ValueError("Send: Did not intialize the websocket")
         if isinstance(self._ws, WebSocket):
-            self._ws.send(payload)
+            self._ws.send(request.json())
         elif isinstance(self._ws, WebSocketTestSession):
-            self._ws.send_text(payload)
+            self._ws.send_text(request.json())
 
-    def receive(self) -> str:
+    def receive(self) -> WebsocketResponse:
         if self._ws is None:
             raise ValueError("Receive: Did not intialize the websocket")
         if isinstance(self._ws, WebSocket):
-            return self._ws.recv()
+            return self._parse_response(self._ws.recv())
         elif isinstance(self._ws, WebSocketTestSession):
-            return self._ws.receive_text()
+            return self._parse_response(self._ws.receive_text())
         else:
             raise ValueError("Receive: websocket wrong type")
+
+    def _parse_response(self, payload: str) -> WebsocketResponse:
+        """Parses the response from the websocket and returns it"""
+        response = WebsocketResponse.parse_raw(payload)
+        if response.type == Type.ERROR:
+            response.convert_msg(ErrorResponse)
+            return response
+        raise ValueError("Invalid response type in parser")
 
     @contextmanager
     def websocket_connect(

@@ -6,14 +6,9 @@ from src.helpers.constants import API_VERSION_ENV_VAR, EXCHANGE_STATUS_URL, LOGI
 from src.helpers.types.auth import LogInRequest, LogInResponse
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.url import URL
-from src.helpers.types.websockets import (
-    Channel,
-    Command,
-    ResponseMessage,
-    Type,
-    WebsocketRequest,
-    WebsocketResponse,
-)
+from src.helpers.types.websockets.common import Type
+from src.helpers.types.websockets.request import Channel, Command, WebsocketRequest
+from src.helpers.types.websockets.response import ResponseMessage, WebsocketResponse
 
 
 def kalshi_test_exchange_factory():
