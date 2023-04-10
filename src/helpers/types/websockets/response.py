@@ -1,6 +1,8 @@
+from typing import Optional
+
 from pydantic import BaseModel, Extra
 
-from src.helpers.types.websockets.common import Id, Type
+from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
 
 
 class ResponseMessage(BaseModel):
@@ -11,7 +13,9 @@ class ResponseMessage(BaseModel):
 
 
 class WebsocketResponse(BaseModel):
-    id: Id
+    id: Optional[Id]
+    seq: Optional[SeqId]
+    sid: Optional[SubscriptionId]
     type: Type
     msg: ResponseMessage
 

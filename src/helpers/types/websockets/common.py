@@ -12,7 +12,7 @@ class Type(str, Enum):
 
 
 class Id(int):
-    """Websocket id"""
+    """Command id"""
 
     LAST_ID = 0
 
@@ -20,6 +20,16 @@ class Id(int):
     def get_new_id(cls):
         cls.LAST_ID += 1
         return cls(cls.LAST_ID)
+
+
+class SeqId(int):
+    """Sequential number
+
+    Should be checked if you wanna guarantee you received all the messages."""
+
+
+class SubscriptionId(int):
+    """Subscription Id"""
 
 
 class Command(str, Enum):
