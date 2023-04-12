@@ -4,7 +4,7 @@ from pydantic import BaseModel, Extra, validator
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.orderbook import OrderbookSide
-from src.helpers.types.orders import Quantity, Side
+from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
 from tests.unit.prices_test import Price
 
@@ -61,3 +61,10 @@ class OrderbookSnapshot(ResponseMessage):
             assert len(level) == 2
             orderbook_side.add_level(Price(level[0]), Quantity(level[1]))
         return orderbook_side
+
+
+class OrderbookDelta(ResponseMessage):
+    market_ticker: MarketTicker
+    price: Price
+    delta: QuantityDelta
+    side: Side

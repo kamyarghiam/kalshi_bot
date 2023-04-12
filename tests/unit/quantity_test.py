@@ -1,6 +1,6 @@
 import pytest
 
-from src.helpers.types.orders import Quantity
+from src.helpers.types.orders import Quantity, QuantityDelta
 
 
 def test_quantity():
@@ -10,3 +10,18 @@ def test_quantity():
 
     with pytest.raises(ValueError):
         Quantity(-1)
+
+
+def test_quantity_delta():
+    quantity = Quantity(10)
+    delta = QuantityDelta(-10)
+    quantity += delta
+    assert quantity == Quantity(0)
+
+    delta = QuantityDelta(10)
+    quantity += delta
+    assert quantity == Quantity(10)
+
+    delta = QuantityDelta(-11)
+    with pytest.raises(ValueError):
+        quantity += delta
