@@ -92,13 +92,10 @@ run `pytest --functional`. You can also get a coverage report with missed lines 
 ```
 coverage erase &&
 pytest --cov=src/ tests/ --cov-append &&
-pytest --functional --cov=src/ tests/ --cov-append &&
 coverage report --show-missing --skip-covered
 ```
 
-Code coverage let's you know how much of your code you've tested. It also let's you know which lines
-are not tested. Note: the coverage test above runs functional tests, so don't run this a lot. Use `pytest`
-instead for regular testing.
+Code coverage let's you know how much of your code you've tested. It also let's you know which lines are not tested.
 
 ### CREATING A PULL REQUEST
 

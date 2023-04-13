@@ -33,7 +33,7 @@ class SessionsWrapper:
         self.base_url = base_url
         self._session = Session()
 
-    def request(self, method, url: URL, *args, **kwargs):
+    def request(self, method: str, url: URL, *args, **kwargs):
         return self._session.request(method, self.base_url.add(url), *args, **kwargs)
 
 
@@ -108,7 +108,7 @@ class Connection:
     exchange. You can pass in a test client so that we can
     test requests against a test exchange"""
 
-    def __init__(self, connection_adapter: Optional[TestClient]):
+    def __init__(self, connection_adapter: Optional[TestClient] = None):
         self._auth = Auth()
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         self._api_version = self._auth._api_version
