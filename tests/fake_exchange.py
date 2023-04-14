@@ -8,12 +8,13 @@ from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.money import Price
 from src.helpers.types.orders import QuantityDelta, Side
 from src.helpers.types.url import URL
-from src.helpers.types.websockets.common import Type
+from src.helpers.types.websockets.common import SubscriptionId, Type
 from src.helpers.types.websockets.request import Channel, Command, WebsocketRequest
 from src.helpers.types.websockets.response import (
     OrderbookDelta,
     OrderbookSnapshot,
     ResponseMessage,
+    Subscribed,
     WebsocketResponse,
 )
 
@@ -59,6 +60,14 @@ def kalshi_test_exchange_factory():
                             ).json()
                         )
                     elif channel == Channel.ORDER_BOOK_DELTA:
+                        # Send subscribed
+                        await websocket.send_text(
+                            WebsocketResponse(
+                                id=data.id,
+                                type=Type.SUBSCRIBED,
+                                msg=Subscribed(channel=channel, sid=SubscriptionId(1)),
+                            ).json()
+                        )
                         # Send two test messages
                         await websocket.send_text(
                             WebsocketResponse(

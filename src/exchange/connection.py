@@ -1,7 +1,8 @@
 import ssl
+import typing
 from contextlib import contextmanager
 from enum import Enum
-from typing import Generator, Optional, Union
+from typing import Dict, Generator, Optional, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
@@ -19,6 +20,8 @@ from src.helpers.types.websockets.response import (
     ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
+    ResponseMessage,
+    Subscribed,
     WebsocketResponse,
 )
 
@@ -79,13 +82,15 @@ class WebsocketWrapper:
     def _parse_response(self, payload: str) -> WebsocketResponse:
         """Parses the response from the websocket and returns it"""
         response = WebsocketResponse.parse_raw(payload)
-        if response.type == Type.ERROR:
-            return response.convert_msg(ErrorResponse)
-        if response.type == Type.ORDERBOOK_DELTA:
-            return response.convert_msg(OrderbookDelta)
-        if response.type == Type.ORDERBOOK_SNAPSHOT:
-            return response.convert_msg(OrderbookSnapshot)
-        raise ValueError("Invalid response type in parser")
+        type_to_response: Dict[Type, typing.Type[ResponseMessage]] = {
+            Type.ERROR: ErrorResponse,
+            Type.ORDERBOOK_DELTA: OrderbookDelta,
+            Type.ORDERBOOK_SNAPSHOT: OrderbookSnapshot,
+            Type.SUBSCRIBED: Subscribed,
+        }
+        if response.type in type_to_response:
+            return response.convert_msg(type_to_response[response.type])
+        raise ValueError(f"Could not map response of type {response.type}")
 
     @contextmanager
     def websocket_connect(

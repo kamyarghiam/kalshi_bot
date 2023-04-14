@@ -7,6 +7,7 @@ from pydantic import BaseModel, Extra, validator
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
+from src.helpers.types.websockets.request import Channel
 from tests.unit.prices_test import Price
 
 
@@ -43,6 +44,11 @@ class WebsocketResponse(BaseModel):
 ##### Different type of response messages ####
 
 
+class Subscribed(ResponseMessage):
+    channel: Channel
+    sid: SubscriptionId
+
+
 class ErrorResponse(ResponseMessage):
     code: int
     msg: str
@@ -50,7 +56,6 @@ class ErrorResponse(ResponseMessage):
 
 class OrderbookSnapshot(ResponseMessage):
     market_ticker: MarketTicker
-    # NOTE: the input type for yes and no is of type List[List[int]] (see validator)
     yes: List[Tuple[Price, Quantity]]
     no: List[Tuple[Price, Quantity]]
 
