@@ -35,8 +35,8 @@ class WebsocketResponse(BaseModel):
     class Config:
         use_enum_values = True
 
-    def convert_msg(self, type: ClassType[BaseModel]):
-        """Converts the response's message to a specific response type"""
+    def convert_msg(self, type: ClassType[ResponseMessage]):
+        """Converts the response's message to a specific ResponseMessage from below"""
         self.msg = type.parse_obj(self.msg)
 
 
