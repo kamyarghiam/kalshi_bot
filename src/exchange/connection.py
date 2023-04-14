@@ -10,9 +10,17 @@ from requests import Session
 from starlette.testclient import WebSocketTestSession
 from websocket import WebSocket
 
-from src.helpers.constants import LOGIN_URL
+from src.helpers.constants import LOGIN_URL, LOGOUT_URL
 from src.helpers.types.api import ExternalApi
-from src.helpers.types.auth import Auth, LogInRequest, LogInResponse, MemberId, Token
+from src.helpers.types.auth import (
+    Auth,
+    LogInRequest,
+    LogInResponse,
+    LogOutRequest,
+    LogOutResponse,
+    MemberId,
+    Token,
+)
 from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import Type
 from src.helpers.types.websockets.request import WebsocketRequest
@@ -184,14 +192,26 @@ class Connection:
     def get_websocket_session(self) -> Generator[WebsocketWrapper, None, None]:
         self._check_auth()
         websocket = WebsocketWrapper(self._connection_adapter)
-        websock_url = URL("/trade-api/ws/").add(self._api_version)
+        websocket_url = URL("/trade-api/ws/").add(self._api_version)
         with websocket.websocket_connect(
-            websock_url, member_id=self._auth.member_id, api_token=self._auth.token
+            websocket_url=websocket_url,
+            member_id=self._auth.member_id,
+            api_token=self._auth.token,
         ) as ws:
             try:
                 yield ws
             finally:
                 pass
+
+    def sign_out(self):
+        """Used to sign out. It clears the credentials in the auth object"""
+        LogOutResponse.parse_obj(
+            self.post(
+                url=LOGOUT_URL,
+                body=LogOutRequest().dict(),
+            )
+        )
+        self._auth.remove_credentials()
 
     def _check_auth(self):
         """Checks to make sure we're signed in"""
