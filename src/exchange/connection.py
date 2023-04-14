@@ -15,7 +15,12 @@ from src.helpers.types.auth import Auth, LogInRequest, LogInResponse, MemberId, 
 from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import Type
 from src.helpers.types.websockets.request import WebsocketRequest
-from src.helpers.types.websockets.response import ErrorResponse, WebsocketResponse
+from src.helpers.types.websockets.response import (
+    ErrorResponse,
+    OrderbookDelta,
+    OrderbookSnapshot,
+    WebsocketResponse,
+)
 
 
 class Method(Enum):
@@ -75,8 +80,11 @@ class WebsocketWrapper:
         """Parses the response from the websocket and returns it"""
         response = WebsocketResponse.parse_raw(payload)
         if response.type == Type.ERROR:
-            response.convert_msg(ErrorResponse)
-            return response
+            return response.convert_msg(ErrorResponse)
+        if response.type == Type.ORDERBOOK_DELTA:
+            return response.convert_msg(OrderbookDelta)
+        if response.type == Type.ORDERBOOK_SNAPSHOT:
+            return response.convert_msg(OrderbookSnapshot)
         raise ValueError("Invalid response type in parser")
 
     @contextmanager

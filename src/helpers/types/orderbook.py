@@ -13,12 +13,11 @@ if typing.TYPE_CHECKING:
 
 
 class OrderbookSide(BaseModel):
-    """Represents levels on side of the order book (yes/no).
+    """Represents levels on side of the order book (either the no side or yes side)
 
     We use a basemodel because this is used for type validation when
     we read an orderbook snapshot on the websocket layer."""
 
-    side: Side
     levels: Dict[Price, Quantity] = {}
 
     def add_level(self, price: Price, quantity: Quantity):
@@ -49,8 +48,8 @@ class Orderbook:
     are more light weight. We use basemodel for objects at the edge of our system"""
 
     market_ticker: MarketTicker
-    yes: OrderbookSide = field(default_factory=lambda: OrderbookSide(side=Side.YES))
-    no: OrderbookSide = field(default_factory=lambda: OrderbookSide(side=Side.NO))
+    yes: OrderbookSide = field(default_factory=OrderbookSide)
+    no: OrderbookSide = field(default_factory=OrderbookSide)
 
     def apply_delta(self, delta: "OrderbookDelta"):
         if delta.market_ticker != self.market_ticker:
@@ -66,6 +65,14 @@ class Orderbook:
 
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshot"):
+        yes = OrderbookSide()
+        no = OrderbookSide()
+        for level in orderbook_snapshot.yes:
+            yes.add_level(level[0], level[1])
+        for level in orderbook_snapshot.no:
+            no.add_level(level[0], level[1])
+        return cls(market_ticker=orderbook_snapshot.market_ticker, yes=yes, no=no)
+
         return cls(
             market_ticker=orderbook_snapshot.market_ticker,
             yes=orderbook_snapshot.yes,

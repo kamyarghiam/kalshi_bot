@@ -6,6 +6,8 @@ class Type(str, Enum):
 
     SUBSCRIBED = "subscribed"
     ERROR = "error"
+    ORDERBOOK_SNAPSHOT = "orderbook_snapshot"
+    ORDERBOOK_DELTA = "orderbook_delta"
 
     # Incorrect type, used for testing
     TEST_WRONG_TYPE = "WRONG_TYPE"

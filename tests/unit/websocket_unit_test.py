@@ -8,8 +8,7 @@ from websocket import WebSocket
 from src.exchange.connection import Connection, SessionsWrapper, WebsocketWrapper
 from src.helpers.types.auth import MemberId, Token
 from src.helpers.types.money import Price
-from src.helpers.types.orderbook import OrderbookSide
-from src.helpers.types.orders import Quantity, Side
+from src.helpers.types.orders import Quantity
 from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import Command, Id, Type
 from src.helpers.types.websockets.request import (
@@ -76,20 +75,14 @@ def test_orderbook_snapshot_validation():
     )
 
     assert orderbook_snapshot.market_ticker == "hi"
-    assert orderbook_snapshot.yes == OrderbookSide(
-        side=Side.YES,
-        levels={
-            Price(40): Quantity(100),
-            Price(20): Quantity(200),
-        },
-    )
-    assert orderbook_snapshot.no == OrderbookSide(
-        side=Side.NO,
-        levels={
-            Price(50): Quantity(200),
-            Price(60): Quantity(700),
-        },
-    )
+    assert orderbook_snapshot.yes == [
+        (Price(40), Quantity(100)),
+        (Price(20), Quantity(200)),
+    ]
+    assert orderbook_snapshot.no == [
+        (Price(50), Quantity(200)),
+        (Price(60), Quantity(700)),
+    ]
 
     # Error in yes price (over 99)
     with pytest.raises(ValidationError):

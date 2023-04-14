@@ -1,11 +1,10 @@
 import pickle
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from typing import Type as ClassType
 
 from pydantic import BaseModel, Extra, validator
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.orderbook import OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
 from tests.unit.prices_test import Price
@@ -35,9 +34,10 @@ class WebsocketResponse(BaseModel):
     class Config:
         use_enum_values = True
 
-    def convert_msg(self, type: ClassType[ResponseMessage]):
+    def convert_msg(self, type: ClassType[ResponseMessage]) -> "WebsocketResponse":
         """Converts the response's message to a specific ResponseMessage from below"""
         self.msg = type.parse_obj(self.msg)
+        return self
 
 
 ##### Different type of response messages ####
@@ -50,26 +50,17 @@ class ErrorResponse(ResponseMessage):
 
 class OrderbookSnapshot(ResponseMessage):
     market_ticker: MarketTicker
-    yes: OrderbookSide = OrderbookSide(side=Side.YES)
-    no: OrderbookSide = OrderbookSide(side=Side.NO)
+    # NOTE: the input type for yes and no is of type List[List[int]] (see validator)
+    yes: List[Tuple[Price, Quantity]]
+    no: List[Tuple[Price, Quantity]]
 
-    @validator("yes", pre=True)
-    @classmethod
-    def yes_validator(cls, levels: List[List[int]]):
-        return cls._level_validator_helper(levels, Side.YES)
-
-    @validator("no", pre=True)
-    @classmethod
-    def no_validator(cls, levels: List[List[int]]):
-        return cls._level_validator_helper(levels, Side.NO)
-
-    @classmethod
-    def _level_validator_helper(cls, levels: List[List[int]], side: Side):
-        orderbook_side = OrderbookSide(side=side)
-        for level in levels:
+    @validator("yes", "no", pre=True)
+    def validate_iterable(cls, input_levels: List[List[int]]):
+        output_levels: List[Tuple[Price, Quantity]] = []
+        for level in input_levels:
             assert len(level) == 2
-            orderbook_side.add_level(Price(level[0]), Quantity(level[1]))
-        return orderbook_side
+            output_levels.append((Price(level[0]), Quantity(level[1])))
+        return output_levels
 
 
 class OrderbookDelta(ResponseMessage):

@@ -12,16 +12,12 @@ def test_from_snapshot():
     )
     orderbook = Orderbook.from_snapshot(orderbook_snapshot)
     assert orderbook.market_ticker == "hi"
-    assert orderbook.yes == OrderbookSide(
-        side=Side.YES, levels={Price(10): Quantity(100)}
-    )
-    assert orderbook.no == OrderbookSide(
-        side=Side.NO, levels={Price(20): Quantity(200)}
-    )
+    assert orderbook.yes == OrderbookSide(levels={Price(10): Quantity(100)})
+    assert orderbook.no == OrderbookSide(levels={Price(20): Quantity(200)})
 
 
 def test_add_remove_level():
-    book = OrderbookSide(side=Side.NO)
+    book = OrderbookSide()
     book.add_level(Price(10), Quantity(100))
 
     with pytest.raises(ValueError):
@@ -34,7 +30,7 @@ def test_add_remove_level():
 
 
 def test_side_apply_delta():
-    book = OrderbookSide(side=Side.YES)
+    book = OrderbookSide()
     book.add_level(Price(10), Quantity(100))
     book.apply_delta(Price(10), QuantityDelta(-75))
     assert len(book.levels) == 1
