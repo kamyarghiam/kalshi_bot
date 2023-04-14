@@ -169,3 +169,9 @@ def test_connecion_with_sessions_wrapper():
         con = Connection()
         assert type(con._connection_adapter) == SessionsWrapper
         assert con._connection_adapter.base_url == "base_url"
+
+
+def test_encode_decode():
+    response = ResponseMessage(some_field="some_field", another_field="another_field")
+
+    assert ResponseMessage.from_pickle(response.encode()) == response

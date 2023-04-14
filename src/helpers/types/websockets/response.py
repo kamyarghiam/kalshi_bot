@@ -1,4 +1,6 @@
+import pickle
 from typing import List, Optional
+from typing import Type as ClassType
 
 from pydantic import BaseModel, Extra, validator
 
@@ -15,6 +17,13 @@ class ResponseMessage(BaseModel):
     class Config:
         extra = Extra.allow
 
+    def encode(self) -> bytes:
+        return pickle.dumps(self)
+
+    @classmethod
+    def from_pickle(cls, data: bytes):
+        return pickle.loads(data)
+
 
 class WebsocketResponse(BaseModel):
     id: Optional[Id]
@@ -26,7 +35,7 @@ class WebsocketResponse(BaseModel):
     class Config:
         use_enum_values = True
 
-    def convert_msg(self, type: BaseModel):
+    def convert_msg(self, type: ClassType[BaseModel]):
         """Converts the response's message to a specific response type"""
         self.msg = type.parse_obj(self.msg)
 
