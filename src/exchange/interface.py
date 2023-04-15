@@ -15,6 +15,7 @@ from src.helpers.types.websockets.request import (
 from src.helpers.types.websockets.response import (
     OrderbookDelta,
     OrderbookSnapshot,
+    Subscribed,
     WebsocketResponse,
 )
 
@@ -31,7 +32,7 @@ class ExchangeInterface:
 
     def subscribe_to_orderbook_delta(
         self, market_tickers: List[MarketTicker]
-    ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta], None, None]:
+    ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta, Subscribed], None, None]:
         """Subscribes to the orderbook delta websocket connection
 
         Returns a generator"""
