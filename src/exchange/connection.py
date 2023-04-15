@@ -138,7 +138,7 @@ class Connection:
         url: URL,
         body: Optional[ExternalApi] = None,
         check_auth: bool = True,
-        **kwargs,
+        params: Optional[Dict[str, str]] = None,
     ):
         """All HTTP requests go through this function. We automatically
         check if the auth credentials are valid and fresh before sending
@@ -153,7 +153,7 @@ class Connection:
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
             url=self._api_version.add(url),
-            params=kwargs,
+            params=params,
             json=body,
             headers=headers,
         )
@@ -161,11 +161,13 @@ class Connection:
 
         return resp.json()
 
-    def get(self, url: URL, **kwargs):
-        return self._request(Method.GET, url, **kwargs)
+    def get(self, url: URL, params: Optional[Dict[str, str]] = None):
+        return self._request(Method.GET, url, params=params)
 
-    def post(self, url: URL, body: Optional[ExternalApi] = None, **kwargs):
-        return self._request(Method.POST, url, body=body, **kwargs)
+    def post(
+        self, url: URL, body: Optional[ExternalApi] = None, check_auth: bool = True
+    ):
+        return self._request(Method.POST, url, body=body, check_auth=check_auth)
 
     def sign_in(self):
         response = LogInResponse.parse_obj(

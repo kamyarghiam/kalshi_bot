@@ -3,9 +3,16 @@ from typing import Generator, List, Optional, Union
 from fastapi.testclient import TestClient
 
 from src.exchange.connection import Connection
-from src.helpers.constants import EXCHANGE_STATUS_URL
+from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
+from src.helpers.types.api import Cursor
 from src.helpers.types.exchange import ExchangeStatusResponse
-from src.helpers.types.markets import MarketTicker
+from src.helpers.types.markets import (
+    GetMarketsRequest,
+    GetMarketsResponse,
+    Market,
+    MarketStatus,
+    MarketTicker,
+)
 from src.helpers.types.websockets.common import Command, Id
 from src.helpers.types.websockets.request import (
     Channel,
@@ -50,3 +57,26 @@ class ExchangeInterface:
             while True:
                 response: WebsocketResponse = ws.receive()
                 yield response.msg
+
+    def get_open_markets(self) -> List[Market]:
+        cursor: Optional[Cursor] = None
+        markets: List[Market] = []
+        while True:
+            response = self._get_markets(
+                GetMarketsRequest(status=MarketStatus.OPEN, cursor=cursor)
+            )
+            cursor = response.cursor
+            markets.extend(response.markets)
+
+            if cursor is None:
+                break
+
+        return markets
+
+    def _get_markets(self, request: GetMarketsRequest) -> GetMarketsResponse:
+        return GetMarketsResponse.parse_obj(
+            self._connection.get(
+                url=MARKETS_URL,
+                params=request.dict(exclude_none=True),
+            )
+        )

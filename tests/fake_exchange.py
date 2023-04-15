@@ -1,11 +1,19 @@
 import asyncio
 import os
+from typing import List, Optional
 
 from fastapi import FastAPI, WebSocket
 
-from src.helpers.constants import API_VERSION_ENV_VAR, EXCHANGE_STATUS_URL, LOGIN_URL
+from src.helpers.constants import (
+    API_VERSION_ENV_VAR,
+    EXCHANGE_STATUS_URL,
+    LOGIN_URL,
+    MARKETS_URL,
+)
+from src.helpers.types.api import Cursor
 from src.helpers.types.auth import LogInRequest, LogInResponse, MemberId, Token
 from src.helpers.types.exchange import ExchangeStatusResponse
+from src.helpers.types.markets import GetMarketsResponse, Market, MarketStatus
 from src.helpers.types.money import Price
 from src.helpers.types.orders import QuantityDelta, Side
 from src.helpers.types.url import URL
@@ -18,6 +26,7 @@ from src.helpers.types.websockets.response import (
     Subscribed,
     WebsocketResponse,
 )
+from tests.utils import random_data_from_basemodel
 
 
 def kalshi_test_exchange_factory():
@@ -44,6 +53,32 @@ def kalshi_test_exchange_factory():
     def exchange_status():
         """Returns a dummy exchange status"""
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
+
+    @app.get(api_version.add(MARKETS_URL).add_slash())
+    def get_markets(
+        status: Optional[MarketStatus] = None, cursor: Optional[Cursor] = None
+    ):
+        """Returns all markets on the exchange"""
+        markets: List[Market] = [random_data_from_basemodel(Market) for _ in range(10)]
+        if status is not None:
+            # We just want to set the markets to the right status
+            for market in markets:
+                market.status = status
+        # We hardcode that there are 3 pages
+        if cursor is None:
+            return GetMarketsResponse(
+                cursor=Cursor("1"),
+                markets=markets,
+            )
+        elif cursor == Cursor("1"):
+            return GetMarketsResponse(
+                cursor=Cursor("2"),
+                markets=markets,
+            )
+        elif cursor == Cursor("2"):
+            return GetMarketsResponse(
+                markets=markets,
+            )
 
     @app.websocket(URL("trade-api/ws/").add(api_version).add_slash())
     async def websocket_endpoint(websocket: WebSocket):
