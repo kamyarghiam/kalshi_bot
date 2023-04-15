@@ -13,9 +13,7 @@ class Type(str, Enum):
     TEST_WRONG_TYPE = "WRONG_TYPE"
 
 
-class Id(int):
-    """Command id"""
-
+class AbstractId(int):
     LAST_ID = 0
 
     @classmethod
@@ -24,14 +22,18 @@ class Id(int):
         return cls(cls.LAST_ID)
 
 
+class Id(AbstractId):
+    """Command id"""
+
+
+class SubscriptionId(AbstractId):
+    """Subscription Id"""
+
+
 class SeqId(int):
     """Sequential number
 
     Should be checked if you wanna guarantee you received all the messages."""
-
-
-class SubscriptionId(int):
-    """Subscription Id"""
 
 
 class Command(str, Enum):

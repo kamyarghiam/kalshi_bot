@@ -8,8 +8,8 @@ def test_basic_urls():
     b = URL("bye")
 
     assert a.add(b) == URL("hi/bye")
-    assert a.add(b).add_leading_forward_slash() == URL("/hi/bye")
-    assert URL("/hi/bye").add_leading_forward_slash() == URL("/hi/bye")
+    assert a.add(b).add_slash() == URL("/hi/bye")
+    assert URL("/hi/bye").add_slash() == URL("/hi/bye")
 
 
 def test_protocol():

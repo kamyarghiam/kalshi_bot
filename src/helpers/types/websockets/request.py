@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class Channel(str, Enum):
 
 class RequestParams(BaseModel):
     channels: List[Channel]
-    market_tickers: Optional[List[MarketTicker]] = None
+    market_tickers: List[MarketTicker] = []
 
     class Config:
         use_enum_values = True

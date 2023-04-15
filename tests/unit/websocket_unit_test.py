@@ -127,7 +127,7 @@ def test_websockets_with_session_wrapper_send_recieve():
         ws.send(request=request)
         send.assert_called_once_with(
             '{"id": 1, "cmd": "subscribe", "params": '
-            + '{"channels": ["fill"], "market_tickers": null}}'
+            + '{"channels": ["fill"], "market_tickers": []}}'
         )
 
     # Test receive

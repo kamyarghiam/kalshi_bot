@@ -8,8 +8,8 @@ class URL(str):
     def add(self, other: Union["URL", str]):
         return URL(urllib.parse.urljoin(str(self + "/"), str(other)))
 
-    def add_leading_forward_slash(self):
-        """Adds forward slash in front of path if it does not exist"""
+    def add_slash(self):
+        """Adds a leading forward slash in front of path if it does not exist"""
         if not self.startswith("/"):
             return URL("/" + self)
         return self
