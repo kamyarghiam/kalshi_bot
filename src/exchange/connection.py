@@ -2,7 +2,7 @@ import ssl
 import typing
 from contextlib import contextmanager
 from enum import Enum
-from typing import Dict, Generator, Optional, Union
+from typing import Dict, Generator, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
@@ -59,7 +59,7 @@ class WebsocketWrapper:
             # Connects to a local exchange
             self._base_url = URL("")
 
-        self._ws: Optional[Union[WebSocket, WebSocketTestSession]] = None
+        self._ws: WebSocket | WebSocketTestSession | None = None
 
     def send(self, request: WebsocketRequest):
         if self._ws is None:
@@ -121,7 +121,7 @@ class Connection:
     exchange. You can pass in a test client so that we can
     test requests against a test exchange"""
 
-    def __init__(self, connection_adapter: Optional[TestClient] = None):
+    def __init__(self, connection_adapter: TestClient | None = None):
         self._auth = Auth()
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         self._api_version = self._auth._api_version
@@ -136,9 +136,9 @@ class Connection:
         self,
         method: Method,
         url: URL,
-        body: Optional[ExternalApi] = None,
+        body: ExternalApi | None = None,
         check_auth: bool = True,
-        params: Optional[Dict[str, str]] = None,
+        params: Dict[str, str] | None = None,
     ):
         """All HTTP requests go through this function. We automatically
         check if the auth credentials are valid and fresh before sending
@@ -161,12 +161,10 @@ class Connection:
 
         return resp.json()
 
-    def get(self, url: URL, params: Optional[Dict[str, str]] = None):
+    def get(self, url: URL, params: Dict[str, str] | None = None):
         return self._request(Method.GET, url, params=params)
 
-    def post(
-        self, url: URL, body: Optional[ExternalApi] = None, check_auth: bool = True
-    ):
+    def post(self, url: URL, body: ExternalApi | None = None, check_auth: bool = True):
         return self._request(Method.POST, url, body=body, check_auth=check_auth)
 
     def sign_in(self):
