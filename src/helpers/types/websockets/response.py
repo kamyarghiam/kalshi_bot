@@ -1,5 +1,5 @@
 import pickle
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 from typing import Type as ClassType
 
 from pydantic import BaseModel, Extra, validator
@@ -26,9 +26,9 @@ class ResponseMessage(BaseModel):
 
 
 class WebsocketResponse(BaseModel):
-    id: Optional[Id]
-    seq: Optional[SeqId]
-    sid: Optional[SubscriptionId]
+    id: Id | None
+    seq: SeqId | None
+    sid: SubscriptionId | None
     type: Type
     msg: ResponseMessage
 

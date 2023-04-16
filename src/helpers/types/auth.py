@@ -1,7 +1,6 @@
 import os
 import typing
 from datetime import datetime, timedelta
-from typing import Optional
 
 from pydantic import Field
 
@@ -77,9 +76,9 @@ class Auth:
             raise ValueError("You're running against prod. Are you sure?")
 
         # Filled after getting info from exchange
-        self._member_id: Optional[MemberId] = None
-        self._token: Optional[Token] = None
-        self._sign_in_time: Optional[datetime] = None
+        self._member_id: MemberId | None = None
+        self._token: Token | None = None
+        self._sign_in_time: datetime | None = None
 
     @property
     def member_id(self) -> MemberId:

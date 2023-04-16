@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel
 
@@ -20,14 +20,14 @@ class MarketStatus(str, Enum):
 class Market(BaseModel):
     # TODO: add custom types for fields you use below
     can_close_early: bool
-    cap_strike: Optional[int]
+    cap_strike: int | None
     category: str
     close_time: datetime
-    custom_strike: Optional[int]
+    custom_strike: int | None
     event_ticker: str
     expiration_time: datetime
     expiration_value: str
-    floor_strike: Optional[int]
+    floor_strike: int | None
     last_price: int
     liquidity: int
     no_ask: int
@@ -40,7 +40,7 @@ class Market(BaseModel):
     result: str
     risk_limit_cents: int
     status: MarketStatus
-    strike_type: Optional[str]
+    strike_type: str | None
     subtitle: str
     ticker: MarketTicker
     title: str
@@ -52,12 +52,12 @@ class Market(BaseModel):
 
 class GetMarketsRequest(ExternalApi):
     status: MarketStatus
-    cursor: Optional[Cursor]
+    cursor: Cursor | None
 
     class Config:
         use_enum_values = True
 
 
 class GetMarketsResponse(ExternalApi):
-    cursor: Optional[Cursor]
+    cursor: Cursor | None
     markets: List[Market]

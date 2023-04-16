@@ -1,4 +1,4 @@
-from typing import Generator, List, Optional, Union
+from typing import Generator, List, Union
 
 from fastapi.testclient import TestClient
 
@@ -28,7 +28,7 @@ from src.helpers.types.websockets.response import (
 
 
 class ExchangeInterface:
-    def __init__(self, test_client: Optional[TestClient] = None):
+    def __init__(self, test_client: TestClient | None = None):
         self._connection = Connection(test_client)
         """This class provides a high level interace with the exchange"""
 
@@ -59,7 +59,7 @@ class ExchangeInterface:
                 yield response.msg
 
     def get_open_markets(self) -> List[Market]:
-        cursor: Optional[Cursor] = None
+        cursor: Cursor | None = None
         markets: List[Market] = []
         while True:
             response = self._get_markets(

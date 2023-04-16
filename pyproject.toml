@@ -1,3 +1,9 @@
+[project]
+name = "Kalshi Bot"
+# NOTE: to change python version, don't forget to change it in
+# the pre-commit-config.yaml as well
+requires-python = ">=3.11.2"
+
 [tool.poetry]
 name = "kalshi-bot"
 version = "0.1.0"

@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import List, Optional
+from typing import List
 
 from fastapi import FastAPI, WebSocket
 
@@ -55,9 +55,7 @@ def kalshi_test_exchange_factory():
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
 
     @app.get(api_version.add(MARKETS_URL).add_slash())
-    def get_markets(
-        status: Optional[MarketStatus] = None, cursor: Optional[Cursor] = None
-    ):
+    def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):
         """Returns all markets on the exchange"""
         markets: List[Market] = [random_data_from_basemodel(Market) for _ in range(10)]
         if status is not None:
