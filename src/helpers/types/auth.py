@@ -58,6 +58,14 @@ class LogInRequest(ExternalApi):
     password: Password
 
 
+class LogOutRequest(ExternalApi):
+    """This is intentionally left blank there are no fields"""
+
+
+class LogOutResponse(ExternalApi):
+    """This is intentionally left blank because there are no fields"""
+
+
 class Auth:
     """The purpose of this class is to store authentication
     information to connect to the exchange"""
@@ -106,6 +114,12 @@ class Auth:
         self._member_id = login_response.member_id
         self._token = login_response.token
         self._sign_in_time = datetime.now()
+
+    def remove_credentials(self):
+        """Sets all of the variables associated with being logged in to None"""
+        self._member_id = None
+        self._token = None
+        self._sign_in_time = None
 
     def get_authorization_header(self) -> str:
         return str(self.member_id) + " " + str(self.token)

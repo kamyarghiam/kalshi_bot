@@ -83,7 +83,7 @@ def test_missing_creds():
         "API_VERSION": "VERSION",
     },
 )
-def test_fresh_auth():
+def test_valid_auth():
     # Test whether the auth class is fresh
     auth = Auth()
     assert not auth.is_valid()

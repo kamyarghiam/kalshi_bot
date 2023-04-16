@@ -8,10 +8,18 @@ from src.helpers.constants import (
     API_VERSION_ENV_VAR,
     EXCHANGE_STATUS_URL,
     LOGIN_URL,
+    LOGOUT_URL,
     MARKETS_URL,
 )
 from src.helpers.types.api import Cursor
-from src.helpers.types.auth import LogInRequest, LogInResponse, MemberId, Token
+from src.helpers.types.auth import (
+    LogInRequest,
+    LogInResponse,
+    LogOutRequest,
+    LogOutResponse,
+    MemberId,
+    Token,
+)
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import GetMarketsResponse, Market, MarketStatus
 from src.helpers.types.money import Price
@@ -48,6 +56,10 @@ def kalshi_test_exchange_factory():
                 + "duIbh4fIGvgYcMqhGlQFeyjF6oGzGjij"
             ),
         )
+
+    @app.post(api_version.add(LOGOUT_URL).add_slash())
+    def logout(log_out_request: LogOutRequest):
+        return LogOutResponse()
 
     @app.get(api_version.add(EXCHANGE_STATUS_URL).add_slash())
     def exchange_status():

@@ -6,6 +6,7 @@ KALSHI_PROD_BASE_URL = "trading-api.kalshi.com"
 EXCHANGE_STATUS_URL = URL("exchange/status/")
 LOGIN_URL = URL("login/")
 MARKETS_URL = URL("markets/")
+LOGOUT_URL = URL("logout/")
 
 # Env vars
 USERNAME_ENV_VAR = "API_USERNAME"

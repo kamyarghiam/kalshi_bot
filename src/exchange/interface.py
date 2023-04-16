@@ -80,3 +80,6 @@ class ExchangeInterface:
                 params=request.dict(exclude_none=True),
             )
         )
+
+    def sign_out(self):
+        self._connection.sign_out()
