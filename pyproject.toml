@@ -29,6 +29,7 @@ websocket-client = "^1.5.1"
 polyfactory = "^2.0.0a1"
 ratelimit = "^2.2.1"
 pytest-xdist = "^3.2.1"
+tenacity = "^8.2.2"
 
 
 [build-system]

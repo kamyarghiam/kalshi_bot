@@ -1,8 +1,10 @@
+import logging
 from typing import Generator, List, Union
 
 from fastapi.testclient import TestClient
+from tenacity import RetryError, retry, retry_if_not_exception_type, stop_after_delay
 
-from src.exchange.connection import Connection
+from src.exchange.connection import Connection, WebsocketWrapper
 from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
@@ -12,12 +14,7 @@ from src.helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from src.helpers.types.websockets.common import (
-    Command,
-    CommandId,
-    SubscriptionId,
-    WebsocketError,
-)
+from src.helpers.types.websockets.common import Command, CommandId, SubscriptionId
 from src.helpers.types.websockets.request import (
     Channel,
     SubscribeRP,
@@ -25,12 +22,12 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
-    ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
     Subscribed,
-    WebsocketResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ExchangeInterface:
@@ -58,24 +55,20 @@ class ExchangeInterface:
 
         Returns a generator. Raises WebsocketError if we see an error on the channel"""
         with self._connection.get_websocket_session() as ws:
-            ws.send(
-                WebsocketRequest(
-                    id=CommandId.get_new_id(),
-                    cmd=Command.SUBSCRIBE,
-                    params=SubscribeRP(
-                        channels=[Channel.ORDER_BOOK_DELTA],
-                        market_tickers=market_tickers,
-                    ),
-                )
+            request = WebsocketRequest(
+                id=CommandId.get_new_id(),
+                cmd=Command.SUBSCRIBE,
+                params=SubscribeRP(
+                    channels=[Channel.ORDER_BOOK_DELTA],
+                    market_tickers=market_tickers,
+                ),
             )
-            while True:
-                response: WebsocketResponse = ws.receive()
-                if isinstance(response.msg, ErrorResponse):
-                    raise WebsocketError(response.msg)
-                if isinstance(response.msg, Subscribed):
-                    self._subsciptions.append(response.msg.sid)
-                    continue
-                yield response.msg  # type:ignore[misc]
+            response: Subscribed = self._retry_until_subscribed_message(ws, request)
+            logger.info(
+                f"Successfully subscribed to orderbook with tickers: {market_tickers}"
+            )
+            self._subsciptions.append(response.sid)
+            yield from ws.continuous_recieve()
 
     def unsubscribe_all(self):
         """Unsubscribes from all webscoket channels"""
@@ -118,3 +111,18 @@ class ExchangeInterface:
                 params=request.dict(exclude_none=True),
             )
         )
+
+    @retry(stop=stop_after_delay(12), retry=retry_if_not_exception_type(RetryError))
+    def _retry_until_subscribed_message(
+        self, ws: WebsocketWrapper, request: WebsocketRequest
+    ) -> Subscribed:
+        """Retries websocket connection until we get a subscribed message"""
+        ws.send(request)
+        return self._receive_until_subscribed(ws)
+
+    @retry(stop=stop_after_delay(3), retry=retry_if_not_exception_type(AssertionError))
+    def _receive_until_subscribed(self, ws: WebsocketWrapper) -> Subscribed:
+        """Loops until we receive a Subscribed message"""
+        response = ws.receive()
+        assert isinstance(response.msg, Subscribed)
+        return response.msg
