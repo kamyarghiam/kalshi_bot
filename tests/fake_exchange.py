@@ -69,8 +69,11 @@ def kalshi_test_exchange_factory():
     @app.get(api_version.add(MARKETS_URL).add_slash())
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):
         """Returns all markets on the exchange"""
-        markets: List[Market] = [random_data_from_basemodel(Market) for _ in range(10)]
+        markets: List[Market] = [random_data_from_basemodel(Market) for _ in range(100)]
         if status is not None:
+            if status == MarketStatus.OPEN:
+                # For some reason, they set the open markets to active
+                status = MarketStatus.ACTIVE
             # We just want to set the markets to the right status
             for market in markets:
                 market.status = status
@@ -87,6 +90,7 @@ def kalshi_test_exchange_factory():
             )
         elif cursor == Cursor("2"):
             return GetMarketsResponse(
+                cursor=Cursor(""),
                 markets=markets,
             )
 

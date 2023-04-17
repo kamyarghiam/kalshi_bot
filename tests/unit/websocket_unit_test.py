@@ -25,7 +25,7 @@ from src.helpers.types.websockets.response import (
 
 
 def test_websocket_wrapper():
-    ws = WebsocketWrapper(MagicMock())
+    ws = WebsocketWrapper(MagicMock(autospec=True), MagicMock(autospec=True))
     with pytest.raises(ValueError):
         ws.receive()
     with pytest.raises(ValueError):
@@ -48,7 +48,7 @@ def test_convert_msg():
 
 
 def test_parse_response():
-    ws = WebsocketWrapper(MagicMock())
+    ws = WebsocketWrapper(MagicMock(autospec=True), MagicMock(autospec=True))
     # Invalid value
     with pytest.raises(ValueError):
         ws._parse_response(
@@ -113,7 +113,7 @@ def test_orderbook_snapshot_validation():
 
 def test_websockets_with_session_wrapper_send_recieve():
     session_wrapper = SessionsWrapper(URL("http://base_url"))
-    ws = WebsocketWrapper(session_wrapper)
+    ws = WebsocketWrapper(session_wrapper, MagicMock(autospec=True))
     assert ws._base_url == URL("wss://base_url")
     ws._ws = WebSocket()
 
@@ -144,7 +144,7 @@ def test_websockets_with_session_wrapper_send_recieve():
 def test_websockets_session_wrapper_connect():
     with patch("src.exchange.connection.WebSocket.connect") as connect:
         sessions_wrapper = SessionsWrapper(URL("base_url"))
-        ws = WebsocketWrapper(sessions_wrapper)
+        ws = WebsocketWrapper(sessions_wrapper, MagicMock(autospec=True))
         with ws.websocket_connect(
             URL("websocket_url"), MemberId("member_id"), api_token=Token("token")
         ):

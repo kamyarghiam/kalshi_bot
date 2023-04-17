@@ -2,7 +2,7 @@ import ssl
 import typing
 from contextlib import contextmanager
 from enum import Enum
-from typing import Dict, Generator, Union
+from typing import Dict, Generator, List, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
@@ -11,7 +11,7 @@ from starlette.testclient import WebSocketTestSession
 from websocket import WebSocket
 
 from src.helpers.constants import LOGIN_URL, LOGOUT_URL
-from src.helpers.types.api import ExternalApi
+from src.helpers.types.api import ExternalApi, RateLimit
 from src.helpers.types.auth import (
     Auth,
     LogInRequest,
@@ -53,11 +53,32 @@ class SessionsWrapper:
         return self._session.request(method, self.base_url.add(url), *args, **kwargs)
 
 
+class RateLimiter:
+    """Ratelimiter for api and websocket requests
+
+    This class provides a buffer between us and the exchange
+    so we don't send the exchange too many requests. There is
+    currently a limit to how many rqeuests we can send"""
+
+    def __init__(self, limits: List[RateLimit]):
+        self._rate_limits = limits
+
+    def check_limits(self):
+        """Checks rate limits and makes sure we don't go over"""
+        for rate_limit in self._rate_limits:
+            rate_limit.check()
+
+
 class WebsocketWrapper:
     """Creates a wrapper around websocket clients so we can send and receive data"""
 
-    def __init__(self, connection_adapter: Union[TestClient, SessionsWrapper]):
+    def __init__(
+        self,
+        connection_adapter: Union[TestClient, SessionsWrapper],
+        rate_limiter: RateLimiter,
+    ):
         self._connection_adapter = connection_adapter
+        self._rate_limiter = rate_limiter
         if isinstance(connection_adapter, SessionsWrapper):
             # Connects to the exchange
             self._base_url = connection_adapter.base_url.remove_protocol().add_protocol(
@@ -70,6 +91,7 @@ class WebsocketWrapper:
         self._ws: WebSocket | WebSocketTestSession | None = None
 
     def send(self, request: WebsocketRequest):
+        self._rate_limiter.check_limits()
         if self._ws is None:
             raise ValueError("Send: Did not intialize the websocket")
         if isinstance(self._ws, WebSocket):
@@ -134,10 +156,18 @@ class Connection:
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         self._api_version = self._auth._api_version
         if connection_adapter:
-            # This is a test connection
+            # This is a test connection. We don't need rate limiting
             self._connection_adapter = connection_adapter
+            self._rate_limiter = RateLimiter(limits=[])
         else:
             self._connection_adapter = SessionsWrapper(base_url=self._auth._base_url)
+            # Limit is 10 queries per second and 100 queries per minute
+            self._rate_limiter = RateLimiter(
+                [
+                    RateLimit(transactions=10, seconds=1),
+                    RateLimit(transactions=100, seconds=60),
+                ]
+            )
         self._check_auth()
 
     def _request(
@@ -158,6 +188,7 @@ class Connection:
         if check_auth:
             self._check_auth()
             headers["Authorization"] = self._auth.get_authorization_header()
+        self._rate_limiter.check_limits()
         resp: requests.Response = self._connection_adapter.request(
             method=method.value,
             url=self._api_version.add(url),
@@ -191,7 +222,7 @@ class Connection:
     @contextmanager
     def get_websocket_session(self) -> Generator[WebsocketWrapper, None, None]:
         self._check_auth()
-        websocket = WebsocketWrapper(self._connection_adapter)
+        websocket = WebsocketWrapper(self._connection_adapter, self._rate_limiter)
         websocket_url = URL("/trade-api/ws/").add(self._api_version)
         with websocket.websocket_connect(
             websocket_url=websocket_url,

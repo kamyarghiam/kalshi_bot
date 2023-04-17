@@ -578,6 +578,17 @@ files = [
 six = ">=1.5"
 
 [[package]]
+name = "ratelimit"
+version = "2.2.1"
+description = "API rate limit decorator"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ratelimit-2.2.1.tar.gz", hash = "sha256:af8a9b64b821529aca09ebaf6d8d279100d766f19e90b5059ac6a718ca6dee42"},
+]
+
+[[package]]
 name = "requests"
 version = "2.28.2"
 description = "Python HTTP for Humans."
@@ -747,4 +758,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "85d3ae7a71ef134cc56b275619998729cb6b84884c529838303fd9eba59c0d0f"
+content-hash = "8583d23261f634f2d4620098e77331a3cb10e739bcd9e9a09d31d5e7ca5f1cd1"

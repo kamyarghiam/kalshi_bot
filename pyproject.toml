@@ -27,6 +27,7 @@ mypy = "^1.1.1"
 pytest-cov = "^4.0.0"
 websocket-client = "^1.5.1"
 polyfactory = "^2.0.0a1"
+ratelimit = "^2.2.1"
 
 
 [build-system]
