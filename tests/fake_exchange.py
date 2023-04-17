@@ -34,7 +34,7 @@ from src.helpers.types.websockets.response import (
     Subscribed,
     WebsocketResponse,
 )
-from tests.utils import random_data_from_basemodel
+from tests.helpers.utils import random_data_from_basemodel
 
 
 def kalshi_test_exchange_factory():
