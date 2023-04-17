@@ -23,7 +23,7 @@ class AbstractId(int):
         return cls(cls.LAST_ID)
 
 
-class Id(AbstractId):
+class CommandId(AbstractId):
     """Command id"""
 
 

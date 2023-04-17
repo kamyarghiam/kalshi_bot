@@ -6,7 +6,7 @@ from pydantic import BaseModel, Extra, validator
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.common import Id, SeqId, SubscriptionId, Type
+from src.helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Type
 from src.helpers.types.websockets.request import Channel
 from tests.unit.prices_test import Price
 
@@ -26,11 +26,11 @@ class ResponseMessage(BaseModel):
 
 
 class WebsocketResponse(BaseModel):
-    id: Id | None
-    seq: SeqId | None
-    sid: SubscriptionId | None
+    id: CommandId | None = None
+    seq: SeqId | None = None
+    sid: SubscriptionId | None = None
     type: Type
-    msg: ResponseMessage
+    msg: ResponseMessage | None = None
 
     class Config:
         use_enum_values = True

@@ -1,4 +1,4 @@
-from mock import patch  # type:ignore[import]
+from mock import patch
 
 from src.exchange.connection import SessionsWrapper
 from src.helpers.types.url import URL

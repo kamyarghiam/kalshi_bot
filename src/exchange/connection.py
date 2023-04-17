@@ -6,9 +6,9 @@ from typing import Dict, Generator, List, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
-from requests import Session
+from requests import JSONDecodeError, Session
 from starlette.testclient import WebSocketTestSession
-from websocket import WebSocket
+from websocket import WebSocket  # type:ignore[import]
 
 from src.helpers.constants import LOGIN_URL, LOGOUT_URL
 from src.helpers.types.api import ExternalApi, RateLimit
@@ -120,7 +120,7 @@ class WebsocketWrapper:
         }
         if response.type in type_to_response:
             return response.convert_msg(type_to_response[response.type])
-        raise ValueError(f"Could not map response of type {response.type}")
+        return response
 
     @contextmanager
     def websocket_connect(
@@ -189,16 +189,21 @@ class Connection:
             self._check_auth()
             headers["Authorization"] = self._auth.get_authorization_header()
         self._rate_limiter.check_limits()
-        resp: requests.Response = self._connection_adapter.request(
-            method=method.value,
-            url=self._api_version.add(url),
-            params=params,
-            json=body,
-            headers=headers,
+        resp: requests.Response = (
+            self._connection_adapter.request(  # type:ignore[assignment]
+                method=method.value,
+                url=self._api_version.add(url),
+                params=params,
+                json=body,
+                headers=headers,
+            )
         )
         resp.raise_for_status()
 
-        return resp.json()
+        try:
+            return resp.json()
+        except JSONDecodeError:
+            return {}
 
     def get(self, url: URL, params: Dict[str, str] | None = None):
         return self._request(Method.GET, url, params=params)

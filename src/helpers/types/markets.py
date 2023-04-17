@@ -31,7 +31,7 @@ class Market(BaseModel):
 
 class GetMarketsRequest(ExternalApi):
     status: MarketStatus
-    cursor: Cursor | None
+    cursor: Cursor | None = None
 
     class Config:
         use_enum_values = True

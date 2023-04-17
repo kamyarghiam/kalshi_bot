@@ -1,21 +1,17 @@
 from unittest.mock import MagicMock
 
 import pytest
-from mock import patch  # type:ignore[import]
+from mock import patch
 from pydantic import ValidationError
-from websocket import WebSocket
+from websocket import WebSocket  # type:ignore[import]
 
 from src.exchange.connection import Connection, SessionsWrapper, WebsocketWrapper
 from src.helpers.types.auth import MemberId, Token
 from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity
 from src.helpers.types.url import URL
-from src.helpers.types.websockets.common import Command, Id, Type
-from src.helpers.types.websockets.request import (
-    Channel,
-    RequestParams,
-    WebsocketRequest,
-)
+from src.helpers.types.websockets.common import Command, CommandId, Type
+from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
     ErrorResponse,
     OrderbookSnapshot,
@@ -38,7 +34,7 @@ def test_websocket_wrapper():
 
 def test_convert_msg():
     response = WebsocketResponse(
-        id=Id(1), type=Type.ERROR, msg=ResponseMessage(code=8, msg="hi")
+        id=CommandId(1), type=Type.ERROR, msg=ResponseMessage(code=8, msg="hi")
     )
     response.convert_msg(ErrorResponse)
 
@@ -50,18 +46,18 @@ def test_convert_msg():
 def test_parse_response():
     ws = WebsocketWrapper(MagicMock(autospec=True), MagicMock(autospec=True))
     # Invalid value
-    with pytest.raises(ValueError):
-        ws._parse_response(
-            WebsocketResponse(
-                id=Id(1),
-                type=Type.TEST_WRONG_TYPE,
-                msg=ResponseMessage(),
-            ).json()
-        )
+    response = ws._parse_response(
+        WebsocketResponse(
+            id=CommandId(1),
+            type=Type.TEST_WRONG_TYPE,
+            msg=ResponseMessage(some_field="some_message"),
+        ).json()
+    )
+    assert response.msg.some_field == "some_message"
 
     response = ws._parse_response(
         WebsocketResponse(
-            id=Id(1),
+            id=CommandId(1),
             type=Type.ERROR,
             msg=ErrorResponse(code=8, msg="something"),
         ).json()
@@ -120,9 +116,9 @@ def test_websockets_with_session_wrapper_send_recieve():
     # Test send
     with patch.object(ws._ws, "send") as send:
         request = WebsocketRequest(
-            id=Id(1),
+            id=CommandId(1),
             cmd=Command.SUBSCRIBE,
-            params=RequestParams(channels=[Channel.FILL]),
+            params=SubscribeRP(channels=[Channel.FILL]),
         )
         ws.send(request=request)
         send.assert_called_once_with(
@@ -133,7 +129,7 @@ def test_websockets_with_session_wrapper_send_recieve():
     # Test receive
     with patch.object(ws._ws, "recv") as recv:
         response = WebsocketResponse(
-            id=Id(1), type=Type.ERROR, msg=ErrorResponse(code=8, msg="hi")
+            id=CommandId(1), type=Type.ERROR, msg=ErrorResponse(code=8, msg="hi")
         )
         recv.return_value = response.json()
 

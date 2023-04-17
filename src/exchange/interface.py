@@ -12,10 +12,16 @@ from src.helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from src.helpers.types.websockets.common import Command, Id, WebsocketError
+from src.helpers.types.websockets.common import (
+    Command,
+    CommandId,
+    SubscriptionId,
+    WebsocketError,
+)
 from src.helpers.types.websockets.request import (
     Channel,
-    RequestParams,
+    SubscribeRP,
+    UnsubscribeRP,
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
@@ -29,12 +35,13 @@ from src.helpers.types.websockets.response import (
 
 class ExchangeInterface:
     def __init__(self, test_client: TestClient | None = None):
-        self._connection = Connection(test_client)
         """This class provides a high level interace with the exchange
 
         Sign-in is automatically handled for you. Simply fill out the
         correct env variablesi in the README. Sign out can be explicitly
-        called in this interface. """
+        called in this interface."""
+        self._connection = Connection(test_client)
+        self._subsciptions: List[SubscriptionId] = []
 
     def sign_out(self):
         self._connection.sign_out()
@@ -46,16 +53,16 @@ class ExchangeInterface:
 
     def subscribe_to_orderbook_delta(
         self, market_tickers: List[MarketTicker]
-    ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta, Subscribed], None, None]:
+    ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta], None, None]:
         """Subscribes to the orderbook delta websocket connection
 
         Returns a generator. Raises WebsocketError if we see an error on the channel"""
         with self._connection.get_websocket_session() as ws:
             ws.send(
                 WebsocketRequest(
-                    id=Id.get_new_id(),
+                    id=CommandId.get_new_id(),
                     cmd=Command.SUBSCRIBE,
-                    params=RequestParams(
+                    params=SubscribeRP(
                         channels=[Channel.ORDER_BOOK_DELTA],
                         market_tickers=market_tickers,
                     ),
@@ -65,7 +72,24 @@ class ExchangeInterface:
                 response: WebsocketResponse = ws.receive()
                 if isinstance(response.msg, ErrorResponse):
                     raise WebsocketError(response.msg)
-                yield response.msg
+                if isinstance(response.msg, Subscribed):
+                    self._subsciptions.append(response.msg.sid)
+                    continue
+                yield response.msg  # type:ignore[misc]
+
+    def unsubscribe_all(self):
+        """Unsubscribes from all webscoket channels"""
+        if len(self._subsciptions):
+            with self._connection.get_websocket_session() as ws:
+                ws.send(
+                    WebsocketRequest(
+                        id=CommandId.get_new_id(),
+                        cmd=Command.UNSUBSCRIBE,
+                        params=UnsubscribeRP(sids=self._subsciptions),
+                    )
+                )
+                self._subsciptions = []
+                return ws.receive()
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:
         """Gets all active markets on the exchange

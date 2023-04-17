@@ -2,6 +2,7 @@
 # in the pyproject.toml as well
 default_language_version:
   python: python3.11.2
+
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: "v0.0.261"
@@ -12,7 +13,15 @@ repos:
     rev: "v1.2.0"
     hooks:
       - id: mypy
-        args: [--namespace-packages, --ignore-missing-imports]
+        args: [--namespace-packages, --install-types, --non-interactive]
+        additional_dependencies:
+          - pytest
+          - polyfactory
+          - pydantic
+          - attr
+          - fastapi
+          - starlette
+          - httpx
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
@@ -28,3 +37,13 @@ repos:
     hooks:
       - id: isort
         args: ["--profile", "black"]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: venv/bin/pytest
+        language: script
+        pass_filenames: false
+        always_run: true
+        args: ["-n", "auto"]

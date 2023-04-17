@@ -1,10 +1,11 @@
+import typing
 from enum import Enum
-from typing import List
+from typing import Generic, List, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.websockets.common import Command, Id
+from src.helpers.types.websockets.common import Command, CommandId, SubscriptionId
 
 
 class Channel(str, Enum):
@@ -22,17 +23,35 @@ class Channel(str, Enum):
 
 
 class RequestParams(BaseModel):
+    class Config:
+        use_enum_values = True
+        extra = Extra.allow
+
+
+class SubscribeRP(RequestParams):
+    """Request parameters for the subscribe command"""
+
     channels: List[Channel]
     market_tickers: List[MarketTicker] = []
 
-    class Config:
-        use_enum_values = True
+
+class UnsubscribeRP(RequestParams):
+    """Request parameters for the unsubscribe command"""
+
+    sids: List[SubscriptionId]
 
 
-class WebsocketRequest(BaseModel):
-    id: Id
+RP = TypeVar("RP", bound=RequestParams)
+
+
+class WebsocketRequest(BaseModel, Generic[RP]):
+    id: CommandId
     cmd: Command
-    params: RequestParams
+    params: RP
 
     class Config:
         use_enum_values = True
+
+    def parse_params(self, params_class: typing.Type[RP]):
+        """Converts the params abstract class to something more specific"""
+        self.params = params_class.parse_obj(self.params)
