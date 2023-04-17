@@ -219,6 +219,17 @@ class Connection:
         )
         self._auth.refresh(response)
 
+    def sign_out(self):
+        """Used to sign out. It clears the credentials in the auth object"""
+        if self._auth.is_valid():
+            LogOutResponse.parse_obj(
+                self.post(
+                    url=LOGOUT_URL,
+                    body=LogOutRequest().dict(),
+                )
+            )
+        self._auth.remove_credentials()
+
     @contextmanager
     def get_websocket_session(self) -> Generator[WebsocketWrapper, None, None]:
         self._check_auth()
@@ -233,16 +244,6 @@ class Connection:
                 yield ws
             finally:
                 pass
-
-    def sign_out(self):
-        """Used to sign out. It clears the credentials in the auth object"""
-        LogOutResponse.parse_obj(
-            self.post(
-                url=LOGOUT_URL,
-                body=LogOutRequest().dict(),
-            )
-        )
-        self._auth.remove_credentials()
 
     def _check_auth(self):
         """Checks to make sure we're signed in"""

@@ -17,3 +17,7 @@ def test_sign_in_and_out(exchange: ExchangeInterface):
     # Below is for sign_out
     exchange.sign_out()
     assert not exchange._connection._auth.is_valid()
+
+    # We can sign out again
+    exchange.sign_out()
+    assert not exchange._connection._auth.is_valid()
