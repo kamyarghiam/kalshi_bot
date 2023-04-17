@@ -28,6 +28,7 @@ from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import SubscriptionId, Type
 from src.helpers.types.websockets.request import Channel, Command, WebsocketRequest
 from src.helpers.types.websockets.response import (
+    ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
     ResponseMessage,
@@ -177,3 +178,12 @@ async def handle_order_book_delta_channel(websocket: WebSocket, data: WebsocketR
             ),
         )
         await websocket.send_text(response_delta.json())
+
+        # Send an error messages for testing
+        await websocket.send_text(
+            WebsocketResponse(
+                id=data.id,
+                type=Type.ERROR,
+                msg=ErrorResponse(code=8, msg="Something went wrong"),
+            ).json()
+        )

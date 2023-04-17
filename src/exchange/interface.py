@@ -19,6 +19,7 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
+    ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
     Subscribed,
@@ -62,6 +63,8 @@ class ExchangeInterface:
             )
             while True:
                 response: WebsocketResponse = ws.receive()
+                if isinstance(response.msg, ErrorResponse):
+                    raise RuntimeError(response.msg)
                 yield response.msg
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:
@@ -81,6 +84,8 @@ class ExchangeInterface:
             markets.extend(response.markets)
 
         return markets
+
+    ######## Helpers ############
 
     def _get_markets(self, request: GetMarketsRequest) -> GetMarketsResponse:
         return GetMarketsResponse.parse_obj(

@@ -12,6 +12,7 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
+    ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
     ResponseMessage,
@@ -63,3 +64,9 @@ def test_orderbook_snapshot(exchange: ExchangeInterface):
         side=Side.NO,
         delta=QuantityDelta(5),
     )
+
+    # The last message in the fake exchnage returns a runtime error
+    with pytest.raises(RuntimeError) as e:
+        next(gen)
+
+    assert e.match(str(ErrorResponse(code=8, msg="Something went wrong")))
