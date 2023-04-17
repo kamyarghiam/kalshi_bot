@@ -1,3 +1,6 @@
+from typing import Callable
+
+import ratelimit
 from pydantic import BaseModel
 
 
@@ -11,3 +14,16 @@ class Cursor(str):
     the next page containing limit records. An empty value of this field indicates there
     is no next page.
     """
+
+
+class RateLimit:
+    """Represents the num transactions per time period in seconds for a rate limit"""
+
+    def __init__(self, transactions: int, seconds: float):
+        self._limiter: Callable = ratelimit.sleep_and_retry(
+            ratelimit.limits(transactions, seconds)(lambda: None)
+        )
+
+    def check(self):
+        """Performs the rate limiting based on the specified values"""
+        return self._limiter()

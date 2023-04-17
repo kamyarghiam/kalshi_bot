@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 
 from src.exchange.connection import Connection
 from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
-from src.helpers.types.api import Cursor
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
     GetMarketsRequest,
@@ -58,18 +57,21 @@ class ExchangeInterface:
                 response: WebsocketResponse = ws.receive()
                 yield response.msg
 
-    def get_open_markets(self) -> List[Market]:
-        cursor: Cursor | None = None
-        markets: List[Market] = []
-        while True:
-            response = self._get_markets(
-                GetMarketsRequest(status=MarketStatus.OPEN, cursor=cursor)
-            )
-            cursor = response.cursor
-            markets.extend(response.markets)
+    def get_active_markets(self, pages: int | None = None) -> List[Market]:
+        """Gets all active markets on the exchange
 
-            if cursor is None:
-                break
+        If pages is None, gets all active markets. If pages is set, we only
+        send that many pages of markets"""
+        response = self._get_markets(GetMarketsRequest(status=MarketStatus.OPEN))
+        markets: List[Market] = response.markets
+
+        while (
+            pages is None or (pages := pages - 1)
+        ) and not response.has_empty_cursor():
+            response = self._get_markets(
+                GetMarketsRequest(status=MarketStatus.OPEN, cursor=response.cursor)
+            )
+            markets.extend(response.markets)
 
         return markets
 
