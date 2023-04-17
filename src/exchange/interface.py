@@ -12,7 +12,7 @@ from src.helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from src.helpers.types.websockets.common import Command, Id
+from src.helpers.types.websockets.common import Command, Id, WebsocketError
 from src.helpers.types.websockets.request import (
     Channel,
     RequestParams,
@@ -49,7 +49,7 @@ class ExchangeInterface:
     ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta, Subscribed], None, None]:
         """Subscribes to the orderbook delta websocket connection
 
-        Returns a generator"""
+        Returns a generator. Raises WebsocketError if we see an error on the channel"""
         with self._connection.get_websocket_session() as ws:
             ws.send(
                 WebsocketRequest(
@@ -64,7 +64,7 @@ class ExchangeInterface:
             while True:
                 response: WebsocketResponse = ws.receive()
                 if isinstance(response.msg, ErrorResponse):
-                    raise RuntimeError(response.msg)
+                    raise WebsocketError(response.msg)
                 yield response.msg
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:

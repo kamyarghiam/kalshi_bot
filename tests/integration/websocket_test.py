@@ -5,7 +5,13 @@ from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.common import Command, Id, SubscriptionId, Type
+from src.helpers.types.websockets.common import (
+    Command,
+    Id,
+    SubscriptionId,
+    Type,
+    WebsocketError,
+)
 from src.helpers.types.websockets.request import (
     Channel,
     RequestParams,
@@ -66,7 +72,7 @@ def test_orderbook_snapshot(exchange: ExchangeInterface):
     )
 
     # The last message in the fake exchnage returns a runtime error
-    with pytest.raises(RuntimeError) as e:
+    with pytest.raises(WebsocketError) as e:
         next(gen)
 
     assert e.match(str(ErrorResponse(code=8, msg="Something went wrong")))

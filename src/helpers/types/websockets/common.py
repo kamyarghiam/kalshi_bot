@@ -40,3 +40,7 @@ class Command(str, Enum):
     """Command sent to the websocket"""
 
     SUBSCRIBE = "subscribe"
+
+
+class WebsocketError(Exception):
+    """Some error from the websocket channel"""
