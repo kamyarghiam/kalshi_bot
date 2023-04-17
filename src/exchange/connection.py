@@ -154,7 +154,7 @@ class Connection:
     def __init__(self, connection_adapter: TestClient | None = None):
         self._auth = Auth()
         self._connection_adapter: Union[TestClient, SessionsWrapper]
-        self._api_version = self._auth._api_version
+        self._api_version = self._auth._api_version.add_slash()
         if connection_adapter:
             # This is a test connection. We don't need rate limiting
             self._connection_adapter = connection_adapter

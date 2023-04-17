@@ -8,6 +8,7 @@ class Type(str, Enum):
     ERROR = "error"
     ORDERBOOK_SNAPSHOT = "orderbook_snapshot"
     ORDERBOOK_DELTA = "orderbook_delta"
+    UNSUBSCRIBE = "unsubscribed"
 
     # Incorrect type, used for testing
     TEST_WRONG_TYPE = "WRONG_TYPE"
@@ -40,6 +41,7 @@ class Command(str, Enum):
     """Command sent to the websocket"""
 
     SUBSCRIBE = "subscribe"
+    UNSUBSCRIBE = "unsubscribe"
 
 
 class WebsocketError(Exception):

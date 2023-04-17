@@ -3,10 +3,10 @@ from src.helpers.types.url import URL
 KALSHI_PROD_BASE_URL = "trading-api.kalshi.com"
 
 # URL's
-EXCHANGE_STATUS_URL = URL("exchange/status/")
-LOGIN_URL = URL("login/")
-MARKETS_URL = URL("markets/")
-LOGOUT_URL = URL("logout/")
+EXCHANGE_STATUS_URL = URL("/exchange/status")
+LOGIN_URL = URL("/login")
+MARKETS_URL = URL("/markets")
+LOGOUT_URL = URL("/logout")
 
 # Env vars
 USERNAME_ENV_VAR = "API_USERNAME"

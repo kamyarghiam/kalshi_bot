@@ -1,8 +1,11 @@
 import asyncio
 import os
-from typing import List
+import uuid
+from typing import List, Set
 
-from fastapi import FastAPI, WebSocket
+from attr import dataclass
+from fastapi import APIRouter, FastAPI, Request, WebSocket
+from starlette.responses import JSONResponse
 
 from src.helpers.constants import (
     API_VERSION_ENV_VAR,
@@ -38,36 +41,54 @@ from src.helpers.types.websockets.response import (
 from tests.helpers.utils import random_data_from_basemodel
 
 
+@dataclass
+class FakeExchangeStorage:
+    # Currently only holds one member's information
+    member_id: MemberId | None = None
+    token: Token | None = None
+    subscribed_websockets: Set[SubscriptionId] = set()
+
+    def valid_auth(self, member_id: MemberId, token: Token) -> bool:
+        return (
+            member_id is not None
+            and token is not None
+            and member_id == self.member_id
+            and token == self.token
+        )
+
+
 def kalshi_test_exchange_factory():
     """This is the fake Kalshi exchange. The endpoints below are
     for testing purposes and mimic the real exchange."""
 
     app = FastAPI()
-    api_version = URL(os.environ.get(API_VERSION_ENV_VAR))
+    api_version = URL(os.environ.get(API_VERSION_ENV_VAR)).add_slash()
+    router = APIRouter(prefix=api_version)
+    storage = FakeExchangeStorage()
 
-    @app.post(api_version.add(LOGIN_URL).add_slash())
+    @router.post(LOGIN_URL)
     def login(log_in_request: LogInRequest):
         """Logs into the exchange and returns dummy values"""
-        # TODO: maybe store these in a mini database and retrieve them
+        if storage.member_id is None or storage.token is None:
+            storage.member_id = MemberId(uuid.uuid4())
+            storage.token = Token(uuid.uuid4().hex)
         return LogInResponse(
-            member_id=MemberId("78cD6d05-dF57-4f0e-90b2-87d9d1801f03"),
-            token=Token(
-                "78cD6d05-dF57-4f0e-90b2-87d9d1801f03:"
-                + "0nzHpJJBTDwb6NEPmGg0Lcg0FmzIEuP6"
-                + "duIbh4fIGvgYcMqhGlQFeyjF6oGzGjij"
-            ),
+            member_id=storage.member_id,
+            token=Token(storage.member_id + ":" + storage.token),
         )
 
-    @app.post(api_version.add(LOGOUT_URL).add_slash())
+    @router.post(LOGOUT_URL)
     def logout(log_out_request: LogOutRequest):
+        storage.member_id = None
+        storage.token = None
         return LogOutResponse()
 
-    @app.get(api_version.add(EXCHANGE_STATUS_URL).add_slash())
+    @router.get(EXCHANGE_STATUS_URL)
     def exchange_status():
         """Returns a dummy exchange status"""
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
 
-    @app.get(api_version.add(MARKETS_URL).add_slash())
+    @router.get(MARKETS_URL)
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):
         """Returns all markets on the exchange"""
         markets: List[Market] = [random_data_from_basemodel(Market) for _ in range(100)]
@@ -103,6 +124,30 @@ def kalshi_test_exchange_factory():
             data = WebsocketRequest.parse_raw(await websocket.receive_text())
             await process_request(websocket, data)
 
+    @app.middleware("https")
+    async def check_auth(request: Request, call_next):
+        if request.url.path == api_version.add(LOGIN_URL).add_slash():
+            # No need to check auth on log in
+            return await call_next(request)
+
+        if "Authorization" not in request.headers:
+            return JSONResponse(
+                content={"code": "missing_parameters", "message": "missing parameters"},
+                status_code=401,
+            )
+        auth: str = request.headers["Authorization"]
+        member_id, token = auth.split(" ")
+
+        if not (storage.valid_auth(MemberId(member_id), Token(token))):
+            return JSONResponse(
+                content={"code": "missing_parameters", "message": "missing parameters"},
+                status_code=403,
+            )
+
+        response = await call_next(request)
+        return response
+
+    app.include_router(router)
     return app
 
 

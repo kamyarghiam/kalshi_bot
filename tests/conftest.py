@@ -19,13 +19,19 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="session")
-def exchange(request):
-    """This fixture either sends the Kalshi fake exchange or a connection to the
-    real exchange through the ehxcnage interface"""
+def fastapi_test_client(request):
+    """Returns the test client, if there is one"""
     pytest.is_functional = request.config.getoption("--functional")
     if pytest.is_functional:
         # We want to run this against the demo env. Pick up the creds from the env vars
-        yield ExchangeInterface()
+        yield None
     else:
         with TestClient(kalshi_test_exchange_factory()) as test_client:
-            yield ExchangeInterface(test_client)
+            yield test_client
+
+
+@pytest.fixture(scope="session")
+def exchange_interface(fastapi_test_client: TestClient | None):
+    """This fixture either sends the Kalshi fake exchange or a connection to the
+    real exchange through the ehxcnage interface"""
+    yield ExchangeInterface(fastapi_test_client)

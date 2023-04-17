@@ -26,8 +26,8 @@ from src.helpers.types.websockets.response import (
 )
 
 
-def test_invalid_channel(exchange: ExchangeInterface):
-    with exchange._connection.get_websocket_session() as ws:
+def test_invalid_channel(exchange_interface: ExchangeInterface):
+    with exchange_interface._connection.get_websocket_session() as ws:
         ws.send(
             WebsocketRequest(
                 id=Id.get_new_id(),
@@ -41,7 +41,7 @@ def test_invalid_channel(exchange: ExchangeInterface):
         assert response.type == Type.ERROR
 
 
-def test_orderbook_snapshot(exchange: ExchangeInterface):
+def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
     # TODO: should we configure this to run against the demo exchange somehow?
     if pytest.is_functional:
         pytest.skip(
@@ -49,7 +49,9 @@ def test_orderbook_snapshot(exchange: ExchangeInterface):
             + "since the ouptut data may be different"
         )
     market_ticker = MarketTicker("SOME_TCIKER")
-    gen = exchange.subscribe_to_orderbook_delta(market_tickers=[market_ticker])
+    gen = exchange_interface.subscribe_to_orderbook_delta(
+        market_tickers=[market_ticker]
+    )
 
     first_message = next(gen)
     assert first_message == Subscribed(

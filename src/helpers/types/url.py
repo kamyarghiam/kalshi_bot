@@ -6,7 +6,9 @@ class URL(str):
     protocol_delim = "://"
 
     def add(self, other: Union["URL", str]):
-        return URL(urllib.parse.urljoin(str(self + "/"), str(other)))
+        url1 = self.strip("/")
+        url2 = other.strip("/")
+        return URL(urllib.parse.urljoin(str(url1 + "/"), str(url2)))
 
     def add_slash(self):
         """Adds a leading forward slash in front of path if it does not exist"""

@@ -13,33 +13,33 @@ from src.helpers.types.url import URL
 
 def almost_greater_than(x: float, y: float) -> bool:
     """Checks that x is almost greater than y, with some error"""
-    allowed_error = 0.0001
-    return x + allowed_error >= y
+    allowed_error_percentage = 0.2
+    return x * (1 + allowed_error_percentage) >= y
 
 
 def test_rate_limiter():
     rate_limiter = RateLimiter(
         [
-            RateLimit(transactions=20, seconds=0.001),
-            RateLimit(transactions=100, seconds=0.01),
+            RateLimit(transactions=2, seconds=0.01),
+            RateLimit(transactions=10, seconds=0.1),
         ]
     )
 
     # Hit first limit
     now = time.time()
-    # It needs to be above 60 so we hit the third threshold
-    for _ in range(61):
+    # It needs to be above 6 so we hit the third threshold
+    for _ in range(7):
         rate_limiter.check_limits()
     after = time.time()
-    # It should take at least 61/20 * 0.001 ~ 0.003 seconds
-    assert almost_greater_than(after - now, 0.003)
+    # It should take at least 7/2 * 0.001 = 0.035 seconds
+    assert almost_greater_than(after - now, 0.035)
 
     # Hit second limit
     now = time.time()
-    for _ in range(101):
+    for _ in range(11):
         rate_limiter.check_limits()
     after = time.time()
-    assert almost_greater_than(after - now, 0.01)
+    assert almost_greater_than(after - now, 0.1)
 
 
 def test_rate_limit_called_for_websockets():

@@ -80,18 +80,18 @@ an actual username and password on Kalshi's demo website.
 
 ### RUNNING TESTS
 
-To run tests, simply run `pytest`. There are three layers of testing: unit testing, integration testing,
+To run tests, simply run `pytest -n auto`. There are three layers of testing: unit testing, integration testing,
 and functional testing. Unit testing is for testing very small units of the code. Integration testing tests
 connections between different parts of the code. Functional testing will be reserved for communication with
 the Kalshi exchange. Functional testing basically runs unit and integration tests, but instead of hitting
 the local "fake" Kalshi exchange that we wrote, it hits the demo Kalshi exchange. Please use functional tests
 sparingly, since we don't want to hit the Kalshi exchange a lot. This is why we set up a local fake instance
 of Kalshi for most of our testing. If you want to run funtional tests against the demo env in Kalshi,
-run `pytest --functional`. You can also get a coverage report with missed lines by running:
+run `pytest -n auto --functional`. You can also get a coverage report with missed lines by running:
 
 ```
 coverage erase &&
-pytest --cov=src/ tests/ --cov-append &&
+pytest -n auto --cov=src/ tests/ --cov-append &&
 coverage report --show-missing --skip-covered
 ```
 
@@ -103,7 +103,7 @@ Code coverage let's you know how much of your code you've tested. It also let's 
 - Write all your code there, and make sure you add type hints where appropriate
 - Write unit and integration tests for your code
 - Add documentation in the README.md or anywhere appropriat
-- Run the tests with the command `pytest`
+- Run the tests with the command `pytest -n auto`
 - After tests are passing, check your code coverage report and make sure it's as close to 100% as possible (see `RUNNING TESTS` section above)
 - Use the following structure for your commits: first, run `git add .`. Then, run `git commit`. Note: we have pre-commits enabled. Pre-commits
   will essentially re-format your code, type check, remove unnecessary code, and spot other errors. It will auto-fix some of the errors, but you
