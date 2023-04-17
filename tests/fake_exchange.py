@@ -2,7 +2,7 @@ import asyncio
 import os
 import uuid
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 from fastapi import APIRouter, FastAPI, Request, WebSocket
 from starlette.responses import JSONResponse
@@ -45,7 +45,7 @@ from src.helpers.types.websockets.response import (
     Subscribed,
     WebsocketResponse,
 )
-from tests.helpers.utils import random_data_from_basemodel
+from tests.utils import random_data_from_basemodel
 
 
 @dataclass
@@ -53,7 +53,7 @@ class FakeExchangeStorage:
     # Currently only holds one member's information
     member_id: MemberId | None = None
     token: Token | None = None
-    subscribed_websockets: List[SubscriptionId] = field(default_factory=list)
+    subscribed_channels: Dict[Channel, SubscriptionId] = field(default_factory=dict)
 
     def valid_auth(self, member_id: MemberId, token: Token) -> bool:
         return (
@@ -187,21 +187,29 @@ def kalshi_test_exchange_factory():
 
     async def subscribe(websocket: WebSocket, data: WebsocketRequest, channel: Channel):
         """Sends message that we've subscribed to a channel"""
-        # Send subscribed
-        sid = SubscriptionId.get_new_id()
-        storage.subscribed_websockets.append(sid)
-        response_subscribed = WebsocketResponse(
-            id=data.id,
-            type=Type.SUBSCRIBED,
-            msg=Subscribed(channel=channel, sid=sid),
-        )
-        await websocket.send_text(response_subscribed.json(exclude_none=True))
+        if channel in storage.subscribed_channels:
+            # Send already subscribed
+            response = WebsocketResponse(
+                id=data.id,
+                type=Type.ERROR,
+                msg=ErrorResponse(code=6, msg="Already subscribed"),
+            )
+        else:
+            # Send subscribed
+            sid = SubscriptionId.get_new_id()
+            storage.subscribed_channels[channel] = sid
+            response = WebsocketResponse(
+                id=data.id,
+                type=Type.SUBSCRIBED,
+                msg=Subscribed(channel=channel, sid=sid),
+            )
+        await websocket.send_text(response.json(exclude_none=True))
 
     async def unsubscribe(websocket: WebSocket, data: WebsocketRequest):
         params: UnsubscribeRP = data.params
-        for sid in params.sids:
-            if sid in storage.subscribed_websockets:
-                storage.subscribed_websockets.remove(sid)
+        for channel, sid in list(storage.subscribed_channels.items()):
+            if sid in params.sids:
+                del storage.subscribed_channels[channel]
                 await websocket.send_text(
                     WebsocketResponse(sid=sid, type=Type.UNSUBSCRIBE).json(
                         exclude_none=True
