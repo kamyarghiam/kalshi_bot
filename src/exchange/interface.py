@@ -29,7 +29,11 @@ from src.helpers.types.websockets.response import (
 class ExchangeInterface:
     def __init__(self, test_client: TestClient | None = None):
         self._connection = Connection(test_client)
-        """This class provides a high level interace with the exchange"""
+        """This class provides a high level interace with the exchange
+
+        Sign-in is automatically handled for you. Simply fill out the
+        correct env variablesi in the README. Sign out can be explicitly
+        called in this interface. """
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(
