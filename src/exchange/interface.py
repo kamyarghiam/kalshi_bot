@@ -35,6 +35,9 @@ class ExchangeInterface:
         correct env variablesi in the README. Sign out can be explicitly
         called in this interface. """
 
+    def sign_out(self):
+        self._connection.sign_out()
+
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(
             self._connection.get(EXCHANGE_STATUS_URL)
@@ -86,6 +89,3 @@ class ExchangeInterface:
                 params=request.dict(exclude_none=True),
             )
         )
-
-    def sign_out(self):
-        self._connection.sign_out()
