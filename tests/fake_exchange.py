@@ -1,9 +1,9 @@
 import asyncio
 import os
 import uuid
-from typing import List, Set
+from dataclasses import dataclass, field
+from typing import List
 
-from attr import dataclass
 from fastapi import APIRouter, FastAPI, Request, WebSocket
 from starlette.responses import JSONResponse
 
@@ -21,6 +21,7 @@ from src.helpers.types.auth import (
     LogOutRequest,
     LogOutResponse,
     MemberId,
+    MemberIdAndToken,
     Token,
 )
 from src.helpers.types.exchange import ExchangeStatusResponse
@@ -29,7 +30,13 @@ from src.helpers.types.money import Price
 from src.helpers.types.orders import QuantityDelta, Side
 from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import SubscriptionId, Type
-from src.helpers.types.websockets.request import Channel, Command, WebsocketRequest
+from src.helpers.types.websockets.request import (
+    Channel,
+    Command,
+    SubscribeRP,
+    UnsubscribeRP,
+    WebsocketRequest,
+)
 from src.helpers.types.websockets.response import (
     ErrorResponse,
     OrderbookDelta,
@@ -46,7 +53,7 @@ class FakeExchangeStorage:
     # Currently only holds one member's information
     member_id: MemberId | None = None
     token: Token | None = None
-    subscribed_websockets: Set[SubscriptionId] = set()
+    subscribed_websockets: List[SubscriptionId] = field(default_factory=list)
 
     def valid_auth(self, member_id: MemberId, token: Token) -> bool:
         return (
@@ -74,7 +81,7 @@ def kalshi_test_exchange_factory():
             storage.token = Token(uuid.uuid4().hex)
         return LogInResponse(
             member_id=storage.member_id,
-            token=Token(storage.member_id + ":" + storage.token),
+            token=MemberIdAndToken(storage.member_id + ":" + storage.token),
         )
 
     @router.post(LOGOUT_URL)
@@ -116,12 +123,14 @@ def kalshi_test_exchange_factory():
                 markets=markets,
             )
 
-    @app.websocket(URL("trade-api/ws/").add(api_version).add_slash())
+    @app.websocket(URL("ws").add(api_version).add_slash())
     async def websocket_endpoint(websocket: WebSocket):
         """Handles websocket requests"""
         await websocket.accept()
         while True:
-            data = WebsocketRequest.parse_raw(await websocket.receive_text())
+            data: WebsocketRequest = WebsocketRequest.parse_raw(
+                await websocket.receive_text()
+            )
             await process_request(websocket, data)
 
     @app.middleware("https")
@@ -147,88 +156,103 @@ def kalshi_test_exchange_factory():
         response = await call_next(request)
         return response
 
-    app.include_router(router)
-    return app
+    ############# HELPERS ##################
 
+    async def process_request(websocket: WebSocket, data: WebsocketRequest):
+        """Processes a websocket request and handle the channels concurrently"""
+        if data.cmd == Command.SUBSCRIBE:
+            data.parse_params(SubscribeRP)
+            params: SubscribeRP = data.params
+            channel_handlers = [
+                handle_channel(websocket, data, channel) for channel in params.channels
+            ]
+            asyncio.gather(*channel_handlers)
+            return
+        if data.cmd == Command.UNSUBSCRIBE:
+            data.parse_params(UnsubscribeRP)
+            await unsubscribe(websocket, data)
+            return
+        raise ValueError(f"Invalid command: {data.cmd}")
 
-############# HELPERS ##################
-
-
-async def process_request(websocket: WebSocket, data: WebsocketRequest):
-    """Processes a websocket request and handle the channels concurrently"""
-    channel_handlers = [
-        handle_channel(websocket, data, channel) for channel in data.params.channels
-    ]
-    asyncio.gather(*channel_handlers)
-
-
-async def handle_channel(
-    websocket: WebSocket, data: WebsocketRequest, channel: Channel
-):
-    if channel == Channel.INVALID_CHANNEL:
-        return await handle_unknown_channel(websocket, data)
-    if data.cmd == Command.SUBSCRIBE:
-        await send_subscribed(websocket, data, channel)
+    async def handle_channel(
+        websocket: WebSocket, data: WebsocketRequest, channel: Channel
+    ):
+        """If the message is a subscription, we handle channels concurrently"""
+        if channel == Channel.INVALID_CHANNEL:
+            return await handle_unknown_channel(websocket, data)
+        await subscribe(websocket, data, channel)
         if channel == Channel.ORDER_BOOK_DELTA:
             return await handle_order_book_delta_channel(websocket, data)
         raise ValueError(f"Invalid channel {channel}")
-    raise ValueError(f"Invalid command: {data.cmd}")
 
-
-async def send_subscribed(
-    websocket: WebSocket, data: WebsocketRequest, channel: Channel
-):
-    """Sends message that we've subscribed to a channel"""
-    # Send subscribed
-    response_subscribed = WebsocketResponse(
-        id=data.id,
-        type=Type.SUBSCRIBED,
-        msg=Subscribed(channel=channel, sid=SubscriptionId.get_new_id()),
-    )
-    await websocket.send_text(response_subscribed.json())
-
-
-async def handle_unknown_channel(websocket: WebSocket, data: WebsocketRequest):
-    """Sends message that we've foudn an unknown channel"""
-    unknown_channel = WebsocketResponse(
-        id=data.id,
-        type=Type.ERROR,
-        msg=ResponseMessage(code=8, msg="Unknown channel name"),
-    )
-    await websocket.send_text(unknown_channel.json())
-
-
-async def handle_order_book_delta_channel(websocket: WebSocket, data: WebsocketRequest):
-    """Sends messages in response to the orderbook delta channel"""
-    for market_ticker in data.params.market_tickers:
-        # Send two test messages
-        response_snapshot = WebsocketResponse(
+    async def subscribe(websocket: WebSocket, data: WebsocketRequest, channel: Channel):
+        """Sends message that we've subscribed to a channel"""
+        # Send subscribed
+        sid = SubscriptionId.get_new_id()
+        storage.subscribed_websockets.append(sid)
+        response_subscribed = WebsocketResponse(
             id=data.id,
-            type=Type.ORDERBOOK_SNAPSHOT,
-            msg=OrderbookSnapshot(
-                market_ticker=market_ticker,
-                yes=[[10, 20]],
-                no=[[20, 40]],
-            ),
+            type=Type.SUBSCRIBED,
+            msg=Subscribed(channel=channel, sid=sid),
         )
-        await websocket.send_text(response_snapshot.json())
-        response_delta = WebsocketResponse(
-            id=data.id,
-            type=Type.ORDERBOOK_DELTA,
-            msg=OrderbookDelta(
-                market_ticker=market_ticker,
-                price=Price(10),
-                side=Side.NO,
-                delta=QuantityDelta(5),
-            ),
-        )
-        await websocket.send_text(response_delta.json())
+        await websocket.send_text(response_subscribed.json(exclude_none=True))
 
-        # Send an error messages for testing
-        await websocket.send_text(
-            WebsocketResponse(
+    async def unsubscribe(websocket: WebSocket, data: WebsocketRequest):
+        params: UnsubscribeRP = data.params
+        for sid in params.sids:
+            if sid in storage.subscribed_websockets:
+                storage.subscribed_websockets.remove(sid)
+                await websocket.send_text(
+                    WebsocketResponse(sid=sid, type=Type.UNSUBSCRIBE).json(
+                        exclude_none=True
+                    )
+                )
+
+    async def handle_unknown_channel(websocket: WebSocket, data: WebsocketRequest):
+        """Sends message that we've foudn an unknown channel"""
+        unknown_channel = WebsocketResponse(
+            id=data.id,
+            type=Type.ERROR,
+            msg=ResponseMessage(code=8, msg="Unknown channel name"),
+        )
+        await websocket.send_text(unknown_channel.json(exclude_none=True))
+
+    async def handle_order_book_delta_channel(
+        websocket: WebSocket, data: WebsocketRequest
+    ):
+        """Sends messages in response to the orderbook delta channel"""
+        for market_ticker in data.params.market_tickers:
+            # Send two test messages
+            response_snapshot = WebsocketResponse(
                 id=data.id,
-                type=Type.ERROR,
-                msg=ErrorResponse(code=8, msg="Something went wrong"),
-            ).json()
-        )
+                type=Type.ORDERBOOK_SNAPSHOT,
+                msg=OrderbookSnapshot(
+                    market_ticker=market_ticker,
+                    yes=[[10, 20]],  # type:ignore[list-item]
+                    no=[[20, 40]],  # type:ignore[list-item]
+                ),
+            )
+            await websocket.send_text(response_snapshot.json(exclude_none=True))
+            response_delta = WebsocketResponse(
+                id=data.id,
+                type=Type.ORDERBOOK_DELTA,
+                msg=OrderbookDelta(
+                    market_ticker=market_ticker,
+                    price=Price(10),
+                    side=Side.NO,
+                    delta=QuantityDelta(5),
+                ),
+            )
+            await websocket.send_text(response_delta.json(exclude_none=True))
+
+            # Send an error messages for testing
+            await websocket.send_text(
+                WebsocketResponse(
+                    id=data.id,
+                    type=Type.ERROR,
+                    msg=ErrorResponse(code=8, msg="Something went wrong"),
+                ).json(exclude_none=True)
+            )
+
+    app.include_router(router)
+    return app
