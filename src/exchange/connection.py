@@ -234,7 +234,7 @@ class Connection:
     def get_websocket_session(self) -> Generator[WebsocketWrapper, None, None]:
         self._check_auth()
         websocket = WebsocketWrapper(self._connection_adapter, self._rate_limiter)
-        websocket_url = URL("/trade-api/ws/").add(self._api_version)
+        websocket_url = URL("ws").add(self._api_version)
         with websocket.websocket_connect(
             websocket_url=websocket_url,
             member_id=self._auth.member_id,
