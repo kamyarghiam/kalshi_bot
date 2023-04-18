@@ -25,11 +25,16 @@ from src.helpers.types.auth import (
     Token,
 )
 from src.helpers.types.exchange import ExchangeStatusResponse
-from src.helpers.types.markets import GetMarketsResponse, Market, MarketStatus
+from src.helpers.types.markets import (
+    GetMarketsResponse,
+    Market,
+    MarketStatus,
+    MarketTicker,
+)
 from src.helpers.types.money import Price
 from src.helpers.types.orders import QuantityDelta, Side
 from src.helpers.types.url import URL
-from src.helpers.types.websockets.common import SubscriptionId, Type
+from src.helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from src.helpers.types.websockets.request import (
     Channel,
     Command,
@@ -180,13 +185,15 @@ def kalshi_test_exchange_factory():
         """If the message is a subscription, we handle channels concurrently"""
         if channel == Channel.INVALID_CHANNEL:
             return await handle_unknown_channel(websocket, data)
-        await subscribe(websocket, data, channel)
         if channel == Channel.ORDER_BOOK_DELTA:
             return await handle_order_book_delta_channel(websocket, data)
         raise ValueError(f"Invalid channel {channel}")
 
-    async def subscribe(websocket: WebSocket, data: WebsocketRequest, channel: Channel):
+    async def subscribe(
+        websocket: WebSocket, data: WebsocketRequest, channel: Channel
+    ) -> SubscriptionId:
         """Sends message that we've subscribed to a channel"""
+        sid: SubscriptionId
         if channel in storage.subscribed_channels:
             # Send already subscribed
             response = WebsocketResponse(
@@ -194,6 +201,7 @@ def kalshi_test_exchange_factory():
                 type=Type.ERROR,
                 msg=ErrorResponse(code=6, msg="Already subscribed"),
             )
+            sid = storage.subscribed_channels[channel]
         else:
             # Send subscribed
             sid = SubscriptionId.get_new_id()
@@ -204,6 +212,7 @@ def kalshi_test_exchange_factory():
                 msg=Subscribed(channel=channel, sid=sid),
             )
         await websocket.send_text(response.json(exclude_none=True))
+        return sid
 
     async def unsubscribe(websocket: WebSocket, data: WebsocketRequest):
         params: UnsubscribeRP = data.params
@@ -229,11 +238,27 @@ def kalshi_test_exchange_factory():
         websocket: WebSocket, data: WebsocketRequest
     ):
         """Sends messages in response to the orderbook delta channel"""
-        for market_ticker in data.params.market_tickers:
+        # For sake of testing, we only look at one market ticker:
+        params: SubscribeRP = data.params
+        assert len(params.market_tickers) == 1
+        market_ticker = params.market_tickers[0]
+        if market_ticker == MarketTicker("SHOULD_ERROR"):
+            sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
+            # Send an error messages for testing
+            await websocket.send_text(
+                WebsocketResponse(
+                    id=data.id,
+                    sid=sid,
+                    type=Type.ERROR,
+                    msg=ErrorResponse(code=8, msg="Something went wrong"),
+                ).json(exclude_none=True)
+            )
+        else:
             # Send two test messages
             response_snapshot = WebsocketResponse(
                 id=data.id,
                 type=Type.ORDERBOOK_SNAPSHOT,
+                seq=SeqId(1),
                 msg=OrderbookSnapshot(
                     market_ticker=market_ticker,
                     yes=[[10, 20]],  # type:ignore[list-item]
@@ -241,9 +266,14 @@ def kalshi_test_exchange_factory():
                 ),
             )
             await websocket.send_text(response_snapshot.json(exclude_none=True))
+            # Purposefully send the subscribe messages after first message to
+            # see if subscribe system works
+            sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
             response_delta = WebsocketResponse(
                 id=data.id,
                 type=Type.ORDERBOOK_DELTA,
+                seq=SeqId(2),
+                sid=sid,
                 msg=OrderbookDelta(
                     market_ticker=market_ticker,
                     price=Price(10),
@@ -253,14 +283,20 @@ def kalshi_test_exchange_factory():
             )
             await websocket.send_text(response_delta.json(exclude_none=True))
 
-            # Send an error messages for testing
-            await websocket.send_text(
-                WebsocketResponse(
-                    id=data.id,
-                    type=Type.ERROR,
-                    msg=ErrorResponse(code=8, msg="Something went wrong"),
-                ).json(exclude_none=True)
+            # Send response with bad seq id
+            response_delta = WebsocketResponse(
+                id=data.id,
+                type=Type.ORDERBOOK_DELTA,
+                seq=SeqId(4),
+                sid=sid,
+                msg=OrderbookDelta(
+                    market_ticker=market_ticker,
+                    price=Price(10),
+                    side=Side.NO,
+                    delta=QuantityDelta(5),
+                ),
             )
+            await websocket.send_text(response_delta.json(exclude_none=True))
 
     app.include_router(router)
     return app

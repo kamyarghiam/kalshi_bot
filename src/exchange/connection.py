@@ -25,7 +25,6 @@ from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import Type, WebsocketError
 from src.helpers.types.websockets.request import WebsocketRequest
 from src.helpers.types.websockets.response import (
-    RM,
     ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
@@ -110,13 +109,13 @@ class WebsocketWrapper:
         else:
             raise ValueError("Receive: websocket wrong type")
 
-    def continuous_recieve(self) -> Generator[RM, None, None]:
+    def continuous_recieve(self) -> Generator[WebsocketResponse, None, None]:
         """Continously pulls messages and returns response message"""
         while True:
             response: WebsocketResponse = self.receive()
             if isinstance(response.msg, ErrorResponse):
                 raise WebsocketError(response.msg)
-            yield response.msg  # type:ignore[misc]
+            yield response
 
     def _parse_response(self, payload: str) -> WebsocketResponse:
         """Parses the response from the websocket and returns it"""
