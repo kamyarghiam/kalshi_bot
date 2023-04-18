@@ -1,6 +1,6 @@
 import ssl
 import typing
-from contextlib import contextmanager
+from contextlib import _GeneratorContextManager, contextmanager
 from enum import Enum
 from typing import Dict, Generator, List, Union
 
@@ -243,20 +243,17 @@ class Connection:
             )
         self._auth.remove_credentials()
 
-    @contextmanager
-    def get_websocket_session(self) -> Generator[WebsocketWrapper, None, None]:
+    def get_websocket_session(
+        self,
+    ) -> _GeneratorContextManager[WebsocketWrapper]:
         self._check_auth()
         websocket = WebsocketWrapper(self._connection_adapter, self._rate_limiter)
         websocket_url = URL("ws").add(self._api_version)
-        with websocket.websocket_connect(
+        return websocket.websocket_connect(
             websocket_url=websocket_url,
             member_id=self._auth.member_id,
             api_token=self._auth.token,
-        ) as ws:
-            try:
-                yield ws
-            finally:
-                pass
+        )
 
     def _check_auth(self):
         """Checks to make sure we're signed in"""

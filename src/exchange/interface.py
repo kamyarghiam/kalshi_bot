@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import typing
+from contextlib import _GeneratorContextManager
 from typing import Generator, List, Tuple, Union
 
 from fastapi.testclient import TestClient
@@ -59,47 +60,47 @@ class ExchangeInterface:
         )
 
     def subscribe_to_orderbook_delta(
-        self, market_tickers: List[MarketTicker]
+        self, ws: WebsocketWrapper, market_tickers: List[MarketTicker]
     ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta], None, None]:
         """Subscribes to the orderbook delta websocket connection
 
         Returns a generator. Raises WebsocketError if we see an error on the channel"""
-        with self._connection.get_websocket_session() as ws:
-            request = WebsocketRequest(
-                id=CommandId.get_new_id(),
-                cmd=Command.SUBSCRIBE,
-                params=SubscribeRP(
-                    channels=[Channel.ORDER_BOOK_DELTA],
-                    market_tickers=market_tickers,
-                ),
-            )
-            websocket_generator: Generator | None = None
-            last_seq_id: SeqId | None = None
-            while True:
-                if websocket_generator is None:
-                    # We need to reconnect to the exchange
-                    msgs: List[typing.Type[ResponseMessage]]
-                    sid: SubscriptionId
-                    msgs, sid = self._retry_until_subscribed(ws, request)
-                    logger.info(
-                        f"Subscribed to orderbook with tickers: {market_tickers}"
-                    )
-                    self._subsciptions.append(sid)
-                    websocket_generator = ws.continuous_recieve()
-                    for msg in msgs:
-                        # Yield msgs recieved
-                        yield msg  # type:ignore[misc]
+        request = WebsocketRequest(
+            id=CommandId.get_new_id(),
+            cmd=Command.SUBSCRIBE,
+            params=SubscribeRP(
+                channels=[Channel.ORDER_BOOK_DELTA],
+                market_tickers=market_tickers,
+            ),
+        )
+        websocket_generator: Generator | None = None
+        last_seq_id: SeqId | None = None
+        while True:
+            if websocket_generator is None:
+                # We need to reconnect to the exchange
+                msgs: List[typing.Type[ResponseMessage]]
+                sid: SubscriptionId
+                msgs, sid = self._retry_until_subscribed(ws, request)
+                logger.info(f"Subscribed to orderbook with tickers: {market_tickers}")
+                self._subsciptions.append(sid)
+                websocket_generator = ws.continuous_recieve()
+                for msg in msgs:
+                    # Yield msgs recieved
+                    yield msg  # type:ignore[misc]
+            else:
+                response: WebsocketResponse = next(websocket_generator)
+                if last_seq_id is None:
+                    last_seq_id = response.seq
                 else:
-                    response: WebsocketResponse = next(websocket_generator)
-                    if last_seq_id is None:
-                        last_seq_id = response.seq
-                    else:
-                        if not (last_seq_id + 1 == response.seq):
-                            self._unsubscribe(ws, [response.sid])
-                            websocket_generator = None
-                            last_seq_id = None
-                            continue
-                    yield response.msg  # type:ignore[misc]
+                    if not (last_seq_id + 1 == response.seq):
+                        self._unsubscribe(ws, [response.sid])
+                        websocket_generator = None
+                        last_seq_id = None
+                        continue
+                yield response.msg  # type:ignore[misc]
+
+    def get_websocket(self) -> _GeneratorContextManager[WebsocketWrapper]:
+        return self._connection.get_websocket_session()
 
     def _unsubscribe(self, ws: WebsocketWrapper, sids=List[SubscriptionId]):
         """Unsubscribes from websocket channels"""
