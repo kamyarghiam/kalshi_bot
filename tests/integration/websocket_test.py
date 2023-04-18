@@ -5,7 +5,13 @@ from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
+from src.helpers.types.websockets.common import (
+    Command,
+    CommandId,
+    SubscriptionId,
+    Type,
+    WebsocketError,
+)
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
     ErrorResponse,
@@ -37,7 +43,7 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
             "We don't want to run this against the real exchange "
             + "since the ouptut data may be different"
         )
-    market_ticker = MarketTicker("SOME_TCIKER")
+    market_ticker = MarketTicker("SOME_TICKER")
     gen = exchange_interface.subscribe_to_orderbook_delta(
         market_tickers=[market_ticker]
     )
@@ -58,11 +64,33 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         delta=QuantityDelta(5),
     )
 
+    # this message is going to re-subscribe to the topic
+    third_message = next(gen)
+    assert second_message == OrderbookDelta(
+        market_ticker=market_ticker,
+        price=Price(10),
+        side=Side.NO,
+        delta=QuantityDelta(5),
+    )
+    assert isinstance(third_message, OrderbookSnapshot)
+    fourth_message = next(gen)
+    assert fourth_message == OrderbookDelta(
+        market_ticker=market_ticker,
+        price=Price(10),
+        side=Side.NO,
+        delta=QuantityDelta(5),
+    )
+
+    with exchange_interface._connection.get_websocket_session() as ws:
+        exchange_interface._unsubscribe(ws, sids=[SubscriptionId(2)])
+
+    market_ticker = MarketTicker("SHOULD_ERROR")
+    gen = exchange_interface.subscribe_to_orderbook_delta(
+        market_tickers=[market_ticker]
+    )
+
     # The last message in the fake exchnage returns a runtime error
     with pytest.raises(WebsocketError) as e:
         next(gen)
 
     assert e.match(str(ErrorResponse(code=8, msg="Something went wrong")))
-
-    # Test unsubscribe
-    exchange_interface.unsubscribe_all()

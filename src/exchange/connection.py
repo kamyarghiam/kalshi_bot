@@ -22,7 +22,7 @@ from src.helpers.types.auth import (
     Token,
 )
 from src.helpers.types.url import URL
-from src.helpers.types.websockets.common import Type
+from src.helpers.types.websockets.common import Type, WebsocketError
 from src.helpers.types.websockets.request import WebsocketRequest
 from src.helpers.types.websockets.response import (
     ErrorResponse,
@@ -109,9 +109,17 @@ class WebsocketWrapper:
         else:
             raise ValueError("Receive: websocket wrong type")
 
+    def continuous_recieve(self) -> Generator[WebsocketResponse, None, None]:
+        """Continously pulls messages and returns response message"""
+        while True:
+            response: WebsocketResponse = self.receive()
+            if isinstance(response.msg, ErrorResponse):
+                raise WebsocketError(response.msg)
+            yield response
+
     def _parse_response(self, payload: str) -> WebsocketResponse:
         """Parses the response from the websocket and returns it"""
-        response = WebsocketResponse.parse_raw(payload)
+        response: WebsocketResponse = WebsocketResponse.parse_raw(payload)
         type_to_response: Dict[Type, typing.Type[ResponseMessage]] = {
             Type.ERROR: ErrorResponse,
             Type.ORDERBOOK_DELTA: OrderbookDelta,
