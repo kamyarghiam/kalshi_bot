@@ -10,11 +10,19 @@ from src.helpers.types.auth import MemberId, Token
 from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity
 from src.helpers.types.url import URL
-from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
+from src.helpers.types.websockets.common import (
+    Command,
+    CommandId,
+    SubscriptionId,
+    Type,
+    WebsocketError,
+)
 from src.helpers.types.websockets.request import (
     Channel,
     RequestParams,
     SubscribeRP,
+    UpdateSubscriptionAction,
+    UpdateSubscriptionRP,
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
@@ -188,3 +196,28 @@ def test_subscribe_with_non_subscribe_request():
     with patch("src.exchange.connection.Websocket._retry_until_subscribed"):
         with pytest.raises(ValueError):
             ws.subscribe(request)
+
+
+def test_update_subscription_RP_sids():
+    # Does not error
+    UpdateSubscriptionRP(
+        sids=[SubscriptionId(1)],
+        market_tickers=[],
+        action=UpdateSubscriptionAction.ADD_MARKETS,
+    )
+
+    with pytest.raises(ValueError):
+        # Errors because len(sids) == 0
+        UpdateSubscriptionRP(
+            sids=[],
+            market_tickers=[],
+            action=UpdateSubscriptionAction.ADD_MARKETS,
+        )
+
+    with pytest.raises(ValueError):
+        # Errors because len(sids) == 2
+        UpdateSubscriptionRP(
+            sids=[SubscriptionId(1), SubscriptionId(2)],
+            market_tickers=[],
+            action=UpdateSubscriptionAction.ADD_MARKETS,
+        )
