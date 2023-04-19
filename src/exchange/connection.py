@@ -120,7 +120,9 @@ class WebsocketWrapper:
     def receive_until(
         self, msg_type: Type, max_messages: int = 30
     ) -> List[WebsocketResponse]:
-        """Pulls until we receive a message of a certain type, with a max_messages"""
+        """Pulls until we receive a message of a certain type.
+
+        We error if we reach max_messages"""
         msgs: List[WebsocketResponse] = []
         while True:
             response = self.receive()
