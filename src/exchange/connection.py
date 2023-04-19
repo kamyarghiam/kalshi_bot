@@ -2,7 +2,6 @@ import ssl
 import typing
 from contextlib import _GeneratorContextManager, contextmanager
 from enum import Enum
-from logging import getLogger
 from typing import Dict, Generator, List, Union
 
 import requests  # type:ignore
@@ -41,8 +40,6 @@ from src.helpers.types.websockets.response import (
     WebsocketResponse,
 )
 from tests.fake_exchange import SubscriptionId
-
-logger = getLogger("__name__")
 
 
 class Method(Enum):
@@ -214,7 +211,7 @@ class Connection:
     def __init__(self, connection_adapter: TestClient | None = None):
         self._auth = Auth()
         self._connection_adapter: Union[TestClient, SessionsWrapper]
-        self._api_version = self._auth._api_version.add_slash()
+        self._api_version = self._auth.api_version.add_slash()
         if connection_adapter:
             # This is a test connection. We don't need rate limiting
             self._connection_adapter = connection_adapter
@@ -312,7 +309,7 @@ class Connection:
     ) -> Generator[WebsocketResponse, None, None]:
         """Sends a subscription command and manages subsciption seq id consistency"""
         if request.cmd != Command.SUBSCRIBE:
-            raise ValueError("subscribe with seq only for subscribe commands")
+            raise ValueError("Request must be a subscribe request")
 
         websocket_generator: Generator | None = None
         last_seq_id: SeqId | None = None
@@ -332,10 +329,9 @@ class Connection:
                     if not (last_seq_id + 1 == response.seq):
                         if response.sid is not None:
                             ws.unsubscribe(response.sid)
-                            websocket_generator = None
-                            last_seq_id = None
-                            continue
-                        raise WebsocketError(f"Invalid sid in {response}")
+                        websocket_generator = None
+                        last_seq_id = None
+                        continue
                 yield response
 
     def _check_auth(self):

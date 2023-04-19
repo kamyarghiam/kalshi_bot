@@ -1,11 +1,8 @@
-import asyncio
 import logging
-import typing
 from contextlib import _GeneratorContextManager
-from typing import Generator, List, Tuple, Union
+from typing import Generator, List, Union
 
 from fastapi.testclient import TestClient
-from tenacity import RetryError, retry, retry_if_not_exception_type, stop_after_delay
 
 from src.exchange.connection import Connection, WebsocketWrapper
 from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
@@ -19,12 +16,7 @@ from src.helpers.types.markets import (
 )
 from src.helpers.types.websockets.common import Command, CommandId, SubscriptionId
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
-from src.helpers.types.websockets.response import (
-    OrderbookDelta,
-    OrderbookSnapshot,
-    ResponseMessage,
-    Subscribed,
-)
+from src.helpers.types.websockets.response import OrderbookDelta, OrderbookSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -94,25 +86,3 @@ class ExchangeInterface:
                 params=request.dict(exclude_none=True),
             )
         )
-
-    @retry(stop=stop_after_delay(12), retry=retry_if_not_exception_type(RetryError))
-    def _retry_until_subscribed(
-        self, ws: WebsocketWrapper, request: WebsocketRequest
-    ) -> Tuple[List[typing.Type[ResponseMessage]], SubscriptionId]:
-        """Retries websocket connection until we get a subscribed message"""
-        ws.send(request)
-        return asyncio.run(
-            asyncio.wait_for(self._receive_until_subscribed(ws), timeout=3)
-        )
-
-    async def _receive_until_subscribed(
-        self, ws: WebsocketWrapper
-    ) -> Tuple[List[typing.Type[ResponseMessage]], SubscriptionId]:
-        """Loops until we receive a Subscribed message. Returns messages accumulated"""
-        msgs: List[typing.Type[ResponseMessage]] = []
-        while True:
-            response = ws.receive()
-            if isinstance(response.msg, Subscribed):
-                return (msgs, response.msg.sid)
-            if response.msg is not None:
-                msgs.append(response.msg)  # type:ignore[arg-type]

@@ -100,6 +100,12 @@ class Auth:
             raise ValueError("Token is null")
         return self._token
 
+    @property
+    def api_version(self) -> URL:
+        if self._api_version is None:
+            raise ValueError("Api version is null")
+        return self._api_version
+
     def is_valid(self):
         """Checks that we are signed in and that the token is not stale"""
         if not (self._member_id and self._token and self._sign_in_time):
