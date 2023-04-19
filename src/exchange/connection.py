@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from requests import JSONDecodeError, Session
 from starlette.testclient import WebSocketTestSession
 from tenacity import retry, retry_if_not_exception_type, stop_after_delay
-from websocket import WebSocket  # type:ignore[import]
+from websocket import WebSocket as ExternalWebsocket  # type:ignore[import]
 
 from src.helpers.constants import LOGIN_URL, LOGOUT_URL
 from src.helpers.types.api import ExternalApi, RateLimit
@@ -77,7 +77,7 @@ class RateLimiter:
             rate_limit.check()
 
 
-class WebsocketWrapper:
+class Websocket:
     """Creates a wrapper around websocket clients so we can send and receive data"""
 
     def __init__(
@@ -96,13 +96,13 @@ class WebsocketWrapper:
             # Connects to a local exchange
             self._base_url = URL("")
 
-        self._ws: WebSocket | WebSocketTestSession | None = None
+        self._ws: ExternalWebsocket | WebSocketTestSession | None = None
 
     def send(self, request: WebsocketRequest):
         self._rate_limiter.check_limits()
         if self._ws is None:
             raise ValueError("Send: Did not intialize the websocket")
-        if isinstance(self._ws, WebSocket):
+        if isinstance(self._ws, ExternalWebsocket):
             self._ws.send(request.json())
         elif isinstance(self._ws, WebSocketTestSession):
             self._ws.send_text(request.json())
@@ -110,7 +110,7 @@ class WebsocketWrapper:
     def receive(self) -> WebsocketResponse:
         if self._ws is None:
             raise ValueError("Receive: Did not intialize the websocket")
-        if isinstance(self._ws, WebSocket):
+        if isinstance(self._ws, ExternalWebsocket):
             return self._parse_response(self._ws.recv())
         elif isinstance(self._ws, WebSocketTestSession):
             return self._parse_response(self._ws.receive_text())
@@ -186,7 +186,7 @@ class WebsocketWrapper:
         self, websocket_url: URL, member_id: MemberId, api_token: Token
     ):
         if isinstance(self._connection_adapter, SessionsWrapper):
-            self._ws = WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
+            self._ws = ExternalWebsocket(sslopt={"cert_reqs": ssl.CERT_NONE})
             try:
                 self._ws.connect(
                     self._base_url.add(websocket_url),
@@ -296,9 +296,9 @@ class Connection:
 
     def get_websocket_session(
         self,
-    ) -> _GeneratorContextManager[WebsocketWrapper]:
+    ) -> _GeneratorContextManager[Websocket]:
         self._check_auth()
-        websocket = WebsocketWrapper(self._connection_adapter, self._rate_limiter)
+        websocket = Websocket(self._connection_adapter, self._rate_limiter)
         websocket_url = URL("ws").add(self._api_version)
         return websocket.websocket_connect(
             websocket_url=websocket_url,
@@ -307,7 +307,7 @@ class Connection:
         )
 
     def subscribe_with_seq(
-        self, ws: WebsocketWrapper, request: WebsocketRequest
+        self, ws: Websocket, request: WebsocketRequest
     ) -> Generator[WebsocketResponse, None, None]:
         """Sends a subscription command and manages subsciption seq id consistency"""
         if request.cmd != Command.SUBSCRIBE:

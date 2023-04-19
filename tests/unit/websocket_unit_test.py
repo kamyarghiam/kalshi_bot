@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 import pytest
 from mock import patch
 from pydantic import ValidationError
-from websocket import WebSocket  # type:ignore[import]
+from websocket import WebSocket as ExternalWebsocket  # type:ignore[import]
 
-from src.exchange.connection import Connection, SessionsWrapper, WebsocketWrapper
+from src.exchange.connection import Connection, SessionsWrapper, Websocket
 from src.helpers.types.auth import MemberId, Token
 from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity
@@ -26,7 +26,7 @@ from src.helpers.types.websockets.response import (
 
 
 def test_websocket_wrapper():
-    ws = WebsocketWrapper(MagicMock(autospec=True), MagicMock(autospec=True))
+    ws = Websocket(MagicMock(autospec=True), MagicMock(autospec=True))
     with pytest.raises(ValueError):
         ws.receive()
     with pytest.raises(ValueError):
@@ -49,7 +49,7 @@ def test_convert_msg():
 
 
 def test_parse_response():
-    ws = WebsocketWrapper(MagicMock(autospec=True), MagicMock(autospec=True))
+    ws = Websocket(MagicMock(autospec=True), MagicMock(autospec=True))
     # Invalid value
     response = ws._parse_response(
         WebsocketResponse(
@@ -114,9 +114,9 @@ def test_orderbook_snapshot_validation():
 
 def test_websockets_with_session_wrapper_send_recieve():
     session_wrapper = SessionsWrapper(URL("http://base_url"))
-    ws = WebsocketWrapper(session_wrapper, MagicMock(autospec=True))
+    ws = Websocket(session_wrapper, MagicMock(autospec=True))
     assert ws._base_url == URL("wss://base_url")
-    ws._ws = WebSocket()
+    ws._ws = ExternalWebsocket()
 
     # Test send
     with patch.object(ws._ws, "send") as send:
@@ -143,9 +143,9 @@ def test_websockets_with_session_wrapper_send_recieve():
 
 
 def test_websockets_session_wrapper_connect():
-    with patch("src.exchange.connection.WebSocket.connect") as connect:
+    with patch("src.exchange.connection.ExternalWebsocket.connect") as connect:
         sessions_wrapper = SessionsWrapper(URL("base_url"))
-        ws = WebsocketWrapper(sessions_wrapper, MagicMock(autospec=True))
+        ws = Websocket(sessions_wrapper, MagicMock(autospec=True))
         with ws.websocket_connect(
             URL("websocket_url"), MemberId("member_id"), api_token=Token("token")
         ):
@@ -172,19 +172,19 @@ def test_encode_decode():
 
 
 def test_receive_until_max_messages():
-    ws = WebsocketWrapper(MagicMock(), MagicMock())
-    with patch("src.exchange.connection.WebsocketWrapper.receive"):
+    ws = Websocket(MagicMock(), MagicMock())
+    with patch("src.exchange.connection.Websocket.receive"):
         with pytest.raises(WebsocketError):
             ws.receive_until(MagicMock())
 
 
 def test_subscribe_with_non_subscribe_request():
-    ws = WebsocketWrapper(MagicMock(), MagicMock())
+    ws = Websocket(MagicMock(), MagicMock())
     request = WebsocketRequest(
         id=CommandId(1),
         cmd=Command.UNSUBSCRIBE,  # this is not subscribe
         params=RequestParams(),
     )
-    with patch("src.exchange.connection.WebsocketWrapper._retry_until_subscribed"):
+    with patch("src.exchange.connection.Websocket._retry_until_subscribed"):
         with pytest.raises(ValueError):
             ws.subscribe(request)

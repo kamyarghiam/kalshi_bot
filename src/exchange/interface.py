@@ -4,7 +4,7 @@ from typing import Generator, List, Union
 
 from fastapi.testclient import TestClient
 
-from src.exchange.connection import Connection, WebsocketWrapper
+from src.exchange.connection import Connection, Websocket
 from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
@@ -40,7 +40,7 @@ class ExchangeInterface:
         )
 
     def subscribe_to_orderbook_delta(
-        self, ws: WebsocketWrapper, market_tickers: List[MarketTicker]
+        self, ws: Websocket, market_tickers: List[MarketTicker]
     ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta], None, None]:
         """Subscribes to the orderbook delta websocket connection
 
@@ -56,7 +56,7 @@ class ExchangeInterface:
         for response in self._connection.subscribe_with_seq(ws, request):
             yield response.msg  # type:ignore[misc]
 
-    def get_websocket(self) -> _GeneratorContextManager[WebsocketWrapper]:
+    def get_websocket(self) -> _GeneratorContextManager[Websocket]:
         return self._connection.get_websocket_session()
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:

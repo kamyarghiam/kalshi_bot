@@ -1,12 +1,7 @@
 import time
 from unittest.mock import MagicMock, patch
 
-from src.exchange.connection import (
-    Connection,
-    RateLimiter,
-    SessionsWrapper,
-    WebsocketWrapper,
-)
+from src.exchange.connection import Connection, RateLimiter, SessionsWrapper, Websocket
 from src.helpers.types.api import RateLimit
 from src.helpers.types.url import URL
 
@@ -43,9 +38,9 @@ def test_rate_limiter():
 
 
 def test_rate_limit_called_for_websockets():
-    with patch("src.exchange.connection.WebSocket.connect"):
+    with patch("src.exchange.connection.ExternalWebsocket.connect"):
         rate_limiter = RateLimiter(limits=[])
-        ws = WebsocketWrapper(SessionsWrapper(base_url=URL("anything")), rate_limiter)
+        ws = Websocket(SessionsWrapper(base_url=URL("anything")), rate_limiter)
         with ws.websocket_connect(
             MagicMock(autospec=True), MagicMock(autospec=True), MagicMock(autospec=True)
         ):

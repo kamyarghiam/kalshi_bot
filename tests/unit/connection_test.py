@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from requests import Response
 
-from src.exchange.connection import Connection, SessionsWrapper, WebsocketWrapper
+from src.exchange.connection import Connection, SessionsWrapper, Websocket
 from src.helpers.types.websockets.common import Command, CommandId
 from src.helpers.types.websockets.request import RequestParams, WebsocketRequest
 
@@ -26,8 +26,4 @@ def test_subscribe_with_seq_bad_command(_):
         id=CommandId.get_new_id(), cmd=Command.UNSUBSCRIBE, params=RequestParams()
     )
     with pytest.raises(ValueError):
-        next(
-            con.subscribe_with_seq(
-                MagicMock(autopec=True, spec=WebsocketWrapper), request
-            )
-        )
+        next(con.subscribe_with_seq(MagicMock(autopec=True, spec=Websocket), request))
