@@ -81,8 +81,7 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
             side=Side.NO,
             delta=QuantityDelta(5),
         )
-
-        exchange_interface._unsubscribe(ws, sids=[SubscriptionId(2)])
+        ws.unsubscribe(SubscriptionId(2))
 
         market_ticker = MarketTicker("SHOULD_ERROR")
         gen = exchange_interface.subscribe_to_orderbook_delta(

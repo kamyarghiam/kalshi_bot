@@ -131,3 +131,11 @@ def test_log_in_response():
         login.token
     login = LogInResponse(member_id="MEMBER_ID", token="MEMBER_ID:TOKEN")
     assert login.token == Token("TOKEN")
+
+
+def test_null_api_version():
+    auth = Auth()
+    auth._api_version = None
+
+    with pytest.raises(ValueError):
+        auth.api_version

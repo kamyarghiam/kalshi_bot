@@ -10,8 +10,13 @@ from src.helpers.types.auth import MemberId, Token
 from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity
 from src.helpers.types.url import URL
-from src.helpers.types.websockets.common import Command, CommandId, Type
-from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
+from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
+from src.helpers.types.websockets.request import (
+    Channel,
+    RequestParams,
+    SubscribeRP,
+    WebsocketRequest,
+)
 from src.helpers.types.websockets.response import (
     ErrorResponse,
     OrderbookSnapshot,
@@ -164,3 +169,22 @@ def test_encode_decode():
     response = ResponseMessage(some_field="some_field", another_field="another_field")
 
     assert ResponseMessage.from_pickle(response.encode()) == response
+
+
+def test_receive_until_max_messages():
+    ws = WebsocketWrapper(MagicMock(), MagicMock())
+    with patch("src.exchange.connection.WebsocketWrapper.receive"):
+        with pytest.raises(WebsocketError):
+            ws.receive_until(MagicMock())
+
+
+def test_subscribe_with_non_subscribe_request():
+    ws = WebsocketWrapper(MagicMock(), MagicMock())
+    request = WebsocketRequest(
+        id=CommandId(1),
+        cmd=Command.UNSUBSCRIBE,  # this is not subscribe
+        params=RequestParams(),
+    )
+    with patch("src.exchange.connection.WebsocketWrapper._retry_until_subscribed"):
+        with pytest.raises(ValueError):
+            ws.subscribe(request)
