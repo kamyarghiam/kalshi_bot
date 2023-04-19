@@ -26,7 +26,7 @@ class ExchangeInterface:
         """This class provides a high level interace with the exchange
 
         Sign-in is automatically handled for you. Simply fill out the
-        correct env variablesi in the README. Sign out can be explicitly
+        correct env veriables in the README. Sign out can be explicitly
         called in this interface."""
         self._connection = Connection(test_client)
         self._subsciptions: List[SubscriptionId] = []
