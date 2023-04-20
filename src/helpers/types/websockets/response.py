@@ -1,4 +1,5 @@
 import pickle
+import typing
 from typing import Generic, List, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, validator
@@ -37,7 +38,7 @@ class WebsocketResponse(BaseModel, Generic[RM]):
     class Config:
         use_enum_values = True
 
-    def convert_msg(self, type: RM) -> "WebsocketResponse[RM]":
+    def convert_msg(self, type: typing.Type[RM]) -> "WebsocketResponse[RM]":
         """Converts the response's message to a specific ResponseMessage from below"""
         self.msg = type.parse_obj(self.msg)
         return self
