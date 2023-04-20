@@ -1,5 +1,6 @@
 import asyncio
 import os
+import pdb
 import uuid
 from dataclasses import dataclass, field
 from typing import Dict, List
@@ -190,10 +191,12 @@ def kalshi_test_exchange_factory():
         raise ValueError(f"Invalid channel {channel}")
 
     async def subscribe(
-        websocket: WebSocket, data: WebsocketRequest, channel: Channel
+        websocket: WebSocket,
+        data: WebsocketRequest,
+        channel: Channel,
+        sid: SubscriptionId,
     ) -> SubscriptionId:
         """Sends message that we've subscribed to a channel"""
-        sid: SubscriptionId
         if channel in storage.subscribed_channels:
             # Send already subscribed
             response = WebsocketResponse(
@@ -201,7 +204,6 @@ def kalshi_test_exchange_factory():
                 type=Type.ERROR,
                 msg=ErrorResponse(code=6, msg="Already subscribed"),
             )
-            sid = storage.subscribed_channels[channel]
         else:
             # Send subscribed
             sid = SubscriptionId.get_new_id()
@@ -212,9 +214,9 @@ def kalshi_test_exchange_factory():
                 msg=Subscribed(channel=channel, sid=sid),
             )
         await websocket.send_text(response.json(exclude_none=True))
-        return sid
 
     async def unsubscribe(websocket: WebSocket, data: WebsocketRequest):
+        pdb.set_trace()
         params: UnsubscribeRP = data.params
         for channel, sid in list(storage.subscribed_channels.items()):
             if sid in params.sids:
@@ -243,12 +245,14 @@ def kalshi_test_exchange_factory():
         assert len(params.market_tickers) == 1
         market_ticker = params.market_tickers[0]
         if market_ticker == MarketTicker("SHOULD_ERROR"):
-            sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
+            await subscribe(
+                websocket, data, Channel.ORDER_BOOK_DELTA, SubscriptionId(2)
+            )
             # Send an error messages for testing
             await websocket.send_text(
                 WebsocketResponse(
                     id=data.id,
-                    sid=sid,
+                    sid=SubscriptionId(2),
                     type=Type.ERROR,
                     msg=ErrorResponse(code=8, msg="Something went wrong"),
                 ).json(exclude_none=True)
@@ -258,6 +262,7 @@ def kalshi_test_exchange_factory():
             response_snapshot = WebsocketResponse(
                 id=data.id,
                 type=Type.ORDERBOOK_SNAPSHOT,
+                sid=SubscriptionId(1),
                 seq=SeqId(1),
                 msg=OrderbookSnapshot(
                     market_ticker=market_ticker,
@@ -268,12 +273,14 @@ def kalshi_test_exchange_factory():
             await websocket.send_text(response_snapshot.json(exclude_none=True))
             # Purposefully send the subscribe messages after first message to
             # see if subscribe system works
-            sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
+            await subscribe(
+                websocket, data, Channel.ORDER_BOOK_DELTA, SubscriptionId(1)
+            )
             response_delta = WebsocketResponse(
                 id=data.id,
                 type=Type.ORDERBOOK_DELTA,
                 seq=SeqId(2),
-                sid=sid,
+                sid=SubscriptionId(1),
                 msg=OrderbookDelta(
                     market_ticker=market_ticker,
                     price=Price(10),
@@ -288,7 +295,7 @@ def kalshi_test_exchange_factory():
                 id=data.id,
                 type=Type.ORDERBOOK_DELTA,
                 seq=SeqId(4),
-                sid=sid,
+                sid=SubscriptionId(1),
                 msg=OrderbookDelta(
                     market_ticker=market_ticker,
                     price=Price(10),

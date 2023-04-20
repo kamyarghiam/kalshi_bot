@@ -1,3 +1,4 @@
+import pdb
 import pytest
 
 from src.exchange.interface import ExchangeInterface
@@ -44,52 +45,53 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
             + "since the ouptut data may be different"
         )
     market_ticker = MarketTicker("SOME_TICKER")
+
     with exchange_interface.get_websocket() as ws:
-        gen = exchange_interface.subscribe_to_orderbook_delta(
+        with exchange_interface.subscribe_to_orderbook_delta(
             ws, market_tickers=[market_ticker]
-        )
+        ) as gen:
+            first_message = next(gen)
+            assert isinstance(first_message, OrderbookSnapshot)
+            assert Orderbook.from_snapshot(first_message) == Orderbook(
+                market_ticker=market_ticker,
+                yes=OrderbookSide(levels={Price(10): Quantity(20)}),
+                no=OrderbookSide(levels={Price(20): Quantity(40)}),
+            )
 
-        first_message = next(gen)
-        assert isinstance(first_message, OrderbookSnapshot)
-        assert Orderbook.from_snapshot(first_message) == Orderbook(
-            market_ticker=market_ticker,
-            yes=OrderbookSide(levels={Price(10): Quantity(20)}),
-            no=OrderbookSide(levels={Price(20): Quantity(40)}),
-        )
+            second_message = next(gen)
+            assert second_message == OrderbookDelta(
+                market_ticker=market_ticker,
+                price=Price(10),
+                side=Side.NO,
+                delta=QuantityDelta(5),
+            )
 
-        second_message = next(gen)
-        assert second_message == OrderbookDelta(
-            market_ticker=market_ticker,
-            price=Price(10),
-            side=Side.NO,
-            delta=QuantityDelta(5),
-        )
+            # this message is going to re-subscribe to the topic
+            third_message = next(gen)
+            assert second_message == OrderbookDelta(
+                market_ticker=market_ticker,
+                price=Price(10),
+                side=Side.NO,
+                delta=QuantityDelta(5),
+            )
+            pdb.set_trace()
+            assert isinstance(third_message, OrderbookSnapshot)
+            fourth_message = next(gen)
+            assert fourth_message == OrderbookDelta(
+                market_ticker=market_ticker,
+                price=Price(10),
+                side=Side.NO,
+                delta=QuantityDelta(5),
+            )
 
-        # this message is going to re-subscribe to the topic
-        third_message = next(gen)
-        assert second_message == OrderbookDelta(
-            market_ticker=market_ticker,
-            price=Price(10),
-            side=Side.NO,
-            delta=QuantityDelta(5),
-        )
-        assert isinstance(third_message, OrderbookSnapshot)
-        fourth_message = next(gen)
-        assert fourth_message == OrderbookDelta(
-            market_ticker=market_ticker,
-            price=Price(10),
-            side=Side.NO,
-            delta=QuantityDelta(5),
-        )
-        ws.unsubscribe(SubscriptionId(2))
+        with exchange_interface.subscribe_to_orderbook_delta(
+            ws, market_tickers=[MarketTicker("SHOULD_ERROR")]
+        ) as gen:
+            gen = exchange_interface.subscribe_to_orderbook_delta(
+                ws, market_tickers=[market_ticker]
+            )
+            # The last message in the fake exchnage returns a runtime error
+            with pytest.raises(WebsocketError) as e:
+                next(gen)
 
-        market_ticker = MarketTicker("SHOULD_ERROR")
-        gen = exchange_interface.subscribe_to_orderbook_delta(
-            ws, market_tickers=[market_ticker]
-        )
-
-        # The last message in the fake exchnage returns a runtime error
-        with pytest.raises(WebsocketError) as e:
-            next(gen)
-
-        assert e.match(str(ErrorResponse(code=8, msg="Something went wrong")))
+            assert e.match(str(ErrorResponse(code=8, msg="Something went wrong")))

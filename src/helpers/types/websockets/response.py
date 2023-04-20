@@ -1,6 +1,6 @@
 import pickle
 import typing
-from typing import List, Tuple
+from typing import Generic, List, Tuple
 
 from pydantic import BaseModel, Extra, validator
 
@@ -25,12 +25,15 @@ class ResponseMessage(BaseModel):
         return pickle.loads(data)
 
 
-class WebsocketResponse(BaseModel):
+RM = typing.TypeVar("RM", bound=ResponseMessage)
+
+
+class WebsocketResponse(BaseModel, Generic[RM]):
     id: CommandId | None = None
     seq: SeqId | None = None
     sid: SubscriptionId | None = None
     type: Type
-    msg: typing.Type[ResponseMessage] | ResponseMessage | None = None
+    msg: RM | None = None
 
     class Config:
         use_enum_values = True

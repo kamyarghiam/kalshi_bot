@@ -183,7 +183,7 @@ def test_receive_until_max_messages():
     ws = Websocket(MagicMock(), MagicMock())
     with patch("src.exchange.connection.Websocket.receive"):
         with pytest.raises(WebsocketError):
-            ws.receive_until(MagicMock())
+            list(ws.receive_until(MagicMock()))
 
 
 def test_subscribe_with_non_subscribe_request():
@@ -195,7 +195,7 @@ def test_subscribe_with_non_subscribe_request():
     )
     with patch("src.exchange.connection.Websocket._retry_until_subscribed"):
         with pytest.raises(ValueError):
-            ws.subscribe(request)
+            next(ws.subscribe(request))
 
 
 def test_update_subscription_RP_sids():

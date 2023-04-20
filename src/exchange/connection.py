@@ -2,7 +2,7 @@ import ssl
 import typing
 from contextlib import _GeneratorContextManager, contextmanager
 from enum import Enum
-from typing import Dict, Generator, List, Union
+from typing import Dict, Generator, List, Tuple, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
@@ -32,6 +32,7 @@ from src.helpers.types.websockets.common import (
 )
 from src.helpers.types.websockets.request import UnsubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
+    RM,
     ErrorResponse,
     OrderbookDelta,
     OrderbookSnapshot,
@@ -107,7 +108,7 @@ class Websocket:
         elif isinstance(self._ws, WebSocketTestSession):
             self._ws.send_text(request.json())
 
-    def receive(self) -> WebsocketResponse:
+    def receive(self) -> WebsocketResponse[RM]:
         if self._ws is None:
             raise ValueError("Receive: Did not intialize the websocket")
         if isinstance(self._ws, ExternalWebsocket):
@@ -119,27 +120,29 @@ class Websocket:
 
     def receive_until(
         self, msg_type: Type, max_messages: int = 30
-    ) -> List[WebsocketResponse]:
-        """Pulls until we receive a message of a certain type.
+    ) -> Tuple[WebsocketResponse, List[WebsocketResponse]]:
+        """Pulls until we receive a message of a certain type. Return
+        the message of that type and all the messages before it
 
         We error if we reach max_messages"""
-        msgs: List[WebsocketResponse] = []
+        msgs_received: List[WebsocketResponse] = []
         while True:
             response = self.receive()
             if response.type == msg_type:
-                return msgs
-            if response.msg is not None:
-                msgs.append(response)
-            if len(msgs) > max_messages:
+                return (response, msgs_received)
+            msgs_received.append(response)
+            if len(msgs_received) > max_messages:
                 raise WebsocketError(
                     f"Could not find type: {msg_type} within {max_messages} msgs"
                 )
 
-    def subscribe(self, request: WebsocketRequest) -> List[WebsocketResponse]:
+    def subscribe(
+        self, request: WebsocketRequest
+    ) -> Generator[WebsocketResponse, None, WebsocketResponse]:
         """Retries until successfully subscribed. Returns initial messages on channel"""
         if request.cmd != Command.SUBSCRIBE:
             raise ValueError(f"Request must be of type subscribe. {request}")
-        return self._retry_until_subscribed(request)
+        yield from self._retry_until_subscribed(request)
 
     def unsubscribe(self, sid: SubscriptionId):
         """Unsubscribes from channel"""
@@ -150,7 +153,8 @@ class Websocket:
                 params=UnsubscribeRP(sids=[sid]),
             )
         )
-        self.receive_until(Type.UNSUBSCRIBE)
+        # Exhaust the generator
+        all(self.receive_until(Type.UNSUBSCRIBE))
 
     def continuous_recieve(self) -> Generator[WebsocketResponse, None, None]:
         """Continously pulls messages and returns response message"""
@@ -163,10 +167,10 @@ class Websocket:
     @retry(stop=stop_after_delay(12), retry=retry_if_not_exception_type(WebsocketError))
     def _retry_until_subscribed(
         self, request: WebsocketRequest
-    ) -> List[WebsocketResponse]:
+    ) -> Generator[WebsocketResponse, None, WebsocketResponse]:
         """Retries websocket connection until we get a subscribed message"""
         self.send(request)
-        return self.receive_until(Type.SUBSCRIBED)
+        yield from self.receive_until(Type.SUBSCRIBED)
 
     def _parse_response(self, payload: str) -> WebsocketResponse:
         """Parses the response from the websocket and returns it"""
@@ -203,6 +207,67 @@ class Websocket:
                     yield self
                 finally:
                     self._ws.close()
+
+
+class WebsocketSubscription:
+    """Provides an interface to subscribe to any channel with a subscribe command
+
+    Sends a subscription command and manages subsciption seq id consistency"""
+
+    def __init__(self, ws: Websocket, request: WebsocketRequest):
+        if request.cmd != Command.SUBSCRIBE:
+            raise ValueError("Request must be a subscribe request")
+        self._ws = ws
+        self._request = request
+        self._message_generator: Generator
+        self._last_seq_id: SeqId | None = None
+        self._sid: SubscriptionId | None = None
+
+    def receive_orderbook_msgs(
+        self,
+    ) -> Generator[OrderbookSnapshot | OrderbookDelta, None, WebsocketResponse]:
+        for response in self.continuous_receive():
+            if isinstance(response.msg, OrderbookDelta) or isinstance(
+                response.msg, OrderbookSnapshot
+            ):
+                yield response.msg
+            else:
+                raise WebsocketError(f"Received a message: {response}")
+
+    def continuous_receive(
+        self,
+    ) -> Generator[WebsocketResponse, None, WebsocketResponse]:
+        """Returns messages as generator. Makes sure that our subscription is valid"""
+        yield from self._reconnect()
+        while True:
+            response: WebsocketResponse = next(self.message_generator)
+            if self._last_seq_id is None:
+                self._last_seq_id = response.seq
+            else:
+                # Check if seq id is one plus the last seq id
+                if not (self._last_seq_id + 1 == response.seq):
+                    if response.sid is not None:
+                        self._ws.unsubscribe(response.sid)
+                    yield from self._reconnect()
+            yield response
+
+    def unsubscribe(self):
+        if self._sid is None:
+            raise ValueError("Not subscribed yet")
+        self._ws.unsubscribe(self._sid)
+
+    def _reconnect(self) -> Generator[WebsocketResponse, None, None]:
+        """Re-subscribes to a websocket subscription"""
+        msgs = self._ws.subscribe(self._request)
+        self.message_generator = self._ws.continuous_recieve()
+        self._last_seq_id = None
+
+        # Pulls the sid from the first message, yields it,
+        # then yields rest of messages
+        first_message = next(msgs)
+        self._sid = first_message.sid
+        yield first_message
+        yield from msgs
 
 
 class Connection:
@@ -305,36 +370,6 @@ class Connection:
             member_id=self._auth.member_id,
             api_token=self._auth.token,
         )
-
-    def subscribe_with_seq(
-        self, ws: Websocket, request: WebsocketRequest
-    ) -> Generator[WebsocketResponse, None, None]:
-        """Sends a subscription command and manages subsciption seq id consistency"""
-        if request.cmd != Command.SUBSCRIBE:
-            raise ValueError("Request must be a subscribe request")
-
-        websocket_generator: Generator | None = None
-        last_seq_id: SeqId | None = None
-        while True:
-            if websocket_generator is None:
-                # We need to reconnect to the exchange
-                msgs = ws.subscribe(request)
-                websocket_generator = ws.continuous_recieve()
-                for msg in msgs:
-                    # Yield msgs recieved
-                    yield msg
-            else:
-                response: WebsocketResponse = next(websocket_generator)
-                if last_seq_id is None:
-                    last_seq_id = response.seq
-                else:
-                    if not (last_seq_id + 1 == response.seq):
-                        if response.sid is not None:
-                            ws.unsubscribe(response.sid)
-                        websocket_generator = None
-                        last_seq_id = None
-                        continue
-                yield response
 
     def _check_auth(self):
         """Checks to make sure we're signed in"""

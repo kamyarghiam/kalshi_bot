@@ -1,10 +1,10 @@
 import logging
-from contextlib import _GeneratorContextManager
+from contextlib import _GeneratorContextManager, contextmanager
 from typing import Generator, List, Union
 
 from fastapi.testclient import TestClient
 
-from src.exchange.connection import Connection, Websocket
+from src.exchange.connection import Connection, Websocket, WebsocketSubscription
 from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
@@ -18,8 +18,6 @@ from src.helpers.types.websockets.common import Command, CommandId, Subscription
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import OrderbookDelta, OrderbookSnapshot
 
-logger = logging.getLogger(__name__)
-
 
 class ExchangeInterface:
     def __init__(self, test_client: TestClient | None = None):
@@ -29,7 +27,6 @@ class ExchangeInterface:
         correct env veriables in the README. Sign out can be explicitly
         called in this interface."""
         self._connection = Connection(test_client)
-        self._subsciptions: List[SubscriptionId] = []
 
     def sign_out(self):
         self._connection.sign_out()
@@ -39,12 +36,13 @@ class ExchangeInterface:
             self._connection.get(EXCHANGE_STATUS_URL)
         )
 
+    @contextmanager
     def subscribe_to_orderbook_delta(
         self, ws: Websocket, market_tickers: List[MarketTicker]
-    ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta], None, None]:
-        """Subscribes to the orderbook delta websocket connection
-
-        Returns a generator. Raises WebsocketError if we see an error on the channel"""
+    ) -> _GeneratorContextManager[
+        Generator[Union[OrderbookDelta, OrderbookSnapshot], None, None]
+    ]:
+        """Subscribes to the orderbook delta websocket connection"""
         request = WebsocketRequest(
             id=CommandId.get_new_id(),
             cmd=Command.SUBSCRIBE,
@@ -53,8 +51,11 @@ class ExchangeInterface:
                 market_tickers=market_tickers,
             ),
         )
-        for response in self._connection.subscribe_with_seq(ws, request):
-            yield response.msg  # type:ignore[misc]
+        sub = WebsocketSubscription(ws, request)
+        try:
+            yield sub.receive_orderbook_msgs()
+        finally:
+            sub.unsubscribe()
 
     def get_websocket(self) -> _GeneratorContextManager[Websocket]:
         return self._connection.get_websocket_session()
