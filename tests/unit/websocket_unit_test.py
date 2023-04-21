@@ -26,7 +26,7 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
-    ErrorResponse,
+    ErrorRM,
     OrderbookSnapshot,
     ResponseMessage,
     WebsocketResponse,
@@ -49,9 +49,9 @@ def test_convert_msg():
     response = WebsocketResponse(
         id=CommandId(1), type=Type.ERROR, msg=ResponseMessage(code=8, msg="hi")
     )
-    response.convert_msg(ErrorResponse)
+    response.convert_msg(ErrorRM)
 
-    err_message: ErrorResponse = response.msg
+    err_message: ErrorRM = response.msg
     assert err_message.code == 8
     assert err_message.msg == "hi"
 
@@ -72,10 +72,10 @@ def test_parse_response():
         WebsocketResponse(
             id=CommandId(1),
             type=Type.ERROR,
-            msg=ErrorResponse(code=8, msg="something"),
+            msg=ErrorRM(code=8, msg="something"),
         ).json()
     )
-    assert response.msg == ErrorResponse(code=8, msg="something")
+    assert response.msg == ErrorRM(code=8, msg="something")
 
 
 def test_orderbook_snapshot_validation():
@@ -142,7 +142,7 @@ def test_websockets_with_session_wrapper_send_recieve():
     # Test receive
     with patch.object(ws._ws, "recv") as recv:
         response = WebsocketResponse(
-            id=CommandId(1), type=Type.ERROR, msg=ErrorResponse(code=8, msg="hi")
+            id=CommandId(1), type=Type.ERROR, msg=ErrorRM(code=8, msg="hi")
         )
         recv.return_value = response.json()
 
@@ -186,16 +186,36 @@ def test_receive_until_max_messages():
             ws.receive_until(MagicMock())
 
 
-def test_subscribe_with_non_subscribe_request():
+def test_subscribe_bad_values():
     ws = Websocket(MagicMock(), MagicMock())
     request = WebsocketRequest(
         id=CommandId(1),
         cmd=Command.UNSUBSCRIBE,  # this is not subscribe
         params=RequestParams(),
     )
-    with patch("src.exchange.connection.Websocket._retry_until_subscribed"):
-        with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as command_error:
+        ws.subscribe(request)
+
+    assert command_error.match(
+        str(ValueError(f"Request must be of type subscribe. {request}"))
+    )
+
+    # Fix subscribe
+    request.cmd = Command.SUBSCRIBE
+    # Test null first response message
+    with patch(
+        "src.exchange.connection.Websocket._retry_until_subscribed"
+    ) as retry_sub:
+        sub_msg = MagicMock()
+        sub_msg.msg = None
+        retry_sub.return_value = (sub_msg, MagicMock())
+
+        with pytest.raises(ValueError) as none_err:
             ws.subscribe(request)
+
+        assert none_err.match(
+            str(ValueError(f"Expected non null subscribe message in {sub_msg}"))
+        )
 
 
 def test_update_subscription_RP_sids():

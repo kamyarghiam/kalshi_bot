@@ -14,7 +14,7 @@ from src.helpers.types.websockets.common import (
 )
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
-    ErrorResponse,
+    ErrorRM,
     OrderbookDelta,
     OrderbookSnapshot,
     ResponseMessage,
@@ -80,7 +80,7 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
             side=Side.NO,
             delta=QuantityDelta(5),
         )
-        ws.unsubscribe(SubscriptionId(2))
+        ws.unsubscribe([SubscriptionId(2)])
 
         market_ticker = MarketTicker("SHOULD_ERROR")
         gen = exchange_interface.subscribe_to_orderbook_delta(
@@ -91,4 +91,4 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         with pytest.raises(WebsocketError) as e:
             next(gen)
 
-        assert e.match(str(ErrorResponse(code=8, msg="Something went wrong")))
+        assert e.match(str(ErrorRM(code=8, msg="Something went wrong")))

@@ -47,12 +47,12 @@ class WebsocketResponse(BaseModel, Generic[RM]):
 ##### Different type of response messages ####
 
 
-class Subscribed(ResponseMessage):
+class SubscribedRM(ResponseMessage):
     channel: Channel
     sid: SubscriptionId
 
 
-class ErrorResponse(ResponseMessage):
+class ErrorRM(ResponseMessage):
     code: int
     msg: str
 

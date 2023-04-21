@@ -43,11 +43,11 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
-    ErrorResponse,
+    ErrorRM,
     OrderbookDelta,
     OrderbookSnapshot,
     ResponseMessage,
-    Subscribed,
+    SubscribedRM,
     WebsocketResponse,
 )
 from tests.utils import random_data_from_basemodel
@@ -200,7 +200,7 @@ def kalshi_test_exchange_factory():
             response = WebsocketResponse(
                 id=data.id,
                 type=Type.ERROR,
-                msg=ErrorResponse(code=6, msg="Already subscribed"),
+                msg=ErrorRM(code=6, msg="Already subscribed"),
             )
             sid = storage.subscribed_channels[channel]
         else:
@@ -210,7 +210,7 @@ def kalshi_test_exchange_factory():
             response = WebsocketResponse(
                 id=data.id,
                 type=Type.SUBSCRIBED,
-                msg=Subscribed(channel=channel, sid=sid),
+                msg=SubscribedRM(channel=channel, sid=sid),
             )
         await websocket.send_text(response.json(exclude_none=True))
         return sid
@@ -251,7 +251,7 @@ def kalshi_test_exchange_factory():
                     id=data.id,
                     sid=sid,
                     type=Type.ERROR,
-                    msg=ErrorResponse(code=8, msg="Something went wrong"),
+                    msg=ErrorRM(code=8, msg="Something went wrong"),
                 ).json(exclude_none=True)
             )
         else:
