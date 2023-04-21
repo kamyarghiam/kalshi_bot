@@ -50,11 +50,12 @@ def test_rate_limit_called_for_websockets():
                 check_limits.assert_called_once()
 
 
-@patch("src.exchange.connection.Auth")
-def test_rate_limit_called_for_request(_):
+def test_rate_limit_called_for_request():
     con = Connection(MagicMock(autospec=True))
     con._connection_adapter = MagicMock(autospec=True)
     con._rate_limiter = RateLimiter(limits=[])
     with patch.object(con._rate_limiter, "check_limits") as check_limits:
-        con._request(MagicMock(autospec=True), MagicMock(autospec=True))
+        con._request(
+            MagicMock(autospec=True), MagicMock(autospec=True), check_auth=False
+        )
         check_limits.assert_called_once()
