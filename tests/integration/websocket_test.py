@@ -37,7 +37,6 @@ def test_invalid_channel(exchange_interface: ExchangeInterface):
 
 
 def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
-    # TODO: should we configure this to run against the demo exchange somehow?
     if pytest.is_functional:
         pytest.skip(
             "We don't want to run this against the real exchange "
