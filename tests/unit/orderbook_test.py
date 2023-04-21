@@ -1,5 +1,6 @@
 import pytest
 
+from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
@@ -8,7 +9,9 @@ from src.helpers.types.websockets.response import OrderbookDelta, OrderbookSnaps
 
 def test_from_snapshot():
     orderbook_snapshot = OrderbookSnapshot(
-        market_ticker="hi", yes=[[10, 100]], no=[[20, 200]]
+        market_ticker=MarketTicker("hi"),
+        yes=[[10, 100]],  # type:ignore[list-item]
+        no=[[20, 200]],  # type:ignore[list-item]
     )
     orderbook = Orderbook.from_snapshot(orderbook_snapshot)
     assert orderbook.market_ticker == "hi"
@@ -62,10 +65,13 @@ def test_side_apply_delta():
 
 
 def test_orderbook_apply_delta():
-    book = Orderbook(market_ticker="hi")
+    book = Orderbook(market_ticker=MarketTicker("hi"))
 
     delta = OrderbookDelta(
-        market_ticker="hi", price=Price(11), delta=QuantityDelta(50), side=Side.NO
+        market_ticker=MarketTicker("hi"),
+        price=Price(11),
+        delta=QuantityDelta(50),
+        side=Side.NO,
     )
     book.apply_delta(delta)
     assert len(book.yes.levels) == 0
@@ -73,7 +79,10 @@ def test_orderbook_apply_delta():
     assert book.no.levels[Price(11)] == Quantity(50)
 
     delta = OrderbookDelta(
-        market_ticker="hi", price=Price(12), delta=QuantityDelta(40), side=Side.YES
+        market_ticker=MarketTicker("hi"),
+        price=Price(12),
+        delta=QuantityDelta(40),
+        side=Side.YES,
     )
     book.apply_delta(delta)
     assert len(book.yes.levels) == 1
@@ -84,7 +93,7 @@ def test_orderbook_apply_delta():
     # Wrong ticker
     with pytest.raises(ValueError):
         delta = OrderbookDelta(
-            market_ticker="WRONG_TICKER",
+            market_ticker=MarketTicker("WRONG_TICKER"),
             price=Price(11),
             delta=QuantityDelta(50),
             side=Side.NO,
@@ -94,7 +103,7 @@ def test_orderbook_apply_delta():
     # Invalid side
     with pytest.raises(ValueError):
         delta = OrderbookDelta(
-            market_ticker="hi",
+            market_ticker=MarketTicker("hi"),
             price=Price(11),
             delta=QuantityDelta(50),
             side=Side.TEST_INVALID_SIDE,

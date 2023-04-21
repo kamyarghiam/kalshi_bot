@@ -2,7 +2,18 @@ import urllib.parse
 from typing import Union
 
 
-class URL(str):
+class NonNullStr(str):
+    """Str class without None values"""
+
+    def __new__(cls, s: str | None):
+        if s is None:
+            raise ValueError(
+                f"Value for {cls} was None. Did you specify your env vars?"
+            )
+        return str.__new__(cls, s)
+
+
+class URL(NonNullStr):
     protocol_delim = "://"
 
     def add(self, other: Union["URL", str]):

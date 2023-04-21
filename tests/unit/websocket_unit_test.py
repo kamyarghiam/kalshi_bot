@@ -7,9 +7,10 @@ from websocket import WebSocket as ExternalWebsocket  # type:ignore[import]
 
 from src.exchange.connection import Connection, SessionsWrapper, Websocket
 from src.helpers.types.auth import MemberId, Token
+from src.helpers.types.common import URL
+from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity
-from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import (
     Command,
     CommandId,
@@ -30,6 +31,7 @@ from src.helpers.types.websockets.response import (
     OrderbookSnapshot,
     ResponseMessage,
     WebsocketResponse,
+    convert_websocket_response,
 )
 
 
@@ -38,22 +40,23 @@ def test_websocket_wrapper():
     with pytest.raises(ValueError):
         ws.receive()
     with pytest.raises(ValueError):
-        ws.send("test")
+        ws.send("test")  # type:ignore[arg-type]
 
     ws._ws = "WRONG_TYPE"
     with pytest.raises(ValueError):
         ws.receive()
 
 
-def test_convert_msg():
+def test_convert_websocket_response():
     response = WebsocketResponse(
         id=CommandId(1), type=Type.ERROR, msg=ResponseMessage(code=8, msg="hi")
     )
-    response.convert_msg(ErrorRM)
-
-    err_message: ErrorRM = response.msg
-    assert err_message.code == 8
-    assert err_message.msg == "hi"
+    response_with_error: WebsocketResponse[ErrorRM] = convert_websocket_response(
+        response, ErrorRM
+    )
+    assert response_with_error.msg is not None
+    assert response_with_error.msg.code == 8
+    assert response_with_error.msg.msg == "hi"
 
 
 def test_parse_response():
@@ -66,7 +69,7 @@ def test_parse_response():
             msg=ResponseMessage(some_field="some_message"),
         ).json()
     )
-    assert response.msg.some_field == "some_message"
+    assert response.msg.some_field == "some_message"  # type:ignore[union-attr]
 
     response = ws._parse_response(
         WebsocketResponse(
@@ -80,7 +83,9 @@ def test_parse_response():
 
 def test_orderbook_snapshot_validation():
     orderbook_snapshot = OrderbookSnapshot(
-        market_ticker="hi", yes=[[40, 100], [20, 200]], no=[[50, 200], [60, 700]]
+        market_ticker=MarketTicker("hi"),
+        yes=[[40, 100], [20, 200]],  # type:ignore[list-item]
+        no=[[50, 200], [60, 700]],  # type:ignore[list-item]
     )
 
     assert orderbook_snapshot.market_ticker == "hi"
@@ -97,27 +102,35 @@ def test_orderbook_snapshot_validation():
     with pytest.raises(ValidationError):
         wrong_price = 100
         OrderbookSnapshot(
-            market_ticker="some_ticker", yes=[[wrong_price, 100]], no=[[1, 20]]
+            market_ticker=MarketTicker("some_ticker"),
+            yes=[[wrong_price, 100]],  # type:ignore[list-item]
+            no=[[1, 20]],  # type:ignore[list-item]
         )
 
     # Error in no quantity (under 0)
     with pytest.raises(ValidationError):
         wrong_quantity = -1
         OrderbookSnapshot(
-            market_ticker="some_ticker",
-            yes=[[wrong_price, 100]],
-            no=[[1, wrong_quantity]],
+            market_ticker=MarketTicker("some_ticker"),
+            yes=[[wrong_price, 100]],  # type:ignore[list-item]
+            no=[[1, wrong_quantity]],  # type:ignore[list-item]
         )
 
     # Error in yes level size (over 2)
     with pytest.raises(ValidationError):
         wrong_price = -1
         OrderbookSnapshot(
-            market_ticker="some_ticker", yes=[[30, 100, 100]], no=[[1, 20]]
+            market_ticker=MarketTicker("some_ticker"),
+            yes=[[30, 100, 100]],  # type:ignore[list-item]
+            no=[[1, 20]],  # type:ignore[list-item]
         )
     # Error in no level size (under 2)
     with pytest.raises(ValidationError):
-        OrderbookSnapshot(market_ticker="some_ticker", yes=[[30, 100]], no=[[1]])
+        OrderbookSnapshot(
+            market_ticker=MarketTicker("some_ticker"),
+            yes=[[30, 100]],  # type:ignore[list-item]
+            no=[[1]],  # type:ignore[list-item]
+        )
 
 
 def test_websockets_with_session_wrapper_send_recieve():

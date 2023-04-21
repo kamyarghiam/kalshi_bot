@@ -24,6 +24,7 @@ from src.helpers.types.auth import (
     MemberIdAndToken,
     Token,
 )
+from src.helpers.types.common import URL
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
     GetMarketsResponse,
@@ -33,7 +34,6 @@ from src.helpers.types.markets import (
 )
 from src.helpers.types.money import Price
 from src.helpers.types.orders import QuantityDelta, Side
-from src.helpers.types.url import URL
 from src.helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from src.helpers.types.websockets.request import (
     Channel,
@@ -82,8 +82,8 @@ def kalshi_test_exchange_factory():
     def login(log_in_request: LogInRequest):
         """Logs into the exchange and returns dummy values"""
         if storage.member_id is None or storage.token is None:
-            storage.member_id = MemberId(uuid.uuid4())
-            storage.token = Token(uuid.uuid4().hex)
+            storage.member_id = MemberId(str(uuid.uuid4()))
+            storage.token = Token(str(uuid.uuid4().hex))
         return LogInResponse(
             member_id=storage.member_id,
             token=MemberIdAndToken(storage.member_id + ":" + storage.token),

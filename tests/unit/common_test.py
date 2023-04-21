@@ -1,6 +1,6 @@
 import pytest
 
-from src.helpers.types.url import URL
+from src.helpers.types.common import URL, NonNullStr
 
 
 def test_basic_urls():
@@ -12,7 +12,7 @@ def test_basic_urls():
     assert URL("/hi/bye").add_slash() == URL("/hi/bye")
 
 
-def test_protocol():
+def test_url_protocol():
     a = URL("https://hi")
     assert a.remove_protocol() == URL("hi")
 
@@ -25,3 +25,12 @@ def test_protocol():
     with pytest.raises(ValueError):
         # Already has a protocol
         URL("https://hi").add_protocol("some_protocol")
+
+
+def test_non_null_str():
+    # These are okay
+    NonNullStr("hi")
+    NonNullStr("")
+
+    with pytest.raises(ValueError):
+        NonNullStr(None)

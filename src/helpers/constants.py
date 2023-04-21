@@ -1,4 +1,4 @@
-from src.helpers.types.url import URL
+from src.helpers.types.common import URL
 
 KALSHI_PROD_BASE_URL = "trading-api.kalshi.com"
 

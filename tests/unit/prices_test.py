@@ -9,7 +9,7 @@ def test_prices():
         Price(0)
     with pytest.raises(ValueError):
         # Not an int
-        Price(1.1)
+        Price(1.1)  # type:ignore[arg-type]
     with pytest.raises(ValueError):
         # Above 99
         Price(100)

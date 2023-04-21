@@ -22,7 +22,7 @@ from src.helpers.types.auth import (
     MemberId,
     Token,
 )
-from src.helpers.types.url import URL
+from src.helpers.types.common import URL
 from src.helpers.types.websockets.common import (
     Command,
     CommandId,
@@ -39,6 +39,7 @@ from src.helpers.types.websockets.response import (
     ResponseMessage,
     SubscribedRM,
     WebsocketResponse,
+    convert_websocket_response,
 )
 from tests.fake_exchange import SubscriptionId
 
@@ -235,7 +236,7 @@ class Websocket:
             Type.SUBSCRIBED: SubscribedRM,
         }
         if response.type in type_to_response:
-            return response.convert_msg(type_to_response[response.type])
+            return convert_websocket_response(response, type_to_response[response.type])
         return response
 
 
@@ -286,7 +287,7 @@ class Connection:
                 method=method.value,
                 url=self._api_version.add(url),
                 params=params,
-                json=body,
+                json=None if body is None else body.dict(),
                 headers=headers,
             )
         )
@@ -310,7 +311,7 @@ class Connection:
                 body=LogInRequest(
                     email=self._auth._username,
                     password=self._auth._password,
-                ).dict(),
+                ),
                 check_auth=False,
             )
         )
@@ -322,7 +323,7 @@ class Connection:
             LogOutResponse.parse_obj(
                 self.post(
                     url=LOGOUT_URL,
-                    body=LogOutRequest().dict(),
+                    body=LogOutRequest(),
                 )
             )
         self._auth.remove_credentials()

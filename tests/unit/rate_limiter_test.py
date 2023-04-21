@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from src.exchange.connection import Connection, RateLimiter, SessionsWrapper, Websocket
 from src.helpers.types.api import RateLimit
-from src.helpers.types.url import URL
+from src.helpers.types.common import URL
 
 
 def almost_greater_than(x: float, y: float) -> bool:

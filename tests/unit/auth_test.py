@@ -3,8 +3,14 @@ from datetime import datetime, timedelta
 import pytest
 from mock import patch  # type:ignore
 
-from src.helpers.types.auth import Auth, LogInResponse, MemberId, Token
-from src.helpers.types.url import URL
+from src.helpers.types.auth import (
+    Auth,
+    LogInResponse,
+    MemberId,
+    MemberIdAndToken,
+    Token,
+)
+from src.helpers.types.common import URL
 
 
 @patch(
@@ -126,16 +132,15 @@ def test_using_prod():
 
 
 def test_log_in_response():
-    login = LogInResponse(member_id="WRONG", token="WRONG")
+    login = LogInResponse(member_id=MemberId("WRONG"), token=MemberIdAndToken("WRONG"))
     with pytest.raises(ValueError):
         login.token
-    login = LogInResponse(member_id="MEMBER_ID", token="MEMBER_ID:TOKEN")
+    login = LogInResponse(
+        member_id=MemberId("MEMBER_ID"), token=MemberIdAndToken("MEMBER_ID:TOKEN")
+    )
     assert login.token == Token("TOKEN")
 
 
 def test_null_api_version():
-    auth = Auth()
-    auth._api_version = None
-
     with pytest.raises(ValueError):
-        auth.api_version
+        Token(None)

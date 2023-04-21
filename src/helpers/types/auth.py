@@ -13,26 +13,26 @@ from src.helpers.constants import (
     USERNAME_ENV_VAR,
 )
 from src.helpers.types.api import ExternalApi
-from src.helpers.types.url import URL
+from src.helpers.types.common import URL, NonNullStr
 
 
-class MemberId(str):
+class MemberId(NonNullStr):
     """Type that represents our id on the exchange"""
 
 
-class Token(str):
+class Token(NonNullStr):
     """Auth token used for sending requests"""
 
 
-class MemberIdAndToken(str):
+class MemberIdAndToken(NonNullStr):
     """The exchange responds with memberid:token"""
 
 
-class Password(str):
+class Password(NonNullStr):
     """Type that encapsulates password"""
 
 
-class Username(str):
+class Username(NonNullStr):
     """Type that encapsulates username"""
 
 
@@ -75,8 +75,8 @@ class Auth:
             if env_var not in os.environ:
                 raise ValueError(f"{env_var} not set in env vars")
 
-        self._username: Username = os.environ.get(USERNAME_ENV_VAR)
-        self._password: Password = os.environ.get(PASSWORD_ENV_VAR)
+        self._username: Username = Username(os.environ.get(USERNAME_ENV_VAR))
+        self._password: Password = Password(os.environ.get(PASSWORD_ENV_VAR))
         self._base_url: URL = URL(os.environ.get(URL_ENV_VAR))
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
 
@@ -102,8 +102,6 @@ class Auth:
 
     @property
     def api_version(self) -> URL:
-        if self._api_version is None:
-            raise ValueError("Api version is null")
         return self._api_version
 
     def is_valid(self):
