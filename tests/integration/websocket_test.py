@@ -50,15 +50,17 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         )
 
         first_message = next(gen)
-        assert isinstance(first_message, OrderbookSnapshot)
-        assert Orderbook.from_snapshot(first_message) == Orderbook(
+        assert first_message.type == Type.ORDERBOOK_SNAPSHOT
+        expected_snapshot = Orderbook(
             market_ticker=market_ticker,
             yes=OrderbookSide(levels={Price(10): Quantity(20)}),
             no=OrderbookSide(levels={Price(20): Quantity(40)}),
         )
+        assert isinstance(first_message.msg, OrderbookSnapshot)
+        assert Orderbook.from_snapshot(first_message.msg) == expected_snapshot
 
         second_message = next(gen)
-        assert second_message == OrderbookDelta(
+        assert second_message.msg == OrderbookDelta(
             market_ticker=market_ticker,
             price=Price(10),
             side=Side.NO,
@@ -67,15 +69,12 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
 
         # this message is going to re-subscribe to the topic
         third_message = next(gen)
-        assert second_message == OrderbookDelta(
-            market_ticker=market_ticker,
-            price=Price(10),
-            side=Side.NO,
-            delta=QuantityDelta(5),
-        )
-        assert isinstance(third_message, OrderbookSnapshot)
+        assert third_message.type == Type.ORDERBOOK_SNAPSHOT
+        assert isinstance(third_message.msg, OrderbookSnapshot)
+        assert Orderbook.from_snapshot(third_message.msg) == expected_snapshot
+
         fourth_message = next(gen)
-        assert fourth_message == OrderbookDelta(
+        assert fourth_message.msg == OrderbookDelta(
             market_ticker=market_ticker,
             price=Price(10),
             side=Side.NO,

@@ -194,6 +194,7 @@ def kalshi_test_exchange_factory():
     ) -> SubscriptionId:
         """Sends message that we've subscribed to a channel"""
         sid: SubscriptionId
+        response: WebsocketResponse
         if channel in storage.subscribed_channels:
             # Send already subscribed
             response = WebsocketResponse(

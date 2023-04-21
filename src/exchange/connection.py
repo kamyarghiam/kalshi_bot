@@ -320,9 +320,7 @@ class Connection:
                 # We need to reconnect to the exchange
                 msgs = ws.subscribe(request)
                 websocket_generator = ws.continuous_recieve()
-                for msg in msgs:
-                    # Yield msgs recieved
-                    yield msg
+                yield from msgs
             else:
                 response: WebsocketResponse = next(websocket_generator)
                 if last_seq_id is None:

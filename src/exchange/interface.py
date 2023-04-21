@@ -1,6 +1,6 @@
 import logging
 from contextlib import _GeneratorContextManager
-from typing import Generator, List, Union
+from typing import Generator, List
 
 from fastapi.testclient import TestClient
 
@@ -16,7 +16,11 @@ from src.helpers.types.markets import (
 )
 from src.helpers.types.websockets.common import Command, CommandId, SubscriptionId
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
-from src.helpers.types.websockets.response import OrderbookDelta, OrderbookSnapshot
+from src.helpers.types.websockets.response import (
+    OrderbookDelta,
+    OrderbookSnapshot,
+    WebsocketResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +45,11 @@ class ExchangeInterface:
 
     def subscribe_to_orderbook_delta(
         self, ws: Websocket, market_tickers: List[MarketTicker]
-    ) -> Generator[Union[OrderbookSnapshot, OrderbookDelta], None, None]:
+    ) -> Generator[
+        WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta],
+        None,
+        None,
+    ]:
         """Subscribes to the orderbook delta websocket connection
 
         Returns a generator. Raises WebsocketError if we see an error on the channel"""
@@ -53,8 +61,7 @@ class ExchangeInterface:
                 market_tickers=market_tickers,
             ),
         )
-        for response in self._connection.subscribe_with_seq(ws, request):
-            yield response.msg  # type:ignore[misc]
+        yield from self._connection.subscribe_with_seq(ws, request)
 
     def get_websocket(self) -> _GeneratorContextManager[Websocket]:
         return self._connection.get_websocket_session()
