@@ -176,6 +176,7 @@ class Websocket:
     def subscribe(
         self, request: WebsocketRequest
     ) -> Tuple[SubscriptionId, List[WebsocketResponse]]:
+        print("CALLED")
         """Retries until successfully subscribed to a channel
 
         Returns sid and initial messages on channel before the subscribe message"""

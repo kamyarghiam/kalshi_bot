@@ -284,11 +284,25 @@ def kalshi_test_exchange_factory():
             )
             await websocket.send_text(response_delta.json(exclude_none=True))
 
+            response_delta = WebsocketResponse(
+                id=data.id,
+                type=Type.ORDERBOOK_DELTA,
+                seq=SeqId(3),
+                sid=sid,
+                msg=OrderbookDelta(
+                    market_ticker=market_ticker,
+                    price=Price(10),
+                    side=Side.NO,
+                    delta=QuantityDelta(5),
+                ),
+            )
+            await websocket.send_text(response_delta.json(exclude_none=True))
+
             # Send response with bad seq id
             response_delta = WebsocketResponse(
                 id=data.id,
                 type=Type.ORDERBOOK_DELTA,
-                seq=SeqId(4),
+                seq=SeqId(5),  # bad
                 sid=sid,
                 msg=OrderbookDelta(
                     market_ticker=market_ticker,

@@ -123,6 +123,9 @@ class OrderbookSubscription:
                 self._ws.unsubscribe([self._sid])
                 yield from self._resubscribe()
 
+    def unsubscribe(self):
+        self._ws.unsubscribe([self._sid])
+
     ####### Helpers ########
 
     def _get_subscription_request(self):
@@ -137,15 +140,17 @@ class OrderbookSubscription:
 
     def _resubscribe(
         self,
-    ) -> Generator[
-        WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta],
-        None,
-        None,
-    ]:
+    ) -> List[WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta]]:
         """Subscribes to orderbook channel and yields msgs before subscription msg"""
         self._last_seq_id = None
         self._sid, msgs = self._ws.subscribe(self._get_subscription_request())
-        yield from msgs
+        for msg in msgs:
+            if self._is_seq_id_valid(msg):
+                continue
+            else:
+                # We need to retry the subscription
+                return self._resubscribe()
+        return msgs
 
     def _is_seq_id_valid(self, response: WebsocketResponse):
         """Checks if seq id is one plus previous seq id.
