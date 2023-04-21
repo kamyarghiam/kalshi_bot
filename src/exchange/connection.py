@@ -23,13 +23,7 @@ from src.helpers.types.auth import (
     Token,
 )
 from src.helpers.types.common import URL
-from src.helpers.types.websockets.common import (
-    Command,
-    CommandId,
-    SeqId,
-    Type,
-    WebsocketError,
-)
+from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
 from src.helpers.types.websockets.request import UnsubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
     RM,
@@ -175,10 +169,12 @@ class Websocket:
                     f"Could not find type: {msg_type} within {max_messages} msgs"
                 )
 
-    def subscribe(self, request: WebsocketRequest) -> List[WebsocketResponse]:
+    def subscribe(
+        self, request: WebsocketRequest
+    ) -> Tuple[SubscriptionId, List[WebsocketResponse]]:
         """Retries until successfully subscribed to a channel
 
-        Returns initial messages on channel before the subscribe message"""
+        Returns sid and initial messages on channel before the subscribe message"""
         if request.cmd != Command.SUBSCRIBE:
             raise ValueError(f"Request must be of type subscribe. {request}")
         sub_resp: WebsocketResponse[SubscribedRM]
@@ -187,7 +183,7 @@ class Websocket:
             self._subscriptions.append(sub_resp.msg.sid)
         else:
             raise ValueError(f"Expected non null subscribe message in {sub_resp}")
-        return other_resps
+        return sub_resp.msg.sid, other_resps
 
     def unsubscribe(self, sids: List[SubscriptionId]):
         """Unsubscribes from subscriptions.
@@ -339,34 +335,6 @@ class Connection:
             member_id=self._auth.member_id,
             api_token=self._auth.token,
         )
-
-    def subscribe_with_seq(
-        self, ws: Websocket, request: WebsocketRequest
-    ) -> Generator[WebsocketResponse, None, None]:
-        """Sends a subscription command and manages subsciption seq id consistency"""
-        if request.cmd != Command.SUBSCRIBE:
-            raise ValueError("Request must be a subscribe request")
-
-        websocket_generator: Generator | None = None
-        last_seq_id: SeqId | None = None
-        while True:
-            if websocket_generator is None:
-                # We need to reconnect to the exchange
-                msgs = ws.subscribe(request)
-                websocket_generator = ws.continuous_recieve()
-                yield from msgs
-            else:
-                response: WebsocketResponse = next(websocket_generator)
-                if last_seq_id is None:
-                    last_seq_id = response.seq
-                else:
-                    if not (last_seq_id + 1 == response.seq):
-                        if response.sid is not None:
-                            ws.unsubscribe([response.sid])
-                        websocket_generator = None
-                        last_seq_id = None
-                        continue
-                yield response
 
     def _check_auth(self):
         """Checks to make sure we're signed in"""

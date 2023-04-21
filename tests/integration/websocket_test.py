@@ -1,6 +1,6 @@
 import pytest
 
-from src.exchange.interface import ExchangeInterface
+from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
@@ -44,9 +44,8 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         )
     market_ticker = MarketTicker("SOME_TICKER")
     with exchange_interface.get_websocket() as ws:
-        gen = exchange_interface.subscribe_to_orderbook_delta(
-            ws, market_tickers=[market_ticker]
-        )
+        sub = OrderbookSubscription(ws, [market_ticker])
+        gen = sub.continuous_receive()
 
         first_message = next(gen)
         assert first_message.type == Type.ORDERBOOK_SNAPSHOT
@@ -82,9 +81,8 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         ws.unsubscribe([SubscriptionId(2)])
 
         market_ticker = MarketTicker("SHOULD_ERROR")
-        gen = exchange_interface.subscribe_to_orderbook_delta(
-            ws, market_tickers=[market_ticker]
-        )
+        sub = OrderbookSubscription(ws, [market_ticker])
+        gen = sub.continuous_receive()
 
         # The last message in the fake exchnage returns a runtime error
         with pytest.raises(WebsocketError) as e:

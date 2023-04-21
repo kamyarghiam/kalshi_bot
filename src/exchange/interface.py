@@ -13,7 +13,12 @@ from src.helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from src.helpers.types.websockets.common import Command, CommandId, SubscriptionId
+from src.helpers.types.websockets.common import (
+    Command,
+    CommandId,
+    SeqId,
+    SubscriptionId,
+)
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
     OrderbookDelta,
@@ -42,26 +47,6 @@ class ExchangeInterface:
         return ExchangeStatusResponse.parse_obj(
             self._connection.get(EXCHANGE_STATUS_URL)
         )
-
-    def subscribe_to_orderbook_delta(
-        self, ws: Websocket, market_tickers: List[MarketTicker]
-    ) -> Generator[
-        WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta],
-        None,
-        None,
-    ]:
-        """Subscribes to the orderbook delta websocket connection
-
-        Returns a generator. Raises WebsocketError if we see an error on the channel"""
-        request = WebsocketRequest(
-            id=CommandId.get_new_id(),
-            cmd=Command.SUBSCRIBE,
-            params=SubscribeRP(
-                channels=[Channel.ORDER_BOOK_DELTA],
-                market_tickers=market_tickers,
-            ),
-        )
-        yield from self._connection.subscribe_with_seq(ws, request)
 
     def get_websocket(self) -> ContextManager[Websocket]:
         return self._connection.get_websocket_session()
@@ -105,3 +90,48 @@ class ExchangeInterface:
         exc_tb: TracebackType | None,
     ):
         self._connection.sign_out()
+
+
+class OrderbookSubscription:
+    def __init__(self, ws: Websocket, market_tickers: List[MarketTicker]):
+        self._sid: SubscriptionId | None = None
+        self._msg_gen: Generator | None = None
+        self._ws = ws
+        self._request = WebsocketRequest(
+            id=CommandId.get_new_id(),
+            cmd=Command.SUBSCRIBE,
+            params=SubscribeRP(
+                channels=[Channel.ORDER_BOOK_DELTA],
+                market_tickers=market_tickers,
+            ),
+        )
+
+    def continuous_receive(
+        self,
+    ) -> Generator[
+        WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta],
+        None,
+        None,
+    ]:
+        # Subscribe to websocket
+        self._sid, msgs = self._ws.subscribe(self._request)
+        websocket_generator: Generator = self._ws.continuous_recieve()
+        yield from msgs
+
+        last_seq_id: SeqId | None = None
+        while True:
+            response: WebsocketResponse = next(websocket_generator)
+            if last_seq_id is None:
+                last_seq_id = response.seq
+            else:
+                if not (last_seq_id + 1 == response.seq):
+                    if response.sid is not None:
+                        self._ws.unsubscribe([response.sid])
+                    # Resubscribe to websocket
+                    self._request.id = CommandId.get_new_id()
+                    self._sid, msgs = self._ws.subscribe(self._request)
+                    websocket_generator = self._ws.continuous_recieve()
+                    last_seq_id = None
+                    yield from msgs
+                    continue
+            yield response
