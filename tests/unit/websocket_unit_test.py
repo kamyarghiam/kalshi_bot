@@ -154,7 +154,7 @@ def test_websockets_session_wrapper_connect():
     with patch("src.exchange.connection.ExternalWebsocket.connect") as connect:
         sessions_wrapper = SessionsWrapper(URL("base_url"))
         ws = Websocket(sessions_wrapper, MagicMock(autospec=True))
-        with ws.websocket_connect(
+        with ws.connect(
             URL("websocket_url"), MemberId("member_id"), api_token=Token("token")
         ):
             connect.assert_called_once_with(

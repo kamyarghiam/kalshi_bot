@@ -1,8 +1,8 @@
 import ssl
 import typing
-from contextlib import _GeneratorContextManager, contextmanager
+from contextlib import contextmanager
 from enum import Enum
-from typing import Dict, Generator, List, Tuple, Union
+from typing import ContextManager, Dict, Generator, List, Tuple, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
@@ -79,7 +79,10 @@ class RateLimiter:
 
 
 class Websocket:
-    """Creates a wrapper around websocket clients so we can send and receive data"""
+    """Creates a wrapper around websocket clients so we can send and receive data
+
+    Support both local websockets for testing and remote websockets for calls
+    to remote clients."""
 
     def __init__(
         self,
@@ -100,7 +103,37 @@ class Websocket:
         self._ws: ExternalWebsocket | WebSocketTestSession | None = None
         self._subscriptions: List[SubscriptionId] = []
 
+    @contextmanager
+    def connect(self, websocket_url: URL, member_id: MemberId, api_token: Token):
+        """Main entry point. Call this function to get websocket connection session
+
+        Automaitcally unsubscribes you from all subscriptions after session is
+        closed."""
+        if isinstance(self._connection_adapter, SessionsWrapper):
+            self._ws = ExternalWebsocket(sslopt={"cert_reqs": ssl.CERT_NONE})
+            try:
+                self._ws.connect(
+                    self._base_url.add(websocket_url),
+                    header=[f"Authorization:Bearer {member_id}:{api_token}"],
+                )
+                yield self
+            finally:
+                self.unsubscribe(self._subscriptions)
+                self._ws.close()
+        elif isinstance(self._connection_adapter, TestClient):
+            with self._connection_adapter.connect(  # type:ignore[attr-defined]
+                websocket_url
+            ) as websocket:
+                websocket: WebSocketTestSession  # type:ignore[no-redef]
+                self._ws = websocket
+                try:
+                    yield self
+                finally:
+                    self.unsubscribe(self._subscriptions)
+                    self._ws.close()
+
     def send(self, request: WebsocketRequest):
+        """Send single message"""
         self._rate_limiter.check_limits()
         if self._ws is None:
             raise ValueError("Send: Did not intialize the websocket")
@@ -110,6 +143,7 @@ class Websocket:
             self._ws.send_text(request.json())
 
     def receive(self) -> WebsocketResponse:
+        """Receive single message"""
         if self._ws is None:
             raise ValueError("Receive: Did not intialize the websocket")
         if isinstance(self._ws, ExternalWebsocket):
@@ -141,7 +175,9 @@ class Websocket:
                 )
 
     def subscribe(self, request: WebsocketRequest) -> List[WebsocketResponse]:
-        """Retries until successfully subscribed. Returns initial messages on channel"""
+        """Retries until successfully subscribed to a channel
+
+        Returns initial messages on channel before the subscribe message"""
         if request.cmd != Command.SUBSCRIBE:
             raise ValueError(f"Request must be of type subscribe. {request}")
         sub_resp: WebsocketResponse[SubscribedRM]
@@ -153,7 +189,10 @@ class Websocket:
         return other_resps
 
     def unsubscribe(self, sids: List[SubscriptionId]):
-        """Unsubscribes from channel"""
+        """Unsubscribes from subscriptions.
+
+        Note: this is automatically called at the end of a
+        connection session"""
         if len(sids) == 0:
             return
         self.send(
@@ -176,6 +215,8 @@ class Websocket:
                 raise WebsocketError(response.msg)
             yield response
 
+    ########### Helpers #############
+
     @retry(stop=stop_after_delay(12), retry=retry_if_not_exception_type(WebsocketError))
     def _retry_until_subscribed(
         self, request: WebsocketRequest
@@ -196,31 +237,6 @@ class Websocket:
         if response.type in type_to_response:
             return response.convert_msg(type_to_response[response.type])
         return response
-
-    @contextmanager
-    def websocket_connect(
-        self, websocket_url: URL, member_id: MemberId, api_token: Token
-    ):
-        if isinstance(self._connection_adapter, SessionsWrapper):
-            self._ws = ExternalWebsocket(sslopt={"cert_reqs": ssl.CERT_NONE})
-            try:
-                self._ws.connect(
-                    self._base_url.add(websocket_url),
-                    header=[f"Authorization:Bearer {member_id}:{api_token}"],
-                )
-                yield self
-            finally:
-                self.unsubscribe(self._subscriptions)
-                self._ws.close()
-        elif isinstance(self._connection_adapter, TestClient):
-            with self._connection_adapter.websocket_connect(websocket_url) as websocket:
-                websocket: WebSocketTestSession  # type:ignore[no-redef]
-                self._ws = websocket
-                try:
-                    yield self
-                finally:
-                    self.unsubscribe(self._subscriptions)
-                    self._ws.close()
 
 
 class Connection:
@@ -245,7 +261,6 @@ class Connection:
                     RateLimit(transactions=100, seconds=60),
                 ]
             )
-        self._check_auth()
 
     def _request(
         self,
@@ -314,11 +329,11 @@ class Connection:
 
     def get_websocket_session(
         self,
-    ) -> _GeneratorContextManager[Websocket]:
+    ) -> ContextManager[Websocket]:
         self._check_auth()
         websocket = Websocket(self._connection_adapter, self._rate_limiter)
         websocket_url = URL("ws").add(self._api_version)
-        return websocket.websocket_connect(
+        return websocket.connect(
             websocket_url=websocket_url,
             member_id=self._auth.member_id,
             api_token=self._auth.token,

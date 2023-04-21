@@ -41,7 +41,7 @@ def test_rate_limit_called_for_websockets():
     with patch("src.exchange.connection.ExternalWebsocket.connect"):
         rate_limiter = RateLimiter(limits=[])
         ws = Websocket(SessionsWrapper(base_url=URL("anything")), rate_limiter)
-        with ws.websocket_connect(
+        with ws.connect(
             MagicMock(autospec=True), MagicMock(autospec=True), MagicMock(autospec=True)
         ):
             ws._ws = MagicMock(autospec=True)

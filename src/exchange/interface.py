@@ -1,6 +1,6 @@
 import logging
-from contextlib import _GeneratorContextManager
-from typing import Generator, List
+from types import TracebackType
+from typing import ContextManager, Generator, List
 
 from fastapi.testclient import TestClient
 
@@ -27,16 +27,17 @@ logger = logging.getLogger(__name__)
 
 class ExchangeInterface:
     def __init__(self, test_client: TestClient | None = None):
-        """This class provides a high level interace with the exchange
+        """This class provides a high level interace with the exchange.
 
-        Sign-in is automatically handled for you. Simply fill out the
-        correct env veriables in the README. Sign out can be explicitly
-        called in this interface."""
+        It is a context manager that autoamtically signs you into and out
+        of the exchange. To use this class properly do:
+
+        with ExchangeInterface(fastapi_test_client) as exchange_interface:
+            ...
+
+        """
         self._connection = Connection(test_client)
         self._subsciptions: List[SubscriptionId] = []
-
-    def sign_out(self):
-        self._connection.sign_out()
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(
@@ -63,7 +64,7 @@ class ExchangeInterface:
         )
         yield from self._connection.subscribe_with_seq(ws, request)
 
-    def get_websocket(self) -> _GeneratorContextManager[Websocket]:
+    def get_websocket(self) -> ContextManager[Websocket]:
         return self._connection.get_websocket_session()
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:
@@ -93,3 +94,15 @@ class ExchangeInterface:
                 params=request.dict(exclude_none=True),
             )
         )
+
+    def __enter__(self) -> "ExchangeInterface":
+        self._connection.sign_in()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ):
+        self._connection.sign_out()

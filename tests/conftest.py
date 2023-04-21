@@ -34,4 +34,5 @@ def fastapi_test_client(request):
 def exchange_interface(fastapi_test_client: TestClient | None):
     """This fixture either sends the Kalshi fake exchange or a connection to the
     real exchange through the ehxcnage interface"""
-    yield ExchangeInterface(fastapi_test_client)
+    with ExchangeInterface(fastapi_test_client) as exchange_interface:
+        yield exchange_interface
