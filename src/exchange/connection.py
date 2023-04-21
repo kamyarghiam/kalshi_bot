@@ -2,7 +2,7 @@ import ssl
 import typing
 from contextlib import contextmanager
 from enum import Enum
-from typing import ContextManager, Dict, Generator, List, Tuple, Union
+from typing import ContextManager, Dict, List, Tuple, Union
 
 import requests  # type:ignore
 from fastapi.testclient import TestClient
@@ -139,14 +139,18 @@ class Websocket:
 
     def receive(self) -> WebsocketResponse:
         """Receive single message"""
+        message: WebsocketResponse
         if self._ws is None:
             raise ValueError("Receive: Did not intialize the websocket")
         if isinstance(self._ws, ExternalWebsocket):
-            return self._parse_response(self._ws.recv())
+            message = self._parse_response(self._ws.recv())
         elif isinstance(self._ws, WebSocketTestSession):
-            return self._parse_response(self._ws.receive_text())
+            message = self._parse_response(self._ws.receive_text())
         else:
             raise ValueError("Receive: websocket wrong type")
+        if isinstance(message.msg, ErrorRM):
+            raise WebsocketError(message.msg)
+        return message
 
     def receive_until(
         self, msg_type: Type, _: typing.Type[RM] | None = None, max_messages: int = 30
@@ -203,14 +207,6 @@ class Websocket:
 
         for sid in sids:
             self._subscriptions.remove(sid)
-
-    def continuous_recieve(self) -> Generator[WebsocketResponse, None, None]:
-        """Continously pulls messages and returns response message"""
-        while True:
-            response: WebsocketResponse = self.receive()
-            if isinstance(response.msg, ErrorRM):
-                raise WebsocketError(response.msg)
-            yield response
 
     ########### Helpers #############
 

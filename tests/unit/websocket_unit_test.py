@@ -159,8 +159,9 @@ def test_websockets_with_session_wrapper_send_recieve():
         )
         recv.return_value = response.json()
 
-        parsed_response = ws.receive()
-        assert parsed_response == response
+        with pytest.raises(WebsocketError) as error:
+            ws.receive()
+        assert error.match(str(response.msg))
 
 
 def test_websockets_session_wrapper_connect():

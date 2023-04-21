@@ -93,18 +93,16 @@ class ExchangeInterface:
 
 
 class OrderbookSubscription:
+    """Interface to allow for easy access to an orderbook subscription
+
+    To use this, first create a websocket with the Exchange interface
+    then pass it in here with a list of market tickers you want to subscribe to"""
+
     def __init__(self, ws: Websocket, market_tickers: List[MarketTicker]):
-        self._sid: SubscriptionId | None = None
-        self._msg_gen: Generator | None = None
+        self._sid: SubscriptionId
+        self._last_seq_id: SeqId | None = None
         self._ws = ws
-        self._request = WebsocketRequest(
-            id=CommandId.get_new_id(),
-            cmd=Command.SUBSCRIBE,
-            params=SubscribeRP(
-                channels=[Channel.ORDER_BOOK_DELTA],
-                market_tickers=market_tickers,
-            ),
-        )
+        self._market_tickers = market_tickers
 
     def continuous_receive(
         self,
@@ -113,25 +111,47 @@ class OrderbookSubscription:
         None,
         None,
     ]:
-        # Subscribe to websocket
-        self._sid, msgs = self._ws.subscribe(self._request)
-        websocket_generator: Generator = self._ws.continuous_recieve()
+        """Returns messages from orderbook channel and makes sure
+        that seq ids are consecutive"""
+
+        yield from self._resubscribe()
+        while True:
+            response = self._ws.receive()
+            if self._is_seq_id_valid(response):
+                yield response
+            else:
+                self._ws.unsubscribe([self._sid])
+                yield from self._resubscribe()
+
+    ####### Helpers ########
+
+    def _get_subscription_request(self):
+        return WebsocketRequest(
+            id=CommandId.get_new_id(),
+            cmd=Command.SUBSCRIBE,
+            params=SubscribeRP(
+                channels=[Channel.ORDER_BOOK_DELTA],
+                market_tickers=self._market_tickers,
+            ),
+        )
+
+    def _resubscribe(
+        self,
+    ) -> Generator[
+        WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta],
+        None,
+        None,
+    ]:
+        """Subscribes to orderbook channel and yields msgs before subscription msg"""
+        self._last_seq_id = None
+        self._sid, msgs = self._ws.subscribe(self._get_subscription_request())
         yield from msgs
 
-        last_seq_id: SeqId | None = None
-        while True:
-            response: WebsocketResponse = next(websocket_generator)
-            if last_seq_id is None:
-                last_seq_id = response.seq
-            else:
-                if not (last_seq_id + 1 == response.seq):
-                    if response.sid is not None:
-                        self._ws.unsubscribe([response.sid])
-                    # Resubscribe to websocket
-                    self._request.id = CommandId.get_new_id()
-                    self._sid, msgs = self._ws.subscribe(self._request)
-                    websocket_generator = self._ws.continuous_recieve()
-                    last_seq_id = None
-                    yield from msgs
-                    continue
-            yield response
+    def _is_seq_id_valid(self, response: WebsocketResponse):
+        """Checks if seq id is one plus previous seq id.
+
+        Also updates the seq id"""
+        if self._last_seq_id is not None and self._last_seq_id + 1 != response.seq:
+            return False
+        self._last_seq_id = response.seq
+        return True

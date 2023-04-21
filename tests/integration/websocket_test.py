@@ -17,7 +17,6 @@ from src.helpers.types.websockets.response import (
     ErrorRM,
     OrderbookDelta,
     OrderbookSnapshot,
-    ResponseMessage,
 )
 
 
@@ -30,10 +29,9 @@ def test_invalid_channel(exchange_interface: ExchangeInterface):
                 params=SubscribeRP(channels=[Channel.INVALID_CHANNEL]),
             )
         )
-        response = ws.receive()
-        assert response.msg == ResponseMessage(code=8, msg="Unknown channel name")
-        assert response.id == 1
-        assert response.type == Type.ERROR
+        with pytest.raises(WebsocketError) as error:
+            ws.receive()
+        assert error.match("code=8 msg='Unknown channel name'")
 
 
 def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
