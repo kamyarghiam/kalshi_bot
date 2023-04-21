@@ -32,8 +32,10 @@ class ExchangeInterface:
         It is a context manager that autoamtically signs you into and out
         of the exchange. To use this class properly do:
 
-        with ExchangeInterface(fastapi_test_client) as exchange_interface:
+        with ExchangeInterface() as exchange_interface:
             ...
+
+        The credentials are picked up from the env variables.
 
         """
         self._connection = Connection(test_client)
