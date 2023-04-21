@@ -1,4 +1,3 @@
-import logging
 from types import TracebackType
 from typing import ContextManager, Generator, List
 
@@ -21,8 +20,6 @@ from src.helpers.types.websockets.response import (
     OrderbookSnapshot,
     WebsocketResponse,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class ExchangeInterface:
