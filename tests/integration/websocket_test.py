@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
@@ -11,6 +13,7 @@ from src.helpers.types.websockets.response import (
     ErrorRM,
     OrderbookDelta,
     OrderbookSnapshot,
+    WebsocketResponse,
 )
 
 
@@ -28,17 +31,16 @@ def test_invalid_channel(exchange_interface: ExchangeInterface):
         assert error.match("code=8 msg='Unknown channel name'")
 
 
-def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
+def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface):
     if pytest.is_functional:
         pytest.skip(
             "We don't want to run this against the real exchange "
             + "since the ouptut data may be different"
         )
-    market_ticker = MarketTicker("SOME_TICKER")
+    market_ticker = MarketTicker("bad_seq_id")
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, [market_ticker])
         gen = sub.continuous_receive()
-        print("message 1")
         first_message = next(gen)
         assert first_message.type == Type.ORDERBOOK_SNAPSHOT
         expected_snapshot = Orderbook(
@@ -49,7 +51,6 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         assert isinstance(first_message.msg, OrderbookSnapshot)
         assert Orderbook.from_snapshot(first_message.msg) == expected_snapshot
 
-        print("message 2")
         second_message = next(gen)
         expected_delta = OrderbookDelta(
             market_ticker=market_ticker,
@@ -59,20 +60,17 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
         )
         assert second_message.msg == expected_delta
 
-        print("message 3")
         third_message = next(gen)
         assert third_message.type == Type.ORDERBOOK_DELTA
         assert isinstance(third_message.msg, OrderbookDelta)
         assert third_message.msg == expected_delta
 
         # this message is going to re-subscribe to the topic. Goes back to beginning
-        print("message 4")
         fourth_message = next(gen)
         assert fourth_message.type == Type.ORDERBOOK_SNAPSHOT
         assert isinstance(fourth_message.msg, OrderbookSnapshot)
         assert Orderbook.from_snapshot(fourth_message.msg) == expected_snapshot
 
-        print("message 5")
         fifth_message = next(gen)
         assert fifth_message.msg == OrderbookDelta(
             market_ticker=market_ticker,
@@ -80,8 +78,15 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
             side=Side.NO,
             delta=QuantityDelta(5),
         )
-        sub.unsubscribe()
 
+
+def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterface):
+    if pytest.is_functional:
+        pytest.skip(
+            "We don't want to run this against the real exchange "
+            + "since the ouptut data may be different"
+        )
+    with exchange_interface.get_websocket() as ws:
         market_ticker = MarketTicker("SHOULD_ERROR")
         sub = OrderbookSubscription(ws, [market_ticker])
         gen = sub.continuous_receive()
@@ -91,3 +96,25 @@ def test_orderbook_snapshot(exchange_interface: ExchangeInterface):
             next(gen)
 
         assert e.match(str(ErrorRM(code=8, msg="Something went wrong")))
+
+
+def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface):
+    with exchange_interface.get_websocket() as ws:
+        market_ticker = MarketTicker("NORMAL_TICKER")
+        sub = OrderbookSubscription(ws, [market_ticker])
+        gen = sub.continuous_receive()
+        next(gen)
+        sub.update_subscription([MarketTicker("another_market")])
+        msgs: List[WebsocketResponse] = []
+        for msg in sub._pending_msgs:
+            msg: WebsocketResponse  # type:ignore[no-redef]
+            msgs.append(msg)
+            if msg.type == Type.SUBSCRIPTION_UPDATED:
+                break
+        else:
+            assert False, "could not find subscription updated message"
+        sub._pending_msgs.add_messages(msgs)
+        for _ in range(len(msgs)):
+            next(gen)
+
+        assert sub._market_tickers == [MarketTicker("another_market")]

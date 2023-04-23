@@ -18,13 +18,21 @@ from src.helpers.types.websockets.common import (
     CommandId,
     SeqId,
     SubscriptionId,
+    Type,
 )
-from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
+from src.helpers.types.websockets.request import (
+    Channel,
+    SubscribeRP,
+    UpdateSubscriptionAction,
+    UpdateSubscriptionRP,
+    WebsocketRequest,
+)
 from src.helpers.types.websockets.response import (
     OrderbookDelta,
     OrderbookSnapshot,
     WebsocketResponse,
 )
+from src.helpers.utils import PendingMessages
 
 
 class ExchangeInterface:
@@ -103,6 +111,13 @@ class OrderbookSubscription:
         self._last_seq_id: SeqId | None = None
         self._ws = ws
         self._market_tickers = market_tickers
+        # When we subscribe, there are messages before the subscribe message that
+        # we may need to return.
+        self._pending_msgs: PendingMessages[
+            WebsocketResponse[OrderbookSnapshot]
+            | WebsocketResponse[OrderbookDelta]
+            | WebsocketResponse  # For update subscription (TODO: change types)
+        ] = PendingMessages()
 
     def continuous_receive(
         self,
@@ -114,17 +129,76 @@ class OrderbookSubscription:
         """Returns messages from orderbook channel and makes sure
         that seq ids are consecutive"""
 
-        yield from self._resubscribe()
+        self._subscribe()
         while True:
-            response = self._ws.receive()
+            response = self._get_next_message()
             if self._is_seq_id_valid(response):
                 yield response
             else:
-                self._ws.unsubscribe([self._sid])
-                yield from self._resubscribe()
+                self._resubscribe()
 
-    def unsubscribe(self):
+    def _get_next_message(self):
+        """We either pull the next message from the pending message queue
+        or we receive a new message from the websocket"""
+        next_message: WebsocketResponse
+        try:
+            next_message = next(self._pending_msgs)
+        except StopIteration:
+            next_message = self._ws.receive()
+
+        if next_message.type == Type.SUBSCRIPTION_UPDATED:
+            # We don't we want to return this type of message.
+            # We just want to check that it's a valid seq id
+            # and continue on with our lives
+            if not self._is_seq_id_valid(next_message):
+                self._resubscribe()
+            return self._get_next_message()
+        return next_message
+
+    def update_subscription(self, new_market_tickers: List[MarketTicker]):
+        mt_set = set(self._market_tickers)
+        new_mt_set = set(new_market_tickers)
+
+        tickers_to_delete = mt_set - new_mt_set
+        if len(tickers_to_delete) > 0:
+            delete_request = WebsocketRequest(
+                id=CommandId.get_new_id(),
+                cmd=Command.UPDATE_SUBSCRIPTION,
+                params=UpdateSubscriptionRP(
+                    sids=[self._sid],
+                    market_tickers=list(tickers_to_delete),
+                    action=UpdateSubscriptionAction.DELETE_MARKETS,
+                ),
+            )
+            sub_ok_msg, msgs = self._ws.update_subscription(delete_request)
+            msgs.append(sub_ok_msg)
+            self._pending_msgs.add_messages(msgs)
+
+        tickers_to_add = new_mt_set - mt_set
+        if len(tickers_to_add) > 0:
+            add_request = WebsocketRequest(
+                id=CommandId.get_new_id(),
+                cmd=Command.UPDATE_SUBSCRIPTION,
+                params=UpdateSubscriptionRP(
+                    sids=[self._sid],
+                    market_tickers=list(tickers_to_add),
+                    action=UpdateSubscriptionAction.ADD_MARKETS,
+                ),
+            )
+            sub_ok_msg, msgs = self._ws.update_subscription(add_request)
+            msgs.append(sub_ok_msg)
+            self._pending_msgs.add_messages(msgs)
+
+        self._market_tickers = new_market_tickers
+
+    def _unsubscribe(self):
+        self._pending_msgs.clear()
+        self._last_seq_id = None
         self._ws.unsubscribe([self._sid])
+
+    def _resubscribe(self):
+        self._unsubscribe()
+        self._subscribe()
 
     ####### Helpers ########
 
@@ -138,19 +212,12 @@ class OrderbookSubscription:
             ),
         )
 
-    def _resubscribe(
-        self,
-    ) -> List[WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta]]:
+    def _subscribe(self):
         """Subscribes to orderbook channel and yields msgs before subscription msg"""
+        self._pending_msgs.clear()
         self._last_seq_id = None
         self._sid, msgs = self._ws.subscribe(self._get_subscription_request())
-        for msg in msgs:
-            if self._is_seq_id_valid(msg):
-                continue
-            else:
-                # We need to retry the subscription
-                return self._resubscribe()
-        return msgs
+        self._pending_msgs.add_messages(msgs)
 
     def _is_seq_id_valid(self, response: WebsocketResponse):
         """Checks if seq id is one plus previous seq id.

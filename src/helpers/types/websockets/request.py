@@ -63,6 +63,10 @@ class UpdateSubscriptionRP(RequestParams):
             raise ValueError("Sids must be of length 1")
         return sids
 
+    @property
+    def sid(self):
+        return self.sids[0]
+
 
 RP = TypeVar("RP", bound=RequestParams)
 

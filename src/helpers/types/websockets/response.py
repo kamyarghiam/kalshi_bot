@@ -29,10 +29,12 @@ RM = TypeVar("RM", bound=ResponseMessage)
 
 
 class WebsocketResponse(BaseModel, Generic[RM]):
+    type: Type
     id: CommandId | None = None
     seq: SeqId | None = None
     sid: SubscriptionId | None = None
-    type: Type
+    # For update subscription
+    market_tickers: List[MarketTicker] | None = None
     msg: RM | None = None
 
     class Config:

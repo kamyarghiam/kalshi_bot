@@ -24,7 +24,11 @@ from src.helpers.types.auth import (
 )
 from src.helpers.types.common import URL
 from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
-from src.helpers.types.websockets.request import UnsubscribeRP, WebsocketRequest
+from src.helpers.types.websockets.request import (
+    UnsubscribeRP,
+    UpdateSubscriptionRP,
+    WebsocketRequest,
+)
 from src.helpers.types.websockets.response import (
     RM,
     ErrorRM,
@@ -176,7 +180,6 @@ class Websocket:
     def subscribe(
         self, request: WebsocketRequest
     ) -> Tuple[SubscriptionId, List[WebsocketResponse]]:
-        print("CALLED")
         """Retries until successfully subscribed to a channel
 
         Returns sid and initial messages on channel before the subscribe message"""
@@ -208,6 +211,14 @@ class Websocket:
 
         for sid in sids:
             self._subscriptions.remove(sid)
+
+    def update_subscription(
+        self, request: WebsocketRequest[UpdateSubscriptionRP]
+    ) -> Tuple[WebsocketResponse, List[WebsocketResponse]]:
+        """Returns tuple of subscription updated messages and
+        all messages that came before it"""
+        self.send(request=request)
+        return self.receive_until(Type.SUBSCRIPTION_UPDATED)
 
     ########### Helpers #############
 
