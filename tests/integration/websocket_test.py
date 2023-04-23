@@ -99,6 +99,11 @@ def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterfac
 
 
 def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface):
+    if pytest.is_functional:
+        pytest.skip(
+            "We don't want to run this against the real exchange "
+            + "since the ouptut data may be different"
+        )
     with exchange_interface.get_websocket() as ws:
         market_ticker = MarketTicker("NORMAL_TICKER")
         sub = OrderbookSubscription(ws, [market_ticker])
