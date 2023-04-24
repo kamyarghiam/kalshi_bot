@@ -228,7 +228,7 @@ class Websocket:
         self.send(request)
         return self.receive_until(Type.SUBSCRIBED, SubscribedWR)
 
-    def _parse_response(self, payload: str) -> type[WebsocketResponse]:
+    def _parse_response(self, payload: str):
         """Parses the response from the websocket and returns it"""
         response: WebsocketResponse = WebsocketResponse.parse_raw(payload)
         type_to_response: Dict[Type, type[WebsocketResponse]] = {
@@ -239,9 +239,7 @@ class Websocket:
             Type.UNSUBSCRIBE: UnsubscribedWR,
             Type.SUBSCRIPTION_UPDATED: SubscriptionUpdatedWR,
         }
-        return response.convert(
-            type_to_response[response.type]  # type:ignore[return-value]
-        )
+        return response.convert(type_to_response[response.type])
 
 
 class Connection:
