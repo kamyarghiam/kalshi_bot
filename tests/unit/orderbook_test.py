@@ -4,11 +4,11 @@ from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.response import OrderbookDelta, OrderbookSnapshot
+from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
 def test_from_snapshot():
-    orderbook_snapshot = OrderbookSnapshot(
+    orderbook_snapshot = OrderbookSnapshotRM(
         market_ticker=MarketTicker("hi"),
         yes=[[10, 100]],  # type:ignore[list-item]
         no=[[20, 200]],  # type:ignore[list-item]
@@ -67,7 +67,7 @@ def test_side_apply_delta():
 def test_orderbook_apply_delta():
     book = Orderbook(market_ticker=MarketTicker("hi"))
 
-    delta = OrderbookDelta(
+    delta = OrderbookDeltaRM(
         market_ticker=MarketTicker("hi"),
         price=Price(11),
         delta=QuantityDelta(50),
@@ -78,7 +78,7 @@ def test_orderbook_apply_delta():
     assert len(book.no.levels) == 1
     assert book.no.levels[Price(11)] == Quantity(50)
 
-    delta = OrderbookDelta(
+    delta = OrderbookDeltaRM(
         market_ticker=MarketTicker("hi"),
         price=Price(12),
         delta=QuantityDelta(40),
@@ -92,7 +92,7 @@ def test_orderbook_apply_delta():
 
     # Wrong ticker
     with pytest.raises(ValueError):
-        delta = OrderbookDelta(
+        delta = OrderbookDeltaRM(
             market_ticker=MarketTicker("WRONG_TICKER"),
             price=Price(11),
             delta=QuantityDelta(50),
@@ -102,7 +102,7 @@ def test_orderbook_apply_delta():
 
     # Invalid side
     with pytest.raises(ValueError):
-        delta = OrderbookDelta(
+        delta = OrderbookDeltaRM(
             market_ticker=MarketTicker("hi"),
             price=Price(11),
             delta=QuantityDelta(50),

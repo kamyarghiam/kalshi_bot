@@ -1,5 +1,4 @@
 import ssl
-import typing
 from contextlib import contextmanager
 from enum import Enum
 from typing import ContextManager, Dict, List, Tuple, Union
@@ -30,14 +29,14 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
-    RM,
-    ErrorRM,
-    OrderbookDelta,
-    OrderbookSnapshot,
-    ResponseMessage,
-    SubscribedRM,
+    WR,
+    ErrorWR,
+    OrderbookDeltaWR,
+    OrderbookSnapshotWR,
+    SubscribedWR,
+    SubscriptionUpdatedWR,
+    UnsubscribedWR,
     WebsocketResponse,
-    convert_websocket_response,
 )
 from tests.fake_exchange import SubscriptionId
 
@@ -141,9 +140,9 @@ class Websocket:
         elif isinstance(self._ws, WebSocketTestSession):
             self._ws.send_text(request.json())
 
-    def receive(self) -> WebsocketResponse:
+    def receive(self) -> type[WebsocketResponse]:
         """Receive single message"""
-        message: WebsocketResponse
+        message: type[WebsocketResponse]
         if self._ws is None:
             raise ValueError("Receive: Did not intialize the websocket")
         if isinstance(self._ws, ExternalWebsocket):
@@ -152,26 +151,25 @@ class Websocket:
             message = self._parse_response(self._ws.receive_text())
         else:
             raise ValueError("Receive: websocket wrong type")
-        if isinstance(message.msg, ErrorRM):
+        if isinstance(message, ErrorWR):
             raise WebsocketError(message.msg)
         return message
 
     def receive_until(
-        self, msg_type: Type, _: typing.Type[RM] | None = None, max_messages: int = 30
-    ) -> Tuple[WebsocketResponse[RM], List[WebsocketResponse]]:
+        self, msg_type: Type, _: type[WR] | None = None, max_messages: int = 30
+    ) -> Tuple[WR, List[type[WebsocketResponse]]]:
         """Pulls until we receive a message of a certain type.
         Returns message we were looking for and all messages
         before it. The second arguemnt is meant to help provide
         typing for the first response in the tuple.
 
         We error if we reach max_messages"""
-        msgs: List[WebsocketResponse] = []
+        msgs: List[type[WebsocketResponse]] = []
         while True:
             response = self.receive()
             if response.type == msg_type:
-                return (response, msgs)
-            if response.msg is not None:
-                msgs.append(response)
+                return (response, msgs)  # type:ignore[return-value]
+            msgs.append(response)
             if len(msgs) > max_messages:
                 raise WebsocketError(
                     f"Could not find type: {msg_type} within {max_messages} msgs"
@@ -179,13 +177,13 @@ class Websocket:
 
     def subscribe(
         self, request: WebsocketRequest
-    ) -> Tuple[SubscriptionId, List[WebsocketResponse]]:
+    ) -> Tuple[SubscriptionId, List[type[WebsocketResponse]]]:
         """Retries until successfully subscribed to a channel
 
         Returns sid and initial messages on channel before the subscribe message"""
         if request.cmd != Command.SUBSCRIBE:
             raise ValueError(f"Request must be of type subscribe. {request}")
-        sub_resp: WebsocketResponse[SubscribedRM]
+        sub_resp: SubscribedWR
         sub_resp, other_resps = self._retry_until_subscribed(request)
         if sub_resp.msg is not None:
             self._subscriptions.append(sub_resp.msg.sid)
@@ -214,7 +212,7 @@ class Websocket:
 
     def update_subscription(
         self, request: WebsocketRequest[UpdateSubscriptionRP]
-    ) -> Tuple[WebsocketResponse, List[WebsocketResponse]]:
+    ) -> Tuple[type[WebsocketResponse], List[type[WebsocketResponse]]]:
         """Returns tuple of subscription updated messages and
         all messages that came before it"""
         self.send(request=request)
@@ -225,23 +223,25 @@ class Websocket:
     @retry(stop=stop_after_delay(12), retry=retry_if_not_exception_type(WebsocketError))
     def _retry_until_subscribed(
         self, request: WebsocketRequest
-    ) -> Tuple[WebsocketResponse[SubscribedRM], List[WebsocketResponse]]:
+    ) -> Tuple[SubscribedWR, List[type[WebsocketResponse]]]:
         """Retries websocket connection until we get a subscribed message"""
         self.send(request)
-        return self.receive_until(Type.SUBSCRIBED, SubscribedRM)
+        return self.receive_until(Type.SUBSCRIBED, SubscribedWR)
 
-    def _parse_response(self, payload: str) -> WebsocketResponse:
+    def _parse_response(self, payload: str) -> type[WebsocketResponse]:
         """Parses the response from the websocket and returns it"""
         response: WebsocketResponse = WebsocketResponse.parse_raw(payload)
-        type_to_response: Dict[Type, typing.Type[ResponseMessage]] = {
-            Type.ERROR: ErrorRM,
-            Type.ORDERBOOK_DELTA: OrderbookDelta,
-            Type.ORDERBOOK_SNAPSHOT: OrderbookSnapshot,
-            Type.SUBSCRIBED: SubscribedRM,
+        type_to_response: Dict[Type, type[WebsocketResponse]] = {
+            Type.ERROR: ErrorWR,
+            Type.ORDERBOOK_DELTA: OrderbookDeltaWR,
+            Type.ORDERBOOK_SNAPSHOT: OrderbookSnapshotWR,
+            Type.SUBSCRIBED: SubscribedWR,
+            Type.UNSUBSCRIBE: UnsubscribedWR,
+            Type.SUBSCRIPTION_UPDATED: SubscriptionUpdatedWR,
         }
-        if response.type in type_to_response:
-            return convert_websocket_response(response, type_to_response[response.type])
-        return response
+        return response.convert(
+            type_to_response[response.type]  # type:ignore[return-value]
+        )
 
 
 class Connection:

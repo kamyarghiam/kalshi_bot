@@ -9,7 +9,10 @@ from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 
 if typing.TYPE_CHECKING:
-    from src.helpers.types.websockets.response import OrderbookDelta, OrderbookSnapshot
+    from src.helpers.types.websockets.response import (
+        OrderbookDeltaRM,
+        OrderbookSnapshotRM,
+    )
 
 
 class OrderbookSide(BaseModel):
@@ -51,7 +54,7 @@ class Orderbook:
     yes: OrderbookSide = field(default_factory=OrderbookSide)
     no: OrderbookSide = field(default_factory=OrderbookSide)
 
-    def apply_delta(self, delta: "OrderbookDelta"):
+    def apply_delta(self, delta: "OrderbookDeltaRM"):
         if delta.market_ticker != self.market_ticker:
             raise ValueError(
                 f"Market tickers don't match. Orderbook: {self}. Delta: {delta}"
@@ -64,7 +67,7 @@ class Orderbook:
             raise ValueError(f"Invalid side: {delta.side}")
 
     @classmethod
-    def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshot"):
+    def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):
         yes = OrderbookSide()
         no = OrderbookSide()
         for level in orderbook_snapshot.yes:
@@ -72,9 +75,3 @@ class Orderbook:
         for level in orderbook_snapshot.no:
             no.add_level(level[0], level[1])
         return cls(market_ticker=orderbook_snapshot.market_ticker, yes=yes, no=no)
-
-        return cls(
-            market_ticker=orderbook_snapshot.market_ticker,
-            yes=orderbook_snapshot.yes,
-            no=orderbook_snapshot.no,
-        )

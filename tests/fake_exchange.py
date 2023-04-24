@@ -47,11 +47,15 @@ from src.helpers.types.websockets.request import (
 )
 from src.helpers.types.websockets.response import (
     ErrorRM,
-    OrderbookDelta,
-    OrderbookSnapshot,
-    ResponseMessage,
+    ErrorWR,
+    OrderbookDeltaRM,
+    OrderbookDeltaWR,
+    OrderbookSnapshotRM,
+    OrderbookSnapshotWR,
     SubscribedRM,
-    WebsocketResponse,
+    SubscribedWR,
+    SubscriptionUpdatedWR,
+    UnsubscribedWR,
 )
 from tests.utils import random_data_from_basemodel
 
@@ -203,26 +207,27 @@ def kalshi_test_exchange_factory():
     ) -> SubscriptionId:
         """Sends message that we've subscribed to a channel"""
         sid: SubscriptionId
-        response: WebsocketResponse
         if channel in storage.subscribed_channels:
             # Send already subscribed
-            response = WebsocketResponse(
+            error_response = ErrorWR(
                 id=data.id,
                 type=Type.ERROR,
                 msg=ErrorRM(code=6, msg="Already subscribed"),
             )
+            await websocket.send_text(error_response.json(exclude_none=True))
             sid = storage.subscribed_channels[channel]
         else:
             # Send subscribed
             sid = SubscriptionId.get_new_id()
             storage.subscribed_channels[channel] = sid
             storage.subscribed_markets[sid] = data.params.market_tickers
-            response = WebsocketResponse(
+            subscribed_response = SubscribedWR(
                 id=data.id,
                 type=Type.SUBSCRIBED,
                 msg=SubscribedRM(channel=channel, sid=sid),
             )
-        await websocket.send_text(response.json(exclude_none=True))
+            await websocket.send_text(subscribed_response.json(exclude_none=True))
+
         return sid
 
     async def unsubscribe(
@@ -233,7 +238,7 @@ def kalshi_test_exchange_factory():
             if sid in params.sids:
                 del storage.subscribed_channels[channel]
                 await websocket.send_text(
-                    WebsocketResponse(sid=sid, type=Type.UNSUBSCRIBE).json(
+                    UnsubscribedWR(sid=sid, type=Type.UNSUBSCRIBE).json(
                         exclude_none=True
                     )
                 )
@@ -248,7 +253,7 @@ def kalshi_test_exchange_factory():
             elif data.params.action == UpdateSubscriptionAction.DELETE_MARKETS:
                 storage.subscribed_markets[data.params.sid].remove(ticker)
         await websocket.send_text(
-            WebsocketResponse(
+            SubscriptionUpdatedWR(
                 id=data.id,
                 sid=data.params.sid,
                 seq=SeqId(123),  # purposefully send bad seq id
@@ -261,10 +266,10 @@ def kalshi_test_exchange_factory():
         websocket: FastApiWebSocket, data: WebsocketRequest
     ):
         """Sends message that we've foudn an unknown channel"""
-        unknown_channel = WebsocketResponse(
+        unknown_channel = ErrorWR(
             id=data.id,
             type=Type.ERROR,
-            msg=ResponseMessage(code=8, msg="Unknown channel name"),
+            msg=ErrorRM(code=8, msg="Unknown channel name"),
         )
         await websocket.send_text(unknown_channel.json(exclude_none=True))
 
@@ -280,20 +285,20 @@ def kalshi_test_exchange_factory():
             sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
             # Send an error messages for testing
             await websocket.send_text(
-                WebsocketResponse(
+                ErrorWR(
                     id=data.id,
-                    sid=sid,
                     type=Type.ERROR,
                     msg=ErrorRM(code=8, msg="Something went wrong"),
                 ).json(exclude_none=True)
             )
         else:
             # Send two test messages
-            response_snapshot = WebsocketResponse(
-                id=data.id,
+            response_snapshot = OrderbookSnapshotWR(
+                # wrong sid since it's generated below, but that's ok
+                sid=SubscriptionId(1),
                 type=Type.ORDERBOOK_SNAPSHOT,
                 seq=SeqId(1),
-                msg=OrderbookSnapshot(
+                msg=OrderbookSnapshotRM(
                     market_ticker=market_ticker,
                     yes=[[10, 20]],  # type:ignore[list-item]
                     no=[[20, 40]],  # type:ignore[list-item]
@@ -303,12 +308,11 @@ def kalshi_test_exchange_factory():
             # Purposefully send the subscribe messages after first message to
             # see if subscribe system works
             sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
-            response_delta = WebsocketResponse(
-                id=data.id,
+            response_delta = OrderbookDeltaWR(
                 type=Type.ORDERBOOK_DELTA,
                 seq=SeqId(2),
                 sid=sid,
-                msg=OrderbookDelta(
+                msg=OrderbookDeltaRM(
                     market_ticker=market_ticker,
                     price=Price(10),
                     side=Side.NO,
@@ -317,12 +321,11 @@ def kalshi_test_exchange_factory():
             )
             await websocket.send_text(response_delta.json(exclude_none=True))
 
-            response_delta = WebsocketResponse(
-                id=data.id,
+            response_delta = OrderbookDeltaWR(
                 type=Type.ORDERBOOK_DELTA,
                 seq=SeqId(3),
                 sid=sid,
-                msg=OrderbookDelta(
+                msg=OrderbookDeltaRM(
                     market_ticker=market_ticker,
                     price=Price(10),
                     side=Side.NO,
@@ -333,12 +336,11 @@ def kalshi_test_exchange_factory():
 
             if market_ticker == MarketTicker("bad_seq_id"):
                 # Send response with bad seq id
-                response_delta = WebsocketResponse(
-                    id=data.id,
+                response_delta = OrderbookDeltaWR(
                     type=Type.ORDERBOOK_DELTA,
                     seq=SeqId(5),  # bad
                     sid=sid,
-                    msg=OrderbookDelta(
+                    msg=OrderbookDeltaRM(
                         market_ticker=market_ticker,
                         price=Price(10),
                         side=Side.NO,

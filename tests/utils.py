@@ -5,9 +5,11 @@ from pydantic import BaseModel
 
 BM = typing.TypeVar("BM", bound=BaseModel)
 
+T = typing.TypeVar("T")
+
 
 def random_data_from_basemodel(
-    base_model_class: typing.Type[BM],
+    base_model_class: type[BM],
 ) -> BM:
     """Fills in a basemodel with random data"""
 

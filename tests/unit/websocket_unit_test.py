@@ -28,11 +28,15 @@ from src.helpers.types.websockets.request import (
 )
 from src.helpers.types.websockets.response import (
     ErrorRM,
-    OrderbookSnapshot,
+    ErrorWR,
+    OrderbookSnapshotRM,
     ResponseMessage,
+    SubscribedWR,
+    SubscriptionUpdatedWR,
+    UnsubscribedWR,
     WebsocketResponse,
-    convert_websocket_response,
 )
+from tests.utils import random_data_from_basemodel
 
 
 def test_websocket_wrapper():
@@ -48,41 +52,44 @@ def test_websocket_wrapper():
 
 
 def test_convert_websocket_response():
-    response = WebsocketResponse(
-        id=CommandId(1), type=Type.ERROR, msg=ResponseMessage(code=8, msg="hi")
-    )
-    response_with_error: WebsocketResponse[ErrorRM] = convert_websocket_response(
-        response, ErrorRM
-    )
-    assert response_with_error.msg is not None
-    assert response_with_error.msg.code == 8
-    assert response_with_error.msg.msg == "hi"
+    # If this fails, it means we have to add a new object in the convert function
+    # For websocket responses
+    assert len(Type.__members__.values()) == 7
+    all_response_types = [
+        SubscribedWR,
+        ErrorWR,
+        # TODO: polyfactory can't transalte the price field in the below two classes
+        # OrderbookSnapshotWR,
+        # OrderbookDeltaWR,
+        UnsubscribedWR,
+        SubscriptionUpdatedWR,
+    ]
+
+    for response_type in all_response_types:
+        random_data = random_data_from_basemodel(  # type:ignore
+            response_type  # type:ignore
+        )
+        response_as_wr = WebsocketResponse(**random_data.dict())
+        # Does not error
+        result = response_as_wr.convert(random_data)
+        assert result == random_data
 
 
 def test_parse_response():
     ws = Websocket(MagicMock(autospec=True), MagicMock(autospec=True))
-    # Invalid value
     response = ws._parse_response(
-        WebsocketResponse(
-            id=CommandId(1),
-            type=Type.TEST_WRONG_TYPE,
-            msg=ResponseMessage(some_field="some_message"),
-        ).json()
-    )
-    assert response.msg.some_field == "some_message"  # type:ignore[union-attr]
-
-    response = ws._parse_response(
-        WebsocketResponse(
+        ErrorWR(
             id=CommandId(1),
             type=Type.ERROR,
             msg=ErrorRM(code=8, msg="something"),
         ).json()
     )
+    assert isinstance(response, ErrorWR)
     assert response.msg == ErrorRM(code=8, msg="something")
 
 
 def test_orderbook_snapshot_validation():
-    orderbook_snapshot = OrderbookSnapshot(
+    orderbook_snapshot = OrderbookSnapshotRM(
         market_ticker=MarketTicker("hi"),
         yes=[[40, 100], [20, 200]],  # type:ignore[list-item]
         no=[[50, 200], [60, 700]],  # type:ignore[list-item]
@@ -101,7 +108,7 @@ def test_orderbook_snapshot_validation():
     # Error in yes price (over 99)
     with pytest.raises(ValidationError):
         wrong_price = 100
-        OrderbookSnapshot(
+        OrderbookSnapshotRM(
             market_ticker=MarketTicker("some_ticker"),
             yes=[[wrong_price, 100]],  # type:ignore[list-item]
             no=[[1, 20]],  # type:ignore[list-item]
@@ -110,7 +117,7 @@ def test_orderbook_snapshot_validation():
     # Error in no quantity (under 0)
     with pytest.raises(ValidationError):
         wrong_quantity = -1
-        OrderbookSnapshot(
+        OrderbookSnapshotRM(
             market_ticker=MarketTicker("some_ticker"),
             yes=[[wrong_price, 100]],  # type:ignore[list-item]
             no=[[1, wrong_quantity]],  # type:ignore[list-item]
@@ -119,14 +126,14 @@ def test_orderbook_snapshot_validation():
     # Error in yes level size (over 2)
     with pytest.raises(ValidationError):
         wrong_price = -1
-        OrderbookSnapshot(
+        OrderbookSnapshotRM(
             market_ticker=MarketTicker("some_ticker"),
             yes=[[30, 100, 100]],  # type:ignore[list-item]
             no=[[1, 20]],  # type:ignore[list-item]
         )
     # Error in no level size (under 2)
     with pytest.raises(ValidationError):
-        OrderbookSnapshot(
+        OrderbookSnapshotRM(
             market_ticker=MarketTicker("some_ticker"),
             yes=[[30, 100]],  # type:ignore[list-item]
             no=[[1]],  # type:ignore[list-item]
@@ -154,7 +161,7 @@ def test_websockets_with_session_wrapper_send_recieve():
 
     # Test receive
     with patch.object(ws._ws, "recv") as recv:
-        response = WebsocketResponse(
+        response = ErrorWR(
             id=CommandId(1), type=Type.ERROR, msg=ErrorRM(code=8, msg="hi")
         )
         recv.return_value = response.json()

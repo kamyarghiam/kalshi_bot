@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import ContextManager, Generator, List
+from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_args
 
 from fastapi.testclient import TestClient
 
@@ -28,8 +28,9 @@ from src.helpers.types.websockets.request import (
     WebsocketRequest,
 )
 from src.helpers.types.websockets.response import (
-    OrderbookDelta,
-    OrderbookSnapshot,
+    OrderbookDeltaWR,
+    OrderbookSnapshotWR,
+    SubscriptionUpdatedWR,
     WebsocketResponse,
 )
 from src.helpers.utils import PendingMessages
@@ -106,26 +107,24 @@ class OrderbookSubscription:
     To use this, first create a websocket with the Exchange interface
     then pass it in here with a list of market tickers you want to subscribe to"""
 
+    MESSAGE_TYPE: TypeAlias = (
+        OrderbookSnapshotWR | OrderbookDeltaWR | SubscriptionUpdatedWR
+    )
+
     def __init__(self, ws: Websocket, market_tickers: List[MarketTicker]):
         self._sid: SubscriptionId
         self._last_seq_id: SeqId | None = None
         self._ws = ws
         self._market_tickers = market_tickers
         # When we subscribe, there are messages before the subscribe message that
-        # we may need to return.
+        # we may need to return
         self._pending_msgs: PendingMessages[
-            WebsocketResponse[OrderbookSnapshot]
-            | WebsocketResponse[OrderbookDelta]
-            | WebsocketResponse  # For update subscription (TODO: change types)
+            OrderbookSubscription.MESSAGE_TYPE
         ] = PendingMessages()
 
     def continuous_receive(
         self,
-    ) -> Generator[
-        WebsocketResponse[OrderbookSnapshot] | WebsocketResponse[OrderbookDelta],
-        None,
-        None,
-    ]:
+    ) -> Generator[OrderbookSnapshotWR | OrderbookDeltaWR, None, None,]:
         """Returns messages from orderbook channel and makes sure
         that seq ids are consecutive"""
 
@@ -140,11 +139,13 @@ class OrderbookSubscription:
     def _get_next_message(self):
         """We either pull the next message from the pending message queue
         or we receive a new message from the websocket"""
-        next_message: WebsocketResponse
+        next_message: OrderbookSubscription.MESSAGE_TYPE
         try:
             next_message = next(self._pending_msgs)
         except StopIteration:
-            next_message = self._ws.receive()
+            message = self._ws.receive()
+            assert self._is_valid_message_type(message)
+            next_message = message
 
         if next_message.type == Type.SUBSCRIPTION_UPDATED:
             # We don't we want to return this type of message.
@@ -171,6 +172,8 @@ class OrderbookSubscription:
                 ),
             )
             sub_ok_msg, msgs = self._ws.update_subscription(delete_request)
+            assert self._is_valid_message_type(sub_ok_msg)
+            assert self._is_valid_list_type(msgs)
             msgs.append(sub_ok_msg)
             self._pending_msgs.add_messages(msgs)
 
@@ -186,10 +189,14 @@ class OrderbookSubscription:
                 ),
             )
             sub_ok_msg, msgs = self._ws.update_subscription(add_request)
+            assert self._is_valid_message_type(sub_ok_msg)
+            assert self._is_valid_list_type(msgs)
             msgs.append(sub_ok_msg)
             self._pending_msgs.add_messages(msgs)
 
         self._market_tickers = new_market_tickers
+
+    ####### Helpers ########
 
     def _unsubscribe(self):
         self._pending_msgs.clear()
@@ -199,8 +206,6 @@ class OrderbookSubscription:
     def _resubscribe(self):
         self._unsubscribe()
         self._subscribe()
-
-    ####### Helpers ########
 
     def _get_subscription_request(self):
         return WebsocketRequest(
@@ -217,9 +222,10 @@ class OrderbookSubscription:
         self._pending_msgs.clear()
         self._last_seq_id = None
         self._sid, msgs = self._ws.subscribe(self._get_subscription_request())
+        assert self._is_valid_list_type(msgs)
         self._pending_msgs.add_messages(msgs)
 
-    def _is_seq_id_valid(self, response: WebsocketResponse):
+    def _is_seq_id_valid(self, response: "OrderbookSubscription.MESSAGE_TYPE"):
         """Checks if seq id is one plus previous seq id.
 
         Also updates the seq id"""
@@ -227,3 +233,14 @@ class OrderbookSubscription:
             return False
         self._last_seq_id = response.seq
         return True
+
+    def _is_valid_message_type(
+        self,
+        msg: type[WebsocketResponse],
+    ) -> "TypeGuard[OrderbookSubscription.MESSAGE_TYPE]":
+        return isinstance(msg, get_args(OrderbookSubscription.MESSAGE_TYPE))
+
+    def _is_valid_list_type(
+        self, msgs: List[type[WebsocketResponse]]
+    ) -> "TypeGuard[List[OrderbookSubscription.MESSAGE_TYPE]]":
+        return all(self._is_valid_message_type(msg) for msg in msgs)

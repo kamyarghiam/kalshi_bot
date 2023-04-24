@@ -1,5 +1,5 @@
 import itertools
-from typing import Generic, Iterable, TypeVar
+from typing import Generic, Iterable, Iterator, TypeVar
 
 T = TypeVar("T")
 
@@ -28,5 +28,5 @@ class PendingMessages(Generic[T]):
         Raises StopIteration if empty"""
         return next(self._messages)  # type:ignore[call-overload]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return self

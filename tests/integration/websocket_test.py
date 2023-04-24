@@ -11,8 +11,9 @@ from src.helpers.types.websockets.common import Command, CommandId, Type, Websoc
 from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from src.helpers.types.websockets.response import (
     ErrorRM,
-    OrderbookDelta,
-    OrderbookSnapshot,
+    OrderbookDeltaRM,
+    OrderbookDeltaWR,
+    OrderbookSnapshotWR,
     WebsocketResponse,
 )
 
@@ -48,11 +49,11 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
             yes=OrderbookSide(levels={Price(10): Quantity(20)}),
             no=OrderbookSide(levels={Price(20): Quantity(40)}),
         )
-        assert isinstance(first_message.msg, OrderbookSnapshot)
+        assert isinstance(first_message, OrderbookSnapshotWR)
         assert Orderbook.from_snapshot(first_message.msg) == expected_snapshot
 
         second_message = next(gen)
-        expected_delta = OrderbookDelta(
+        expected_delta = OrderbookDeltaRM(
             market_ticker=market_ticker,
             price=Price(10),
             side=Side.NO,
@@ -62,17 +63,17 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
 
         third_message = next(gen)
         assert third_message.type == Type.ORDERBOOK_DELTA
-        assert isinstance(third_message.msg, OrderbookDelta)
+        assert isinstance(third_message, OrderbookDeltaWR)
         assert third_message.msg == expected_delta
 
         # this message is going to re-subscribe to the topic. Goes back to beginning
         fourth_message = next(gen)
         assert fourth_message.type == Type.ORDERBOOK_SNAPSHOT
-        assert isinstance(fourth_message.msg, OrderbookSnapshot)
+        assert isinstance(fourth_message, OrderbookSnapshotWR)
         assert Orderbook.from_snapshot(fourth_message.msg) == expected_snapshot
 
         fifth_message = next(gen)
-        assert fifth_message.msg == OrderbookDelta(
+        assert fifth_message.msg == OrderbookDeltaRM(
             market_ticker=market_ticker,
             price=Price(10),
             side=Side.NO,
@@ -110,9 +111,9 @@ def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface
         gen = sub.continuous_receive()
         next(gen)
         sub.update_subscription([MarketTicker("another_market")])
-        msgs: List[WebsocketResponse] = []
+        msgs: List[OrderbookSubscription.MESSAGE_TYPE] = []
         for msg in sub._pending_msgs:
-            msg: WebsocketResponse  # type:ignore[no-redef]
+            msg: type[WebsocketResponse]  # type:ignore[no-redef]
             msgs.append(msg)
             if msg.type == Type.SUBSCRIPTION_UPDATED:
                 break

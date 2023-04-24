@@ -1,6 +1,6 @@
 import pickle
 import typing
-from typing import Generic, List, Tuple, TypeVar
+from typing import List, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, validator
 
@@ -10,9 +10,27 @@ from src.helpers.types.websockets.common import CommandId, SeqId, SubscriptionId
 from src.helpers.types.websockets.request import Channel
 from tests.unit.prices_test import Price
 
+WR = TypeVar("WR", bound="WebsocketResponse")
+
+
+class WebsocketResponse(BaseModel):
+    type: Type
+
+    class Config:
+        use_enum_values = True
+        extra = Extra.allow
+
+    def convert(self, sub_class: typing.Type[WR]) -> WR:
+        """Converts a websocket response to the specific type it should be
+        based on the type field
+
+        For example, converts a websocket response to a orderbook snapshot
+        websocket response."""
+        return sub_class.parse_obj(self)
+
 
 class ResponseMessage(BaseModel):
-    """Message part of the websocket response"""
+    """Msg attribute of the websocket response"""
 
     class Config:
         extra = Extra.allow
@@ -25,32 +43,8 @@ class ResponseMessage(BaseModel):
         return pickle.loads(data)
 
 
-RM = TypeVar("RM", bound=ResponseMessage)
-
-
-class WebsocketResponse(BaseModel, Generic[RM]):
-    type: Type
-    id: CommandId | None = None
-    seq: SeqId | None = None
-    sid: SubscriptionId | None = None
-    # For update subscription
-    market_tickers: List[MarketTicker] | None = None
-    msg: RM | None = None
-
-    class Config:
-        use_enum_values = True
-
-
-def convert_websocket_response(
-    wr: WebsocketResponse, type: typing.Type[RM]
-) -> WebsocketResponse[RM]:
-    """Converts the response's message to a specific ResponseMessage from below"""
-    new_msg: WebsocketResponse[RM] = wr.copy()
-    new_msg.msg = type.parse_obj(wr.msg)
-    return new_msg
-
-
-##### Different type of response messages ####
+##### Different type of response messages ###################
+##### These are the "msg" field in the websocket resposne ###
 
 
 class SubscribedRM(ResponseMessage):
@@ -63,7 +57,7 @@ class ErrorRM(ResponseMessage):
     msg: str
 
 
-class OrderbookSnapshot(ResponseMessage):
+class OrderbookSnapshotRM(ResponseMessage):
     market_ticker: MarketTicker
     yes: List[Tuple[Price, Quantity]]
     no: List[Tuple[Price, Quantity]]
@@ -77,8 +71,44 @@ class OrderbookSnapshot(ResponseMessage):
         return output_levels
 
 
-class OrderbookDelta(ResponseMessage):
+class OrderbookDeltaRM(ResponseMessage):
     market_ticker: MarketTicker
     price: Price
     delta: QuantityDelta
     side: Side
+
+
+### Different websocket responses ####
+
+
+class SubscribedWR(WebsocketResponse):
+    id: CommandId
+    msg: SubscribedRM
+
+
+class ErrorWR(WebsocketResponse):
+    id: CommandId
+    msg: ErrorRM
+
+
+class OrderbookSnapshotWR(WebsocketResponse):
+    sid: SubscriptionId
+    seq: SeqId
+    msg: OrderbookSnapshotRM
+
+
+class OrderbookDeltaWR(WebsocketResponse):
+    sid: SubscriptionId
+    seq: SeqId
+    msg: OrderbookDeltaRM
+
+
+class UnsubscribedWR(WebsocketResponse):
+    sid: SubscriptionId
+
+
+class SubscriptionUpdatedWR(WebsocketResponse):
+    id: CommandId
+    sid: SubscriptionId
+    seq: SeqId
+    market_tickers: List[MarketTicker]

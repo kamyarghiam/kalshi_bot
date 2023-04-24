@@ -1,4 +1,3 @@
-import typing
 from enum import Enum
 from typing import Generic, List, TypeVar
 
@@ -79,6 +78,6 @@ class WebsocketRequest(BaseModel, Generic[RP]):
     class Config:
         use_enum_values = True
 
-    def parse_params(self, params_class: typing.Type[RP]):
+    def parse_params(self, params_class: type[RP]):
         """Converts the params abstract class to something more specific"""
         self.params = params_class.parse_obj(self.params)
