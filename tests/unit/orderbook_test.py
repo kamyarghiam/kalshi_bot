@@ -109,3 +109,9 @@ def test_orderbook_apply_delta():
             side=Side.TEST_INVALID_SIDE,
         )
         book.apply_delta(delta)
+
+
+def test_blank_orderbook():
+    snapshot = OrderbookSnapshotRM(market_ticker=MarketTicker("some_ticker"))
+    assert snapshot.yes == []
+    assert snapshot.no == []

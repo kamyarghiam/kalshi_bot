@@ -59,8 +59,8 @@ class ErrorRM(ResponseMessage):
 
 class OrderbookSnapshotRM(ResponseMessage):
     market_ticker: MarketTicker
-    yes: List[Tuple[Price, Quantity]]
-    no: List[Tuple[Price, Quantity]]
+    yes: List[Tuple[Price, Quantity]] = []
+    no: List[Tuple[Price, Quantity]] = []
 
     @validator("yes", "no", pre=True)
     def validate_iterable(cls, input_levels: List[List[int]]):
