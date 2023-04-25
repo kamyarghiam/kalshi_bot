@@ -1,6 +1,5 @@
 import pickle
 import typing
-from datetime import datetime
 from typing import List, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, validator
@@ -62,7 +61,6 @@ class OrderbookSnapshotRM(ResponseMessage):
     market_ticker: MarketTicker
     yes: List[Tuple[Price, Quantity]] = []
     no: List[Tuple[Price, Quantity]] = []
-    receieved: datetime = datetime.now()
 
     @validator("yes", "no", pre=True)
     def validate_iterable(cls, input_levels: List[List[int]]):
@@ -78,7 +76,6 @@ class OrderbookDeltaRM(ResponseMessage):
     price: Price
     delta: QuantityDelta
     side: Side
-    receieved: datetime = datetime.now()
 
 
 ### Different websocket responses ####
