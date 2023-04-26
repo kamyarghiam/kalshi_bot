@@ -1,6 +1,6 @@
 import typing
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Tuple
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
@@ -40,6 +40,22 @@ class OrderbookSide:
 
         if self.levels[price] == 0:
             self._remove_level(price)
+
+    def is_empty(self):
+        return len(self.levels) == 0
+
+    def get_largest_price_level(self) -> Tuple[Price, Quantity]:
+        if self.is_empty():
+            raise ValueError("Empty levels")
+
+        max_price: Price | None = None
+        quantiy_at_max_price: Quantity | None = None
+        for price, quantity in self.levels.items():
+            if max_price is None or price > max_price:
+                max_price = price
+                quantiy_at_max_price = quantity
+        assert max_price is not None and quantiy_at_max_price is not None
+        return max_price, quantiy_at_max_price
 
 
 @dataclass

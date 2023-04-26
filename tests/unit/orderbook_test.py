@@ -170,3 +170,49 @@ def test_orderbook_apply_delta_copied():
     assert len(orderbook_dict[book.market_ticker].no.levels) == 2
     assert orderbook_dict[book.market_ticker].no.levels[Price(11)] == Quantity(50)
     assert orderbook_dict[book.market_ticker].no.levels[Price(12)] == Quantity(30)
+
+
+def test_is_empty():
+    book = Orderbook(market_ticker=MarketTicker("hi"))
+
+    assert book.yes.is_empty()
+    assert book.no.is_empty()
+
+    delta = OrderbookDeltaRM(
+        market_ticker=MarketTicker("hi"),
+        price=Price(11),
+        delta=QuantityDelta(50),
+        side=Side.NO,
+    )
+    book.apply_delta(delta)
+
+    assert book.yes.is_empty()
+    assert not book.no.is_empty()
+
+    # reverse
+    delta = OrderbookDeltaRM(
+        market_ticker=MarketTicker("hi"),
+        price=Price(11),
+        delta=QuantityDelta(-50),
+        side=Side.NO,
+    )
+    book.apply_delta(delta)
+
+    assert book.yes.is_empty()
+    assert book.no.is_empty()
+
+
+def test_get_largest_price_level():
+    book = OrderbookSide()
+
+    with pytest.raises(ValueError):
+        # Book is empty
+        book.get_largest_price_level()
+
+    book.add_level(Price(10), Quantity(1))
+    book.add_level(Price(12), Quantity(2))
+    book.add_level(Price(9), Quantity(3))
+    book.add_level(Price(15), Quantity(4))
+    book.add_level(Price(4), Quantity(5))
+
+    assert book.get_largest_price_level() == (Price(15), Quantity(4))
