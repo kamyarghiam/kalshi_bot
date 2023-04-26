@@ -17,26 +17,34 @@ from src.helpers.types.orderbook import (
 from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 
 
-def main():
-    # TODO: test this whole file in chunks
-    # Also clean up everything in this file
-    exchange_interface = ExchangeInterface()
+def main(
+    exchange_interface: ExchangeInterface = ExchangeInterface(),
+    models_root_path: Path = Path("src/strategies/experiment_1/models"),
+    num_runs: int | None = None,
+):
     print("Fetching open markets...")
-    # TODO: update pages numbers here?
-    open_markets = exchange_interface.get_active_markets(pages=5)
+    open_markets = exchange_interface.get_active_markets(pages=10)
     market_tickers = [market.ticker for market in open_markets]
     print("Loading model predictor...")
-    model = Experiment1Predictor()
+    model = Experiment1Predictor(root_path=models_root_path)
     previous_snapshots: Dict[MarketTicker, Orderbook] = {}
 
     print("Connection to websockets...")
-    with exchange_interface.get_websocket() as ws:
-        sub = OrderbookSubscription(ws, market_tickers)
-        gen = sub.continuous_receive()
+    try:
+        with exchange_interface.get_websocket() as ws:
+            sub = OrderbookSubscription(ws, market_tickers)
+            gen = sub.continuous_receive()
 
-        while True:
-            data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
-            process_message(data, model, previous_snapshots)
+            while True:
+                data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
+                process_message(data, model, previous_snapshots)
+                if num_runs is not None:
+                    if num_runs == 0:
+                        break
+                    num_runs -= 1
+    finally:
+        # Save the model before we error or exit
+        model._save()
 
 
 def process_message(
@@ -68,6 +76,9 @@ class ModelNames(Enum):
     QUANTITY_NO = "quantity_no"
     QUANTITY_YES = "quantity_yes"
 
+    # Incorrect value for testing
+    WRONG_VALUE = "test_wrong_value"
+
 
 class Model:
     """Individual SGD models"""
@@ -87,10 +98,8 @@ class Model:
     def update(self, x_values: np.ndarray, new_ob: Orderbook):
         y_val = np.array([self._get_y_val(new_ob)])
         self._model.partial_fit(x_values, y_val)
-        # TODO: save everytime? Seems inefficient
-        self._save()
 
-    def predict(self, x_values: np.ndarray):
+    def predict(self, x_values: np.ndarray) -> np.ndarray:
         return self._model.predict(x_values)
 
     def _save(self):
@@ -115,10 +124,11 @@ class Model:
 class Experiment1Predictor:
     """This model is a linear regression with SGD"""
 
-    def __init__(self):
-        self._root_path = Path("src/strategies/experiment_1/models")
+    def __init__(self, root_path: Path):
+        self._root_path = root_path
+        self._num_updates = 0
         if not self._root_path.exists():
-            self._root_path.mkdir()
+            self._root_path.mkdir()  # pragma: no cover
         self._models: List[Model] = [
             Model(ModelNames.PRICE_NO, self._root_path),
             Model(ModelNames.PRICE_YES, self._root_path),
@@ -135,6 +145,14 @@ class Experiment1Predictor:
             # We don't update the model if things are empty
             print(f"Empty orderbook. Prev: {prev_ob}. Curr: {curr_ob}")
             return
+        self._num_updates += 1
+        if self._should_save_models():
+            self._save()
+
+    def _should_save_models(self):
+        """We don't want to always save the models. Only save them once in a while"""
+        # Save every 50 updates
+        return self._num_updates % 50 == 0
 
     def _save(self):
         for model in self._models:
@@ -161,4 +179,4 @@ class Experiment1Predictor:
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pragma: no cover
