@@ -4,7 +4,11 @@ import pytest
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
-from src.helpers.types.orderbook import Orderbook, OrderbookSide
+from src.helpers.types.orderbook import (
+    EmptyOrderbookSideError,
+    Orderbook,
+    OrderbookSide,
+)
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
@@ -205,7 +209,7 @@ def test_is_empty():
 def test_get_largest_price_level():
     book = OrderbookSide()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(EmptyOrderbookSideError):
         # Book is empty
         book.get_largest_price_level()
 

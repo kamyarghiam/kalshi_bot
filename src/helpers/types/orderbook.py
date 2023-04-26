@@ -13,6 +13,10 @@ if typing.TYPE_CHECKING:
     )
 
 
+class EmptyOrderbookSideError(Exception):
+    """The orderbook side is empty"""
+
+
 @dataclass
 class OrderbookSide:
     """Represents levels on side of the order book (either the no side or yes side)
@@ -29,9 +33,6 @@ class OrderbookSide:
             )
         self.levels[price] = quantity
 
-    def _remove_level(self, price: Price):
-        del self.levels[price]
-
     def apply_delta(self, price: Price, delta: QuantityDelta):
         """Applies an orderbook delta to the orderbook side"""
         if price not in self.levels:
@@ -46,7 +47,7 @@ class OrderbookSide:
 
     def get_largest_price_level(self) -> Tuple[Price, Quantity]:
         if self.is_empty():
-            raise ValueError("Empty levels")
+            raise EmptyOrderbookSideError("Empty levels")
 
         max_price: Price | None = None
         quantiy_at_max_price: Quantity | None = None
@@ -56,6 +57,9 @@ class OrderbookSide:
                 quantiy_at_max_price = quantity
         assert max_price is not None and quantiy_at_max_price is not None
         return max_price, quantiy_at_max_price
+
+    def _remove_level(self, price: Price):
+        del self.levels[price]
 
 
 @dataclass
