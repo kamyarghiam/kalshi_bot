@@ -5,26 +5,41 @@ from typing import Dict, List
 
 import joblib  # type:ignore[import]
 import numpy as np  # type:ignore[import]
+from sklearn.exceptions import NotFittedError  # type:ignore[import]
 from sklearn.linear_model import SGDRegressor  # type:ignore[import]
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
+from src.helpers.types.money import get_opposite_side_price
 from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
     OrderbookSide,
 )
 from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
+from tests.fake_exchange import Price
+from tests.unit.orderbook_test import Quantity
 
 
 def main(
-    exchange_interface: ExchangeInterface = ExchangeInterface(),
+    exchange_interface: ExchangeInterface | None = None,
     models_root_path: Path = Path("src/strategies/experiment_1/models"),
     num_runs: int | None = None,
+    is_test_run: bool = True,
 ):
     print("Fetching open markets...")
-    open_markets = exchange_interface.get_active_markets(pages=10)
+    exchange_interface = (
+        ExchangeInterface(is_test_run=is_test_run)
+        if exchange_interface is None
+        else exchange_interface
+    )
+    assert exchange_interface is not None
+
+    pages = 10 if is_test_run else None
+    open_markets = exchange_interface.get_active_markets(pages=pages)
     market_tickers = [market.ticker for market in open_markets]
+    print(f"Market tickers: {market_tickers}")
+    print()
     print("Loading model predictor...")
     model = Experiment1Predictor(root_path=models_root_path)
     previous_snapshots: Dict[MarketTicker, Orderbook] = {}
@@ -36,6 +51,7 @@ def main(
             gen = sub.continuous_receive()
 
             while True:
+                print("Waiting for message...")
                 data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
                 process_message(data, model, previous_snapshots)
                 if num_runs is not None:
@@ -45,6 +61,7 @@ def main(
     finally:
         # Save the model before we error or exit
         model._save()
+        print(f"Money made this session: ${model.money_made / 100}")
 
 
 def process_message(
@@ -52,8 +69,8 @@ def process_message(
     model: "Experiment1Predictor",
     previous_snapshots: Dict[MarketTicker, Orderbook],
 ):
+    print(f"{data}", flush=True)
     market_ticker = data.msg.market_ticker
-    print(f"{data.type}: {market_ticker}")
     if isinstance(data, OrderbookSnapshotWR):
         orderbook = Orderbook.from_snapshot(data.msg)
         if market_ticker in previous_snapshots:
@@ -95,8 +112,8 @@ class Model:
             self._model = SGDRegressor()
             self._save()
 
-    def update(self, x_values: np.ndarray, new_ob: Orderbook):
-        y_val = np.array([self._get_y_val(new_ob)])
+    def update(self, x_values: np.ndarray, prev_ob: Orderbook, new_ob: Orderbook):
+        y_val = np.array([self._get_y_val(prev_ob, new_ob)])
         self._model.partial_fit(x_values, y_val)
 
     def predict(self, x_values: np.ndarray) -> np.ndarray:
@@ -105,19 +122,23 @@ class Model:
     def _save(self):
         joblib.dump(self._model, self._full_path)
 
-    def _get_y_val(self, new_ob: Orderbook) -> int:
+    def _get_y_val(self, prev_ob: Orderbook, new_ob: Orderbook) -> float:
         if self._name == ModelNames.PRICE_NO:
-            price, _ = new_ob.no.get_largest_price_level()
-            return int(price)
+            price_new, _ = new_ob.no.get_largest_price_level()
+            price_old, _ = prev_ob.no.get_largest_price_level()
+            return float(price_new - price_old)
         if self._name == ModelNames.PRICE_YES:
-            price, _ = new_ob.yes.get_largest_price_level()
-            return int(price)
+            price_new, _ = new_ob.yes.get_largest_price_level()
+            price_old, _ = prev_ob.yes.get_largest_price_level()
+            return float(price_new - price_old)
         if self._name == ModelNames.QUANTITY_NO:
             _, quantity = new_ob.no.get_largest_price_level()
-            return int(quantity)
+            prev_ob_total_quantity = prev_ob.no.get_total_quantity()
+            return quantity / prev_ob_total_quantity
         if self._name == ModelNames.QUANTITY_YES:
             _, quantity = new_ob.yes.get_largest_price_level()
-            return int(quantity)
+            prev_ob_total_quantity = prev_ob.yes.get_total_quantity()
+            return quantity / prev_ob_total_quantity
         raise ValueError(f"Invalid name {self._name}")
 
 
@@ -135,12 +156,19 @@ class Experiment1Predictor:
             Model(ModelNames.QUANTITY_NO, self._root_path),
             Model(ModelNames.QUANTITY_YES, self._root_path),
         ]
+        self.money_made = 0
 
     def update(self, prev_ob: Orderbook, curr_ob: Orderbook):
         try:
             x_vals = self._extract_x_values(prev_ob).reshape(1, -1)
+            try:
+                self._make_prediction(x_vals, prev_ob, curr_ob)
+            except NotFittedError:
+                print("Model not ready to predict yet")
+            except Exception as e:
+                print(f"Error while predicting: {e}")
             for model in self._models:
-                model.update(x_vals, curr_ob)
+                model.update(x_vals, prev_ob, curr_ob)
         except EmptyOrderbookSideError:
             # We don't update the model if things are empty
             print(f"Empty orderbook. Prev: {prev_ob}. Curr: {curr_ob}")
@@ -155,6 +183,7 @@ class Experiment1Predictor:
         return self._num_updates % 50 == 0
 
     def _save(self):
+        print("Saving models...")
         for model in self._models:
             model._save()
 
@@ -167,7 +196,7 @@ class Experiment1Predictor:
     def _extract_value_per_side(self, orderbook_side: OrderbookSide) -> np.ndarray:
         """Extracts x values per orderbook side"""
         max_price, _ = orderbook_side.get_largest_price_level()
-        total_quantity = sum(quantity for quantity in orderbook_side.levels.values())
+        total_quantity = orderbook_side.get_total_quantity()
         # Each index represents the step away from the max price
         # Each value at index represents quantitiy (as fraction of total quantity)
         x_values = np.zeros(99)
@@ -177,6 +206,105 @@ class Experiment1Predictor:
             x_values[index] = quantity_ratio
         return x_values
 
+    def _make_prediction(
+        self, x_vals: np.ndarray, prev_ob: Orderbook, new_ob: Orderbook
+    ):
+        max_no_price, no_quantity = prev_ob.no.get_largest_price_level()
+        max_yes_price, yes_quantity = prev_ob.yes.get_largest_price_level()
 
-if __name__ == "__main__":
-    main()  # pragma: no cover
+        # TODO: confirm this understanding is correct
+        # Price these contracts are available at on orderbook
+        buy_no_at = get_opposite_side_price(max_no_price)
+        buy_yes_at = get_opposite_side_price(max_yes_price)
+
+        no_price_model = self._models[0]
+        assert no_price_model._name == ModelNames.PRICE_NO
+        yes_price_model = self._models[1]
+        assert yes_price_model._name == ModelNames.PRICE_YES
+
+        # TODO: these calculation ignore fees, mecnet, and whether an order
+        # will actually be filled.
+        # TODO: this also ignores orders placed by the user themselves
+        # Remember models represent change from the bid / ask
+        predicted_no_price_change = no_price_model.predict(x_vals)
+        predicted_yes_price_change = yes_price_model.predict(x_vals)
+
+        # Price to sell at
+        predicted_no_price = min(max(max_no_price + predicted_no_price_change, 1), 99)
+        predicted_yes_price = min(
+            max(max_yes_price + predicted_yes_price_change, 1), 99
+        )
+        if predicted_yes_price_change > 0 or predicted_no_price_change > 0:
+            if predicted_no_price_change > predicted_yes_price_change:
+                # We will make more profit from buying the no
+                (
+                    actual_no_price,
+                    actual_no_quantity,
+                ) = new_ob.no.get_largest_price_level()
+
+                no_quantity_model = self._models[2]
+                assert no_quantity_model._name == ModelNames.QUANTITY_NO
+                predicted_no_quantity_ratio = no_quantity_model.predict(x_vals)
+                sum_of_quantity = prev_ob.no.get_total_quantity()
+                predicted_no_quantity = predicted_no_quantity_ratio * sum_of_quantity
+
+                self._compute_side_profits(
+                    buy_no_at,
+                    no_quantity,
+                    predicted_no_price,
+                    predicted_no_quantity,
+                    actual_no_price,
+                    actual_no_quantity,
+                )
+
+            else:
+                (
+                    actual_yes_price,
+                    actual_yes_quantity,
+                ) = new_ob.yes.get_largest_price_level()
+                # We will make more profit from buying the yes
+                yes_quantity_model = self._models[3]
+                assert yes_quantity_model._name == ModelNames.QUANTITY_YES
+                predicted_yes_quantity_ratio = yes_quantity_model.predict(x_vals)
+                sum_of_quantity = prev_ob.yes.get_total_quantity()
+                predicted_yes_quantity = predicted_yes_quantity_ratio * sum_of_quantity
+
+                self._compute_side_profits(
+                    buy_yes_at,
+                    yes_quantity,
+                    predicted_yes_price,
+                    predicted_yes_quantity,
+                    actual_yes_price,
+                    actual_yes_quantity,
+                )
+        else:
+            print("No profitable trades")
+
+    def _compute_side_profits(
+        self,
+        price_to_buy: Price,
+        quantity_available: Quantity,
+        predicted_price: Price,
+        predicted_quantity: Quantity,
+        actual_price: Price,
+        actual_quantity: Quantity,
+    ):
+        quantity_to_buy = min(quantity_available, predicted_quantity)
+        change_in_price = predicted_price - price_to_buy
+        expected_profit = quantity_to_buy * change_in_price
+        # Worst case actual profit
+        actual_price_change = actual_price - price_to_buy
+        if actual_price_change < 0:
+            # Lose the most money
+            actual_profit = max(quantity_to_buy, actual_quantity) * actual_price_change
+        else:
+            # Make the least money
+            actual_profit = min(quantity_to_buy, actual_quantity) * actual_price_change
+        print(f"Expected profit: ${expected_profit / 100}")
+        print(f"Actual profit: ${actual_profit / 100}")
+        self.money_made += actual_profit
+        return expected_profit, actual_profit
+
+
+# if __name__ == "__main__":
+#     main(is_test_run=False)
