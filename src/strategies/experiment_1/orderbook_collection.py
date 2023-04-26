@@ -36,22 +36,30 @@ def main():
 
         while True:
             data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
-            market_ticker = data.msg.market_ticker
-            print(f"{data.type}: {market_ticker}")
-            if isinstance(data, OrderbookSnapshotWR):
-                orderbook = Orderbook.from_snapshot(data.msg)
-                if market_ticker in previous_snapshots:
-                    model.update(previous_snapshots[market_ticker], orderbook)
-                previous_snapshots[market_ticker] = orderbook
-            elif isinstance(data, OrderbookDeltaWR):
-                if market_ticker not in previous_snapshots:
-                    print(f"ERROR: skipping, could not find snapshot for {data}.")
-                else:
-                    orderbook = previous_snapshots[market_ticker]
-                    prev_orderbook = copy.deepcopy(orderbook)
-                    # automatically updates orderbook in dict
-                    orderbook.apply_delta(data.msg)
-                    model.update(prev_orderbook, orderbook)
+            process_message(data, model, previous_snapshots)
+
+
+def process_message(
+    data: OrderbookSnapshotWR | OrderbookDeltaWR,
+    model: "Experiment1Predictor",
+    previous_snapshots: Dict[MarketTicker, Orderbook],
+):
+    market_ticker = data.msg.market_ticker
+    print(f"{data.type}: {market_ticker}")
+    if isinstance(data, OrderbookSnapshotWR):
+        orderbook = Orderbook.from_snapshot(data.msg)
+        if market_ticker in previous_snapshots:
+            model.update(previous_snapshots[market_ticker], orderbook)
+        previous_snapshots[market_ticker] = orderbook
+    elif isinstance(data, OrderbookDeltaWR):
+        if market_ticker not in previous_snapshots:
+            print(f"ERROR: skipping, could not find snapshot for {data}.")
+        else:
+            orderbook = previous_snapshots[market_ticker]
+            prev_orderbook = copy.deepcopy(orderbook)
+            # automatically updates orderbook in dict
+            orderbook.apply_delta(data.msg)
+            model.update(prev_orderbook, orderbook)
 
 
 class ModelNames(Enum):
@@ -81,6 +89,9 @@ class Model:
         self._model.partial_fit(x_values, y_val)
         # TODO: save everytime? Seems inefficient
         self._save()
+
+    def predict(self, x_values: np.ndarray):
+        return self._model.predict(x_values)
 
     def _save(self):
         joblib.dump(self._model, self._full_path)
