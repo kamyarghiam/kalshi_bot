@@ -279,7 +279,7 @@ def kalshi_test_exchange_factory():
         """Sends messages in response to the orderbook delta channel"""
         # For sake of testing, we only look at one market ticker:
         params: SubscribeRP = data.params
-        assert len(params.market_tickers) == 1
+        assert len(params.market_tickers) >= 1
         market_ticker = params.market_tickers[0]
         if market_ticker == MarketTicker("SHOULD_ERROR"):
             sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)

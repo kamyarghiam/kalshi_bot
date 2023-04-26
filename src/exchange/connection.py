@@ -156,7 +156,7 @@ class Websocket:
         return message
 
     def receive_until(
-        self, msg_type: Type, _: type[WR] | None = None, max_messages: int = 30
+        self, msg_type: Type, _: type[WR] | None = None, max_messages: int = 1000
     ) -> Tuple[WR, List[type[WebsocketResponse]]]:
         """Pulls until we receive a message of a certain type.
         Returns message we were looking for and all messages
