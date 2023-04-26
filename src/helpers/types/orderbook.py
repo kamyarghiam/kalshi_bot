@@ -2,8 +2,6 @@ import typing
 from dataclasses import dataclass, field
 from typing import Dict
 
-from pydantic import BaseModel
-
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
@@ -15,13 +13,14 @@ if typing.TYPE_CHECKING:
     )
 
 
-class OrderbookSide(BaseModel):
+@dataclass
+class OrderbookSide:
     """Represents levels on side of the order book (either the no side or yes side)
 
     We use a basemodel because this is used for type validation when
     we read an orderbook snapshot on the websocket layer."""
 
-    levels: Dict[Price, Quantity] = {}
+    levels: Dict[Price, Quantity] = field(default_factory=dict)
 
     def add_level(self, price: Price, quantity: Quantity):
         if price in self.levels:

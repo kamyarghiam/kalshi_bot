@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 
 from src.helpers.types.markets import MarketTicker
@@ -115,3 +117,56 @@ def test_blank_orderbook():
     snapshot = OrderbookSnapshotRM(market_ticker=MarketTicker("some_ticker"))
     assert snapshot.yes == []
     assert snapshot.no == []
+
+
+def test_orderbook_apply_delta_copied():
+    # Test that we can apply a delta to an orderbook without
+    # affecting its copies
+    book = Orderbook(market_ticker=MarketTicker("hi"))
+
+    delta = OrderbookDeltaRM(
+        market_ticker=MarketTicker("hi"),
+        price=Price(11),
+        delta=QuantityDelta(50),
+        side=Side.NO,
+    )
+    book.apply_delta(delta)
+    assert len(book.yes.levels) == 0
+    assert len(book.no.levels) == 1
+    assert book.no.levels[Price(11)] == Quantity(50)
+
+    copy_of_book = copy.deepcopy(book)
+
+    delta = OrderbookDeltaRM(
+        market_ticker=MarketTicker("hi"),
+        price=Price(12),
+        delta=QuantityDelta(40),
+        side=Side.NO,
+    )
+    book.apply_delta(delta)
+    assert len(book.yes.levels) == 0
+    assert len(book.no.levels) == 2
+    assert book.no.levels[Price(11)] == Quantity(50)
+    assert book.no.levels[Price(12)] == Quantity(40)
+
+    # Make sure it's copy didn't change
+    assert len(copy_of_book.yes.levels) == 0
+    assert len(copy_of_book.no.levels) == 1
+    assert copy_of_book.no.levels[Price(11)] == Quantity(50)
+
+    # Make sure we can apply a delta if an orderbook is in a dict
+    orderbook_dict = {book.market_ticker: book}
+
+    delta = OrderbookDeltaRM(
+        market_ticker=MarketTicker("hi"),
+        price=Price(12),
+        delta=QuantityDelta(-10),
+        side=Side.NO,
+    )
+    orderbook_in_dict = orderbook_dict[book.market_ticker]
+    orderbook_in_dict.apply_delta(delta)
+
+    assert len(orderbook_dict[book.market_ticker].yes.levels) == 0
+    assert len(orderbook_dict[book.market_ticker].no.levels) == 2
+    assert orderbook_dict[book.market_ticker].no.levels[Price(11)] == Quantity(50)
+    assert orderbook_dict[book.market_ticker].no.levels[Price(12)] == Quantity(30)
