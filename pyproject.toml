@@ -30,6 +30,7 @@ polyfactory = "^2.0.0a1"
 ratelimit = "^2.2.1"
 pytest-xdist = "^3.2.1"
 tenacity = "^8.2.2"
+mysql-connector-python = "^8.0.33"
 
 
 [build-system]
