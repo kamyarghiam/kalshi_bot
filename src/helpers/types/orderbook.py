@@ -58,6 +58,9 @@ class OrderbookSide:
         assert max_price is not None and quantiy_at_max_price is not None
         return max_price, quantiy_at_max_price
 
+    def get_total_quantity(self) -> Quantity:
+        return Quantity(sum(quantity for quantity in self.levels.values()))
+
     def _remove_level(self, price: Price):
         del self.levels[price]
 

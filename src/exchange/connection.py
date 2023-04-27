@@ -247,8 +247,10 @@ class Connection:
     exchange. You can pass in a test client so that we can
     test requests against a test exchange"""
 
-    def __init__(self, connection_adapter: TestClient | None = None):
-        self._auth = Auth()
+    def __init__(
+        self, connection_adapter: TestClient | None = None, is_test_run: bool = True
+    ):
+        self._auth = Auth(is_test_run)
         self._connection_adapter: Union[TestClient, SessionsWrapper]
         self._api_version = self._auth.api_version.add_slash()
         if connection_adapter:

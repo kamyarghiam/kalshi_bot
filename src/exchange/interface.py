@@ -37,7 +37,7 @@ from src.helpers.utils import PendingMessages
 
 
 class ExchangeInterface:
-    def __init__(self, test_client: TestClient | None = None):
+    def __init__(self, test_client: TestClient | None = None, is_test_run: bool = True):
         """This class provides a high level interace with the exchange.
 
         It is a context manager that autoamtically signs you into and out
@@ -49,7 +49,7 @@ class ExchangeInterface:
         The credentials are picked up from the env variables.
 
         """
-        self._connection = Connection(test_client)
+        self._connection = Connection(test_client, is_test_run)
         self._subsciptions: List[SubscriptionId] = []
 
     def get_exchange_status(self):
