@@ -258,6 +258,18 @@ def test_compute_side_profits(tmp_path):
     assert expected_profit == 10 * 150
     assert actual_profit == 20 * 100
 
+    expected_profit, actual_profit = pred._compute_side_profits(
+        price_to_buy,
+        quantity_available,
+        predicted_price,
+        # negative quantity should avoid the buy
+        -1,  # type:ignore[arg-type]
+        actual_price,
+        actual_quantity,
+    )
+    assert expected_profit == 0
+    assert actual_profit == 0
+
 
 def test_make_predicition(tmp_path):
     x_vals = np.array([[1, 2, 3]])

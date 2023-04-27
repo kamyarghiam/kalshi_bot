@@ -293,6 +293,10 @@ class Experiment1Predictor:
         actual_price: Price,
         actual_quantity: Quantity,
     ):
+        if predicted_quantity <= 0:
+            # Don't buy if we don't expect anything to be there to sell
+            print(f"Negative quantity at {predicted_quantity}. Avoiding buy")
+            return 0, 0
         quantity_to_buy = min(quantity_available, predicted_quantity)
         change_in_price = predicted_price - price_to_buy
         expected_profit = quantity_to_buy * change_in_price
@@ -304,11 +308,11 @@ class Experiment1Predictor:
         else:
             # Make the least money
             actual_profit = min(quantity_to_buy, actual_quantity) * actual_price_change
-        print(f"Expected profit: ${expected_profit / 100}")
-        print(f"Actual profit: ${actual_profit / 100}")
+        print(f"  Expected profit: ${expected_profit / 100}")
+        print(f"  Actual profit: ${actual_profit / 100}")
         self.money_made += actual_profit
         return expected_profit, actual_profit
 
 
-if __name__ == "__main__":
-    main(is_test_run=False)
+# if __name__ == "__main__":
+#     main(is_test_run=False)
