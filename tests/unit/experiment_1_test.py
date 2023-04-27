@@ -1,10 +1,10 @@
 import copy
 from typing import Dict
 
-import numpy as np  # type:ignore[import]
+import numpy as np
 import pytest
 from mock import MagicMock, patch
-from sklearn.linear_model import SGDRegressor  # type:ignore[import]
+from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface
 from src.helpers.types.markets import MarketTicker

@@ -3,10 +3,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List
 
-import joblib  # type:ignore[import]
-import numpy as np  # type:ignore[import]
-from sklearn.exceptions import NotFittedError  # type:ignore[import]
-from sklearn.linear_model import SGDRegressor  # type:ignore[import]
+import joblib
+import numpy as np
+from sklearn.exceptions import NotFittedError
+from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
@@ -310,5 +310,5 @@ class Experiment1Predictor:
         return expected_profit, actual_profit
 
 
-# if __name__ == "__main__":
-#     main(is_test_run=False)
+if __name__ == "__main__":
+    main(is_test_run=False)

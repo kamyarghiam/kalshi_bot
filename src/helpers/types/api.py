@@ -1,6 +1,6 @@
 from typing import Callable
 
-import ratelimit  # type:ignore[import]
+import ratelimit
 from pydantic import BaseModel
 
 

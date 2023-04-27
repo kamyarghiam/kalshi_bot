@@ -1,9 +1,10 @@
-from unittest.mock import MagicMock
+import ssl
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from mock import patch
 from pydantic import ValidationError
-from websocket import WebSocket as ExternalWebsocket  # type:ignore[import]
+from websockets.sync.client import ClientConnection as ExternalWebsocket
 
 from src.exchange.connection import Connection, SessionsWrapper, Websocket
 from src.helpers.types.auth import MemberId, Token
@@ -144,7 +145,7 @@ def test_websockets_with_session_wrapper_send_recieve():
     session_wrapper = SessionsWrapper(URL("http://base_url"))
     ws = Websocket(session_wrapper, MagicMock(autospec=True))
     assert ws._base_url == URL("wss://base_url")
-    ws._ws = ExternalWebsocket()
+    ws._ws = MagicMock(autospec=True, spec=ExternalWebsocket)
 
     # Test send
     with patch.object(ws._ws, "send") as send:
@@ -172,15 +173,19 @@ def test_websockets_with_session_wrapper_send_recieve():
 
 
 def test_websockets_session_wrapper_connect():
-    with patch("src.exchange.connection.ExternalWebsocket.connect") as connect:
+    with patch("src.exchange.connection.external_websocket_connect") as connect:
         sessions_wrapper = SessionsWrapper(URL("base_url"))
         ws = Websocket(sessions_wrapper, MagicMock(autospec=True))
         with ws.connect(
             URL("websocket_url"), MemberId("member_id"), api_token=Token("token")
         ):
+            ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
             connect.assert_called_once_with(
                 "wss://base_url/websocket_url",
-                header=["Authorization:Bearer member_id:token"],
+                additional_headers={"Authorization": "Bearer member_id:token"},
+                ssl_context=ANY,
             )
 
 

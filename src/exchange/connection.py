@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 from requests import JSONDecodeError, Session
 from starlette.testclient import WebSocketTestSession
 from tenacity import retry, retry_if_not_exception_type, stop_after_delay
-from websocket import WebSocket as ExternalWebsocket  # type:ignore[import]
+from websockets.sync.client import ClientConnection as ExternalWebsocket
+from websockets.sync.client import connect as external_websocket_connect
 
 from src.helpers.constants import LOGIN_URL, LOGOUT_URL
 from src.helpers.types.api import ExternalApi, RateLimit
@@ -108,16 +109,20 @@ class Websocket:
         Automaitcally unsubscribes you from all subscriptions after session is
         closed."""
         if isinstance(self._connection_adapter, SessionsWrapper):
-            self._ws = ExternalWebsocket(sslopt={"cert_reqs": ssl.CERT_NONE})
-            try:
-                self._ws.connect(
-                    self._base_url.add(websocket_url),
-                    header=[f"Authorization:Bearer {member_id}:{api_token}"],
-                )
-                yield self
-            finally:
-                self.unsubscribe(self._subscriptions)
-                self._ws.close()
+            ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            with external_websocket_connect(
+                self._base_url.add(websocket_url),
+                additional_headers={"Authorization": f"Bearer {member_id}:{api_token}"},
+                ssl_context=ssl_context,
+            ) as websocket:
+                self._ws = websocket
+                try:
+                    yield self
+                finally:
+                    self.unsubscribe(self._subscriptions)
+                    self._ws.close()
         elif isinstance(self._connection_adapter, TestClient):
             with self._connection_adapter.connect(  # type:ignore[attr-defined]
                 websocket_url
