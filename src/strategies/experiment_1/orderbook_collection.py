@@ -10,7 +10,6 @@ from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import get_opposite_side_price
 from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
@@ -61,7 +60,8 @@ def main(
     finally:
         # Save the model before we error or exit
         model._save()
-        print(f"Money made this session: ${model.money_made / 100}")
+        print(f"Money made this session: ${sum(model.trade_profits) / 100}")
+        print(f"Amount made per trade: {model.trade_profits}")
 
 
 def process_message(
@@ -156,7 +156,8 @@ class Experiment1Predictor:
             Model(ModelNames.QUANTITY_NO, self._root_path),
             Model(ModelNames.QUANTITY_YES, self._root_path),
         ]
-        self.money_made = 0
+        # In cents
+        self.trade_profits: List = []
 
     def update(self, prev_ob: Orderbook, curr_ob: Orderbook):
         try:
@@ -184,6 +185,7 @@ class Experiment1Predictor:
 
     def _save(self):
         print("Saving models...")
+        print(f"Profit so far: ${sum(self.trade_profits)/100}")
         for model in self._models:
             model._save()
 
@@ -212,11 +214,6 @@ class Experiment1Predictor:
         max_no_price, no_quantity = prev_ob.no.get_largest_price_level()
         max_yes_price, yes_quantity = prev_ob.yes.get_largest_price_level()
 
-        # TODO: confirm this understanding is correct
-        # Price these contracts are available at on orderbook
-        buy_no_at = get_opposite_side_price(max_no_price)
-        buy_yes_at = get_opposite_side_price(max_yes_price)
-
         no_price_model = self._models[0]
         assert no_price_model._name == ModelNames.PRICE_NO
         yes_price_model = self._models[1]
@@ -230,15 +227,15 @@ class Experiment1Predictor:
         predicted_yes_price_change = yes_price_model.predict(x_vals)
 
         # Price to sell at
-        predicted_no_price = min(max(max_no_price + predicted_no_price_change, 1), 99)
-        predicted_yes_price = min(
-            max(max_yes_price + predicted_yes_price_change, 1), 99
-        )
+        # TODO: double check this
+        predicted_no_price = max_no_price + predicted_no_price_change
+        predicted_yes_price = max_yes_price + predicted_yes_price_change
         print(
             f"Predicted: yes price change: {predicted_yes_price_change}. "
             + f"No price change: {predicted_no_price_change}"
         )
-        if predicted_yes_price_change > 0 or predicted_no_price_change > 0:
+
+        if predicted_no_price_change > 0 or predicted_yes_price_change > 0:
             if predicted_no_price_change > predicted_yes_price_change:
                 # We will make more profit from buying the no
                 (
@@ -253,7 +250,7 @@ class Experiment1Predictor:
                 predicted_no_quantity = predicted_no_quantity_ratio * sum_of_quantity
 
                 self._compute_side_profits(
-                    buy_no_at,
+                    max_no_price,
                     no_quantity,
                     predicted_no_price,
                     predicted_no_quantity,
@@ -274,7 +271,7 @@ class Experiment1Predictor:
                 predicted_yes_quantity = predicted_yes_quantity_ratio * sum_of_quantity
 
                 self._compute_side_profits(
-                    buy_yes_at,
+                    max_yes_price,
                     yes_quantity,
                     predicted_yes_price,
                     predicted_yes_quantity,
@@ -299,6 +296,10 @@ class Experiment1Predictor:
             return 0, 0
         quantity_to_buy = min(quantity_available, predicted_quantity)
         change_in_price = predicted_price - price_to_buy
+        print(
+            f"Predicted price: {predicted_price}."
+            + f"Price to buy: {price_to_buy}. Quantity: {quantity_to_buy}"
+        )
         expected_profit = quantity_to_buy * change_in_price
         # Worst case actual profit
         actual_price_change = actual_price - price_to_buy
@@ -310,9 +311,9 @@ class Experiment1Predictor:
             actual_profit = min(quantity_to_buy, actual_quantity) * actual_price_change
         print(f"  Expected profit: ${expected_profit / 100}")
         print(f"  Actual profit: ${actual_profit / 100}")
-        self.money_made += actual_profit
+        self.trade_profits.append(actual_profit)
         return expected_profit, actual_profit
 
 
-# if __name__ == "__main__":
-#     main(is_test_run=False)
+if __name__ == "__main__":
+    main(is_test_run=False)

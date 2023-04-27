@@ -312,7 +312,7 @@ def test_make_predicition(tmp_path):
     with patch.object(pred, "_compute_side_profits") as side_profits:
         pred._make_prediction(x_vals, orderbook, new_orderbook)
         expected_call_args = [
-            Price(20),
+            Price(80),
             Quantity(15),
             no_price_model.predict(x_vals) + Price(80),
             no_quantity_model.predict(x_vals) * Quantity(25),
@@ -333,7 +333,7 @@ def test_make_predicition(tmp_path):
     with patch.object(pred, "_compute_side_profits") as side_profits:
         pred._make_prediction(x_vals, orderbook, new_orderbook)
         expected_call_args = [
-            Price(90),
+            Price(10),
             Quantity(150),
             yes_price_model.predict(x_vals) + Price(10),
             yes_quantity_model.predict(x_vals) * Quantity(250),
