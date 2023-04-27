@@ -70,7 +70,7 @@ class Auth:
     """The purpose of this class is to store authentication
     information to connect to the exchange"""
 
-    def __init__(self):
+    def __init__(self, is_test_run: bool = True):
         for env_var in ENV_VARS:
             if env_var not in os.environ:
                 raise ValueError(f"{env_var} not set in env vars")
@@ -80,7 +80,7 @@ class Auth:
         self._base_url: URL = URL(os.environ.get(URL_ENV_VAR))
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
 
-        if KALSHI_PROD_BASE_URL in self._base_url:
+        if is_test_run and KALSHI_PROD_BASE_URL in self._base_url:
             raise ValueError("You're running against prod. Are you sure?")
 
         # Filled after getting info from exchange
