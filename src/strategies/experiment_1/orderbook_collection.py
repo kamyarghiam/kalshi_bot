@@ -234,6 +234,10 @@ class Experiment1Predictor:
         predicted_yes_price = min(
             max(max_yes_price + predicted_yes_price_change, 1), 99
         )
+        print(
+            f"Predicted: yes price change: {predicted_yes_price_change}. "
+            + f"No price change: {predicted_no_price_change}"
+        )
         if predicted_yes_price_change > 0 or predicted_no_price_change > 0:
             if predicted_no_price_change > predicted_yes_price_change:
                 # We will make more profit from buying the no
