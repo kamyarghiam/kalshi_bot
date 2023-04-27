@@ -235,7 +235,8 @@ class Experiment1Predictor:
             + f"No price change: {predicted_no_price_change}"
         )
 
-        if predicted_no_price_change > 0 or predicted_yes_price_change > 0:
+        # Only buy if the predicted price chagne is at least half a cent
+        if predicted_no_price_change >= 0.5 or predicted_yes_price_change >= 0.5:
             if predicted_no_price_change > predicted_yes_price_change:
                 # We will make more profit from buying the no
                 (
