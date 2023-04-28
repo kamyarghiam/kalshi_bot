@@ -10,11 +10,14 @@ from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
+from src.helpers.types.money import Balance, Cents
 from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
     OrderbookSide,
 )
+from src.helpers.types.orders import Side
+from src.helpers.types.portfolio import Portfolio, PortfolioError
 from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 from tests.fake_exchange import Price
 from tests.unit.orderbook_test import Quantity
@@ -48,9 +51,8 @@ def main(
         with exchange_interface.get_websocket() as ws:
             sub = OrderbookSubscription(ws, market_tickers)
             gen = sub.continuous_receive()
-
+            print("Waiting for messages...")
             while True:
-                print("Waiting for message...")
                 data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
                 process_message(data, model, previous_snapshots)
                 if num_runs is not None:
@@ -61,6 +63,8 @@ def main(
         # Save the model before we error or exit
         model._save()
         print(f"Money made this session: ${sum(model.trade_profits) / 100}")
+        print(f"Cash balance: ${model.portfolio._cash_balance._balance/100}")
+        print(f"Cash locked in positions: ${model.portfolio.get_positions_value()/100}")
         print(f"Amount made per trade: {model.trade_profits}")
 
 
@@ -69,7 +73,7 @@ def process_message(
     model: "Experiment1Predictor",
     previous_snapshots: Dict[MarketTicker, Orderbook],
 ):
-    print(f"{data}", flush=True)
+    print(f"{data.type}", flush=True)
     market_ticker = data.msg.market_ticker
     if isinstance(data, OrderbookSnapshotWR):
         orderbook = Orderbook.from_snapshot(data.msg)
@@ -158,12 +162,18 @@ class Experiment1Predictor:
         ]
         # In cents
         self.trade_profits: List = []
+        self.portfolio = Portfolio(Balance(Cents(500000)))  # $5k
 
     def update(self, prev_ob: Orderbook, curr_ob: Orderbook):
         try:
             x_vals = self._extract_x_values(prev_ob).reshape(1, -1)
             try:
-                self._make_prediction(x_vals, prev_ob, curr_ob)
+                profit = self.portfolio.find_sell_opportunities(curr_ob)
+                if profit is not None:
+                    self.trade_profits.append(profit)
+                    print(f"Found profitable trade later on. Profit: ${profit/ 100}")
+                else:
+                    self._make_prediction(x_vals, prev_ob, curr_ob, self.portfolio)
             except NotFittedError:
                 print("Model not ready to predict yet")
             except Exception as e:
@@ -172,7 +182,7 @@ class Experiment1Predictor:
                 model.update(x_vals, prev_ob, curr_ob)
         except EmptyOrderbookSideError:
             # We don't update the model if things are empty
-            print(f"Empty orderbook. Prev: {prev_ob}. Curr: {curr_ob}")
+            print(f"Empty orderbook. Market ticker: {prev_ob.market_ticker}")
             return
         self._num_updates += 1
         if self._should_save_models():
@@ -186,6 +196,9 @@ class Experiment1Predictor:
     def _save(self):
         print("Saving models...")
         print(f"Profit so far: ${sum(self.trade_profits)/100}")
+        print(f"Cash balance: ${self.portfolio._cash_balance._balance/100}")
+        print(f"Cash locked in positions: ${self.portfolio.get_positions_value()/100}")
+
         for model in self._models:
             model._save()
 
@@ -209,7 +222,11 @@ class Experiment1Predictor:
         return x_values
 
     def _make_prediction(
-        self, x_vals: np.ndarray, prev_ob: Orderbook, new_ob: Orderbook
+        self,
+        x_vals: np.ndarray,
+        prev_ob: Orderbook,
+        new_ob: Orderbook,
+        portfolio: Portfolio,
     ):
         max_no_price, no_quantity = prev_ob.no.get_largest_price_level()
         max_yes_price, yes_quantity = prev_ob.yes.get_largest_price_level()
@@ -227,16 +244,11 @@ class Experiment1Predictor:
         predicted_yes_price_change = yes_price_model.predict(x_vals)
 
         # Price to sell at
-        # TODO: double check this
         predicted_no_price = max_no_price + predicted_no_price_change
         predicted_yes_price = max_yes_price + predicted_yes_price_change
-        print(
-            f"Predicted: yes price change: {predicted_yes_price_change}. "
-            + f"No price change: {predicted_no_price_change}"
-        )
 
-        # Only buy if the predicted price chagne is at least half a cent
-        if predicted_no_price_change >= 0.5 or predicted_yes_price_change >= 0.5:
+        # Only buy if the predicted price chagne is at least 2 cents
+        if predicted_no_price_change >= 2 or predicted_yes_price_change >= 2:
             if predicted_no_price_change > predicted_yes_price_change:
                 # We will make more profit from buying the no
                 (
@@ -251,6 +263,9 @@ class Experiment1Predictor:
                 predicted_no_quantity = predicted_no_quantity_ratio * sum_of_quantity
 
                 self._compute_side_profits(
+                    portfolio,
+                    prev_ob.market_ticker,
+                    Side.NO,
                     max_no_price,
                     no_quantity,
                     predicted_no_price,
@@ -272,6 +287,9 @@ class Experiment1Predictor:
                 predicted_yes_quantity = predicted_yes_quantity_ratio * sum_of_quantity
 
                 self._compute_side_profits(
+                    portfolio,
+                    prev_ob.market_ticker,
+                    Side.NO,
                     max_yes_price,
                     yes_quantity,
                     predicted_yes_price,
@@ -279,11 +297,12 @@ class Experiment1Predictor:
                     actual_yes_price,
                     actual_yes_quantity,
                 )
-        else:
-            print("No profitable trades")
 
     def _compute_side_profits(
         self,
+        portfolio: Portfolio,
+        ticker: MarketTicker,
+        side: Side,
         price_to_buy: Price,
         quantity_available: Quantity,
         predicted_price: Price,
@@ -296,20 +315,27 @@ class Experiment1Predictor:
             print(f"Negative quantity at {predicted_quantity}. Avoiding buy")
             return 0, 0
         quantity_to_buy = min(quantity_available, predicted_quantity)
+        try:
+            portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
+        except PortfolioError as e:
+            print(f"Could not buy because: {e}")
+            return
         change_in_price = predicted_price - price_to_buy
-        print(
-            f"Predicted price: {predicted_price}."
-            + f"Price to buy: {price_to_buy}. Quantity: {quantity_to_buy}"
-        )
         expected_profit = quantity_to_buy * change_in_price
         # Worst case actual profit
         actual_price_change = actual_price - price_to_buy
-        if actual_price_change < 0:
-            # Lose the most money
-            actual_profit = max(quantity_to_buy, actual_quantity) * actual_price_change
-        else:
-            # Make the least money
-            actual_profit = min(quantity_to_buy, actual_quantity) * actual_price_change
+        if actual_price_change == 0:
+            print(
+                f"Holding position {ticker} on side {side} at price "
+                + f"{price_to_buy} with quantity {quantity_to_buy}"
+            )
+            return
+        actual_quantity_sold = (
+            max(quantity_to_buy, actual_quantity)  # Lose the most money
+            if actual_price_change < 0
+            else min(quantity_to_buy, actual_quantity)  # Make the least money
+        )
+        actual_profit = portfolio.sell(ticker, actual_price, actual_quantity_sold, side)
         print(f"  Expected profit: ${expected_profit / 100}")
         print(f"  Actual profit: ${actual_profit / 100}")
         self.trade_profits.append(actual_profit)

@@ -8,9 +8,10 @@ from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
+from src.helpers.types.money import Balance, Cents, Price
 from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
+from src.helpers.types.portfolio import Portfolio
 from src.helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from src.helpers.types.websockets.response import (
     OrderbookDeltaRM,
@@ -234,6 +235,9 @@ def test_compute_side_profits(tmp_path):
     actual_price = Price(20)
     actual_quantity = Quantity(100)
     expected_profit, actual_profit = pred._compute_side_profits(
+        Portfolio(Balance(Cents(5000000))),
+        MarketTicker("hi"),
+        Side.NO,
         price_to_buy,
         quantity_available,
         predicted_price,
@@ -248,6 +252,9 @@ def test_compute_side_profits(tmp_path):
     # Let's say our prediction was directionally correct
     actual_price = Price(50)
     expected_profit, actual_profit = pred._compute_side_profits(
+        Portfolio(Balance(Cents(5000000))),
+        MarketTicker("hi"),
+        Side.NO,
         price_to_buy,
         quantity_available,
         predicted_price,
@@ -259,6 +266,9 @@ def test_compute_side_profits(tmp_path):
     assert actual_profit == 20 * 100
 
     expected_profit, actual_profit = pred._compute_side_profits(
+        Portfolio(Balance(Cents(5000000))),
+        MarketTicker("hi"),
+        Side.NO,
         price_to_buy,
         quantity_available,
         predicted_price,
@@ -310,8 +320,13 @@ def test_make_predicition(tmp_path):
 
     # Try no side
     with patch.object(pred, "_compute_side_profits") as side_profits:
-        pred._make_prediction(x_vals, orderbook, new_orderbook)
+        pred._make_prediction(
+            x_vals, orderbook, new_orderbook, Portfolio(Balance(Cents(500000)))
+        )
         expected_call_args = [
+            Portfolio(Balance(Cents(500000))),
+            MarketTicker("hi"),
+            Side.NO,
             Price(80),
             Quantity(15),
             no_price_model.predict(x_vals) + Price(80),
@@ -319,8 +334,9 @@ def test_make_predicition(tmp_path):
             Price(90),
             Quantity(15),
         ]
+        # Skip first three args
         call_args = side_profits.call_args[0]
-        for arg1, arg2 in zip(call_args, expected_call_args):
+        for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
             assert abs(arg1 - arg2) < 0.1
 
     # Test yes price
@@ -331,8 +347,13 @@ def test_make_predicition(tmp_path):
     pred._models[1] = yes_price
 
     with patch.object(pred, "_compute_side_profits") as side_profits:
-        pred._make_prediction(x_vals, orderbook, new_orderbook)
+        pred._make_prediction(
+            x_vals, orderbook, new_orderbook, Portfolio(Balance(Cents(500000)))
+        )
         expected_call_args = [
+            Portfolio(Balance(Cents(500000))),
+            MarketTicker("hi"),
+            Side.YES,
             Price(10),
             Quantity(150),
             yes_price_model.predict(x_vals) + Price(10),
@@ -341,5 +362,6 @@ def test_make_predicition(tmp_path):
             Quantity(150),
         ]
         call_args = side_profits.call_args[0]
-        for arg1, arg2 in zip(call_args, expected_call_args):
+        # Skip first three args
+        for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
             assert abs(arg1 - arg2) < 0.1

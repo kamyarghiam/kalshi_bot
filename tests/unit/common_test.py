@@ -1,6 +1,7 @@
 import pytest
 
 from src.helpers.types.common import URL, NonNullStr
+from src.helpers.types.money import Balance, Cents
 from src.helpers.utils import PendingMessages
 
 
@@ -61,3 +62,8 @@ def test_pending_messages():
 
     with pytest.raises(StopIteration):
         next(pm)
+
+
+def test_negative_balance():
+    with pytest.raises(ValueError):
+        Balance(Cents(-50))

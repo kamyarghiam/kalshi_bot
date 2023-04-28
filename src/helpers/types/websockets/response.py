@@ -1,6 +1,6 @@
 import pickle
 import typing
-from typing import List, Tuple, TypeVar
+from typing import List, Sequence, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, validator
 
@@ -63,7 +63,7 @@ class OrderbookSnapshotRM(ResponseMessage):
     no: List[Tuple[Price, Quantity]] = []
 
     @validator("yes", "no", pre=True)
-    def validate_iterable(cls, input_levels: List[List[int]]):
+    def validate_iterable(cls, input_levels: List[Sequence[int]]):
         output_levels: List[Tuple[Price, Quantity]] = []
         for level in input_levels:
             assert len(level) == 2
