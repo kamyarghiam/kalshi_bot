@@ -6,7 +6,7 @@ import numpy as np
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, Price
 from src.helpers.types.orderbook import Orderbook
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
+from src.helpers.types.orders import Quantity, QuantityDelta, Side, compute_fee
 
 
 @dataclass
@@ -68,12 +68,14 @@ class Portfolio:
     ):
         self._cash_balance: Balance = balance
         self._positions: Dict[MarketTicker, Position] = {}
+        self._fees_paid: Cents = Cents(0)
 
     def buy(self, ticker: MarketTicker, price: Price, quantity: Quantity, side: Side):
         """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
-        # TODO: does not include fees
-        price_to_pay = price * quantity
+        fee = compute_fee(price, quantity)
+        price_to_pay = price * quantity + fee
         self._cash_balance.add_balance(Cents(-1 * price_to_pay))
+        self._fees_paid += fee
 
         if ticker in self._positions:
             holding = self._positions[ticker]
@@ -90,7 +92,8 @@ class Portfolio:
         max_quantity_to_sell: Quantity,
         side: Side,
     ) -> Cents:
-        """Returns pnl from sell using fifo
+        # TODO: refector this
+        """Returns pnl from sell using fifo. DOES NOT INCLUDE FEES FROM BUYING
 
         Sells min of what you have the max_quantity_to_sell"""
         if ticker not in self._positions:
@@ -99,14 +102,16 @@ class Portfolio:
         if position.side != side:
             raise PortfolioError("Holding a different side when trying to sell")
         quantity_to_sell = min(max_quantity_to_sell, Quantity(sum(position.quantities)))
+        fee = compute_fee(price, quantity_to_sell)
         amount_paid = position.sell_position(quantity_to_sell)
-        amount_made = Cents(price * quantity_to_sell)
-
+        amount_made = Cents(price * quantity_to_sell) - fee
+        self._fees_paid += fee
         self._cash_balance.add_balance(Cents(amount_made))
 
         if position.is_empty():
             del self._positions[ticker]
 
+        # Returns profit without buying fees
         return Cents(amount_made - amount_paid)
 
     def find_sell_opportunities(self, orderbook: Orderbook) -> Cents | None:

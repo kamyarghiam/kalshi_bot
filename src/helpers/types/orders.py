@@ -1,4 +1,8 @@
+import math
 from enum import Enum
+
+from src.helpers.types.money import Cents, Price
+from tests.unit.prices_test import get_opposite_side_price
 
 
 class QuantityDelta(int):
@@ -10,7 +14,7 @@ class Quantity(int):
 
     def __new__(cls, num: int):
         if not isinstance(num, int) or num < 0:
-            raise ValueError("{num} invalid quantitiy")
+            raise ValueError(f"{num} invalid quantitiy")
         return super(Quantity, cls).__new__(cls, num)
 
     def __add__(self, delta: QuantityDelta) -> "Quantity":  # type:ignore[override]
@@ -27,3 +31,9 @@ class Side(str, Enum):
 
     # for testing
     TEST_INVALID_SIDE = "TEST_INVALID"
+
+
+def compute_fee(price: Price, quantity: Quantity) -> Cents:
+    return Cents(
+        math.ceil((7 * quantity * price * get_opposite_side_price(price)) / 10000)
+    )

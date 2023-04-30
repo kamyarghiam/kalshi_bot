@@ -10,7 +10,7 @@ from src.exchange.interface import ExchangeInterface
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, Price
 from src.helpers.types.orderbook import Orderbook
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
+from src.helpers.types.orders import Quantity, QuantityDelta, Side, compute_fee
 from src.helpers.types.portfolio import Portfolio
 from src.helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from src.helpers.types.websockets.response import (
@@ -246,8 +246,20 @@ def test_compute_side_profits(tmp_path):
         actual_quantity,
     )
 
-    assert expected_profit == 10 * 150
-    assert actual_profit == -10 * 150
+    assert expected_profit == 10 * 150 - compute_fee(
+        price_to_buy,
+        quantity_available,
+    ) - compute_fee(
+        predicted_price,
+        quantity_available,
+    )
+    assert actual_profit == -10 * 150 - compute_fee(
+        price_to_buy,
+        quantity_available,
+    ) - compute_fee(
+        actual_price,
+        quantity_available,
+    )
 
     # Let's say our prediction was directionally correct
     actual_price = Price(50)
@@ -262,8 +274,20 @@ def test_compute_side_profits(tmp_path):
         actual_price,
         actual_quantity,
     )
-    assert expected_profit == 10 * 150
-    assert actual_profit == 20 * 100
+    assert expected_profit == 10 * 150 - compute_fee(
+        price_to_buy,
+        quantity_available,
+    ) - compute_fee(
+        predicted_price,
+        quantity_available,
+    )
+    assert actual_profit == 20 * 100 - compute_fee(
+        price_to_buy,
+        actual_quantity,
+    ) - compute_fee(
+        actual_price,
+        actual_quantity,
+    )
 
     expected_profit, actual_profit = pred._compute_side_profits(
         Portfolio(Balance(Cents(5000000))),
@@ -334,6 +358,7 @@ def test_make_predicition(tmp_path):
             Price(90),
             Quantity(15),
         ]
+        side_profits.assert_called_once()
         # Skip first three args
         call_args = side_profits.call_args[0]
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
@@ -361,6 +386,7 @@ def test_make_predicition(tmp_path):
             Price(20),
             Quantity(150),
         ]
+        side_profits.assert_called_once()
         call_args = side_profits.call_args[0]
         # Skip first three args
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):

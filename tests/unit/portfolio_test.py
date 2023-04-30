@@ -3,7 +3,7 @@ import pytest
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, OutOfMoney
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
-from src.helpers.types.orders import Quantity, Side
+from src.helpers.types.orders import Quantity, Side, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError, Position
 from tests.fake_exchange import Price
 
@@ -92,21 +92,34 @@ def test_portfolio_buy():
         Quantity(100),
         Side.NO,
     )
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - compute_fee(
+        Price(5), Quantity(100)
+    )
     portfolio.buy(
         MarketTicker("hi2"),
         Price(10),
         Quantity(10),
         Side.YES,
     )
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - compute_fee(
+        Price(5), Quantity(100)
+    ) - compute_fee(Price(10), Quantity(10))
     portfolio.buy(
         MarketTicker("hi2"),
         Price(15),
         Quantity(5),
         Side.YES,
     )
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - 15 * 5
+    assert (
+        portfolio._cash_balance._balance
+        == 5000
+        - 5 * 100
+        - 10 * 10
+        - 15 * 5
+        - compute_fee(Price(5), Quantity(100))
+        - compute_fee(Price(10), Quantity(10))
+        - compute_fee(Price(15), Quantity(5))
+    )
     portfolio.buy(
         MarketTicker("hi2"),
         Price(20),
@@ -114,7 +127,16 @@ def test_portfolio_buy():
         Side.YES,
     )
     assert (
-        portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25
+        portfolio._cash_balance._balance
+        == 5000
+        - 5 * 100
+        - 10 * 10
+        - 15 * 5
+        - 20 * 25
+        - compute_fee(Price(5), Quantity(100))
+        - compute_fee(Price(10), Quantity(10))
+        - compute_fee(Price(15), Quantity(5))
+        - compute_fee(Price(20), Quantity(25))
     )
 
     assert portfolio.get_positions_value() == 5 * 100 + 10 * 10 + 15 * 5 + 20 * 25
@@ -127,14 +149,14 @@ def test_portfolio_buy():
             Quantity(50000),
             Side.YES,
         )
-    money_remaining = 5000 - (600 + 75 + 500)
+    money_remaining = portfolio._cash_balance._balance
     assert portfolio.get_positions_value() == 5 * 100 + 10 * 10 + 15 * 5 + 20 * 25
 
     # Does not raise out of money error
     portfolio.buy(
         MarketTicker("hi2"),
         Price(1),
-        Quantity(money_remaining),
+        Quantity(money_remaining - 250),  # subtract some fee
         Side.YES,
     )
 
@@ -156,7 +178,9 @@ def test_portfolio_sell():
         Quantity(100),
         Side.NO,
     )
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - compute_fee(
+        Price(5), Quantity(100)
+    )
     assert len(portfolio._positions) == 1
 
     # Wrong ticker
@@ -183,9 +207,11 @@ def test_portfolio_sell():
         Side.NO,
     )
 
-    assert profit1 == (100 - 50) * (6 - 5)
+    assert profit1 == (100 - 50) * (6 - 5) - compute_fee(Price(6), Quantity(50))
 
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 - compute_fee(
+        Price(5), Quantity(100)
+    ) - compute_fee(Price(6), Quantity(50))
 
     profit2 = portfolio.sell(
         MarketTicker("hi"),
@@ -194,9 +220,18 @@ def test_portfolio_sell():
         Side.NO,
     )
 
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3
+    assert (
+        portfolio._cash_balance._balance
+        == 5000
+        - 5 * 100
+        + 50 * 6
+        + 50 * 3
+        - compute_fee(Price(5), Quantity(100))
+        - compute_fee(Price(6), Quantity(50))
+        - compute_fee(Price(3), Quantity(50))
+    )
 
-    assert profit2 == (100 - 50) * (3 - 5)
+    assert profit2 == (100 - 50) * (3 - 5) - compute_fee(Price(3), Quantity(50))
     assert len(portfolio._positions) == 0
 
 
@@ -245,14 +280,16 @@ def test_find_sell_opportunites():
     assert len(portfolio._positions[MarketTicker("hi")].prices) == 2
     opportunity = portfolio.find_sell_opportunities(orderbook)
     assert len(portfolio._positions[MarketTicker("hi")].prices) == 1
-    assert opportunity == (75 - 5) * 100 + (75 - 6) * 50
+    assert opportunity == (75 - 5) * 100 + (75 - 6) * 50 - compute_fee(
+        Price(75), Quantity(150)
+    )
 
     # Other market ticker
     orderbook.market_ticker = MarketTicker("hi2")
 
     len(portfolio._positions) == 2
     opportunity = portfolio.find_sell_opportunities(orderbook)
-    assert opportunity == (50 - 10) * 10
+    assert opportunity == (50 - 10) * 10 - compute_fee(Price(50), Quantity(10))
     len(portfolio._positions) == 1
 
     assert portfolio.get_positions_value() == 50 * 6
