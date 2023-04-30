@@ -250,7 +250,7 @@ def test_change_view():
 
     # Can't change to the same view
     with pytest.raises(ValueError):
-        book.get_view(book.view)
+        book.get_view(OrderbookView.SELL)
 
     buy_book = book.get_view(OrderbookView.BUY)
     assert buy_book == Orderbook(
@@ -265,3 +265,9 @@ def test_change_view():
         no=OrderbookSide(levels={Price(98): Quantity(100), Price(99): Quantity(200)}),
         view=OrderbookView.BUY,
     )
+
+    # Can't change to the same view
+    with pytest.raises(ValueError):
+        buy_book.get_view(OrderbookView.BUY)
+
+    assert buy_book.get_view(OrderbookView.SELL) == book
