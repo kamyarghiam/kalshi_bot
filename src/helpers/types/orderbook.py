@@ -1,9 +1,10 @@
 import typing
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Dict, Tuple
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
+from src.helpers.types.money import Price, get_opposite_side_price
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 
 if typing.TYPE_CHECKING:
@@ -61,8 +62,25 @@ class OrderbookSide:
     def get_total_quantity(self) -> Quantity:
         return Quantity(sum(quantity for quantity in self.levels.values()))
 
+    def invert_prices(self) -> "OrderbookSide":
+        """Non-destructively inverts prices on orderboook side
+
+        Useful for changing the view of the orderbook"""
+        inverted_levels: Dict[Price, Quantity] = {}
+        for price, quantity in self.levels.items():
+            inverted_levels[get_opposite_side_price(price)] = quantity
+
+        return OrderbookSide(inverted_levels)
+
     def _remove_level(self, price: Price):
         del self.levels[price]
+
+
+class OrderbookView(str, Enum):
+    # The sell view is the same as the maker view on the website
+    SELL = "maker"
+    # The buy view is the same as the take view on the website
+    BUY = "taker"
 
 
 @dataclass
@@ -75,6 +93,8 @@ class Orderbook:
     market_ticker: MarketTicker
     yes: OrderbookSide = field(default_factory=OrderbookSide)
     no: OrderbookSide = field(default_factory=OrderbookSide)
+    # Initially all orderbooks are in the maker (aka sell view) view from the websocket
+    view: OrderbookView = field(default_factory=lambda: OrderbookView.SELL)
 
     def apply_delta(self, delta: "OrderbookDeltaRM"):
         if delta.market_ticker != self.market_ticker:
@@ -97,3 +117,17 @@ class Orderbook:
         for level in orderbook_snapshot.no:
             no.add_level(level[0], level[1])
         return cls(market_ticker=orderbook_snapshot.market_ticker, yes=yes, no=no)
+
+    def get_view(self, view: OrderbookView) -> "Orderbook":
+        """Returns a different view of the orderbook"""
+        if view == self.view:
+            raise ValueError(f"Already in view: {view}")
+        no_inverted = self.no.invert_prices()
+        yes_inverted = self.yes.invert_prices()
+
+        return Orderbook(
+            market_ticker=self.market_ticker,
+            yes=no_inverted,
+            no=yes_inverted,
+            view=view,
+        )

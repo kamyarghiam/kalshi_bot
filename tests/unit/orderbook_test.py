@@ -8,6 +8,7 @@ from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
     OrderbookSide,
+    OrderbookView,
 )
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
@@ -220,3 +221,47 @@ def test_get_largest_price_level():
     book.add_level(Price(4), Quantity(5))
 
     assert book.get_largest_price_level() == (Price(15), Quantity(4))
+
+
+def test_invert_prices():
+    side = OrderbookSide()
+    assert side.invert_prices() == side
+    side.add_level(Price(10), Quantity(100))
+    assert side.invert_prices() == OrderbookSide(levels={Price(90): Quantity(100)})
+    side.add_level(Price(40), Quantity(400))
+    assert side.invert_prices() == OrderbookSide(
+        levels={Price(90): Quantity(100), Price(60): Quantity(400)}
+    )
+
+
+def test_change_view():
+    book = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+    )
+    assert book.view == OrderbookView.SELL
+
+    # Can't change to the same view
+    with pytest.raises(ValueError):
+        book.get_view(book.view)
+
+    buy_book = book.get_view(OrderbookView.BUY)
+    assert buy_book == Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(
+            levels={
+                Price(7): Quantity(300),
+                Price(6): Quantity(400),
+                Price(5): Quantity(500),
+            }
+        ),
+        no=OrderbookSide(levels={Price(98): Quantity(100), Price(99): Quantity(200)}),
+        view=OrderbookView.BUY,
+    )
