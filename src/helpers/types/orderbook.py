@@ -50,14 +50,13 @@ class OrderbookSide:
         if self.is_empty():
             raise EmptyOrderbookSideError("Empty levels")
 
-        max_price: Price | None = None
-        quantiy_at_max_price: Quantity | None = None
-        for price, quantity in self.levels.items():
-            if max_price is None or price > max_price:
-                max_price = price
-                quantiy_at_max_price = quantity
-        assert max_price is not None and quantiy_at_max_price is not None
-        return max_price, quantiy_at_max_price
+        return max(self.levels.items())
+
+    def get_smallest_price_level(self) -> Tuple[Price, Quantity]:
+        if self.is_empty():
+            raise EmptyOrderbookSideError("Empty levels")
+
+        return min(self.levels.items())
 
     def get_total_quantity(self) -> Quantity:
         return Quantity(sum(quantity for quantity in self.levels.values()))

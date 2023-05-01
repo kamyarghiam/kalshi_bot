@@ -230,56 +230,36 @@ def test_compute_side_profits(tmp_path):
     pred = Experiment1Predictor(tmp_path)
     price_to_buy = Price(30)
     quantity_available = Quantity(150)
-    predicted_price = Price(40)
-    predicted_quantity = Quantity(200)
     actual_price = Price(20)
     actual_quantity = Quantity(100)
-    expected_profit, actual_profit = pred._compute_side_profits(
+    actual_profit = pred._compute_side_profits(
         Portfolio(Balance(Cents(5000000))),
         MarketTicker("hi"),
         Side.NO,
         price_to_buy,
         quantity_available,
-        predicted_price,
-        predicted_quantity,
         actual_price,
         actual_quantity,
     )
 
-    assert expected_profit == 10 * 150 - compute_fee(
+    assert actual_profit == -10 * 100 - compute_fee(
         price_to_buy,
-        quantity_available,
-    ) - compute_fee(
-        predicted_price,
-        quantity_available,
-    )
-    assert actual_profit == -10 * 150 - compute_fee(
-        price_to_buy,
-        quantity_available,
+        actual_quantity,
     ) - compute_fee(
         actual_price,
-        quantity_available,
+        actual_quantity,
     )
 
     # Let's say our prediction was directionally correct
     actual_price = Price(50)
-    expected_profit, actual_profit = pred._compute_side_profits(
+    actual_profit = pred._compute_side_profits(
         Portfolio(Balance(Cents(5000000))),
         MarketTicker("hi"),
         Side.NO,
         price_to_buy,
         quantity_available,
-        predicted_price,
-        predicted_quantity,
         actual_price,
         actual_quantity,
-    )
-    assert expected_profit == 10 * 150 - compute_fee(
-        price_to_buy,
-        quantity_available,
-    ) - compute_fee(
-        predicted_price,
-        quantity_available,
     )
     assert actual_profit == 20 * 100 - compute_fee(
         price_to_buy,
@@ -288,21 +268,6 @@ def test_compute_side_profits(tmp_path):
         actual_price,
         actual_quantity,
     )
-
-    expected_profit, actual_profit = pred._compute_side_profits(
-        Portfolio(Balance(Cents(5000000))),
-        MarketTicker("hi"),
-        Side.NO,
-        price_to_buy,
-        quantity_available,
-        predicted_price,
-        # negative quantity should avoid the buy
-        -1,  # type:ignore[arg-type]
-        actual_price,
-        actual_quantity,
-    )
-    assert expected_profit == 0
-    assert actual_profit == 0
 
 
 def test_make_predicition(tmp_path):

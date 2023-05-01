@@ -1,7 +1,8 @@
 import copy
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List
+import pdb
+from typing import Dict, List, Tuple
 
 import joblib
 import numpy as np
@@ -15,6 +16,7 @@ from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
     OrderbookSide,
+    OrderbookView,
 )
 from src.helpers.types.orders import Side, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError
@@ -54,7 +56,6 @@ def main(
             print("Waiting for messages...")
             while True:
                 data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
-                print(data)
                 process_message(data, model, previous_snapshots)
                 if num_runs is not None:
                     if num_runs == 0:
@@ -65,6 +66,7 @@ def main(
         model._save()
         print(f"Money made this session: ${sum(model.trade_profits) / 100}")
         print(f"Cash balance: ${model.portfolio._cash_balance._balance/100}")
+        print(f"Fees paid: ${model.portfolio._fees_paid/100}")
         print(f"Cash locked in positions: ${model.portfolio.get_positions_value()/100}")
         print(f"Amount made per trade: {model.trade_profits}")
 
@@ -118,6 +120,8 @@ class Model:
             self._save()
 
     def update(self, x_values: np.ndarray, prev_ob: Orderbook, new_ob: Orderbook):
+        assert prev_ob.view == OrderbookView.SELL
+        assert new_ob.view == OrderbookView.SELL
         y_val = np.array([self._get_y_val(prev_ob, new_ob)])
         self._model.partial_fit(x_values, y_val)
 
@@ -128,6 +132,8 @@ class Model:
         joblib.dump(self._model, self._full_path)
 
     def _get_y_val(self, prev_ob: Orderbook, new_ob: Orderbook) -> float:
+        assert prev_ob.view == OrderbookView.SELL
+        assert new_ob.view == OrderbookView.SELL
         if self._name == ModelNames.PRICE_NO:
             price_new, _ = new_ob.no.get_largest_price_level()
             price_old, _ = prev_ob.no.get_largest_price_level()
@@ -177,6 +183,8 @@ class Experiment1Predictor:
                     self._make_prediction(x_vals, prev_ob, curr_ob, self.portfolio)
             except NotFittedError:
                 print("Model not ready to predict yet")
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 print(f"Error while predicting: {e}")
             for model in self._models:
@@ -198,6 +206,7 @@ class Experiment1Predictor:
         print("Saving models...")
         print(f"Profit so far: ${sum(self.trade_profits)/100}")
         print(f"Cash balance: ${self.portfolio._cash_balance._balance/100}")
+        print(f"Fees paid: ${self.portfolio._fees_paid/100}")
         print(f"Cash locked in positions: ${self.portfolio.get_positions_value()/100}")
 
         for model in self._models:
@@ -217,10 +226,48 @@ class Experiment1Predictor:
         # Each value at index represents quantitiy (as fraction of total quantity)
         x_values = np.zeros(99)
         for price, quantity in orderbook_side.levels.items():
-            index = max_price - price
+            index = int(max_price) - int(price)
             quantity_ratio = quantity / total_quantity
             x_values[index] = quantity_ratio
         return x_values
+
+    def _get_buy_prices_and_quantities(
+        self, ob: Orderbook
+    ) -> Tuple[Price, Quantity, Price, Quantity]:
+        buy_ob = ob.get_view(OrderbookView.BUY)
+        no_price, no_quantity = buy_ob.no.get_smallest_price_level()
+        yes_price, yes_quantity = buy_ob.yes.get_smallest_price_level()
+
+        return (
+            yes_price,
+            yes_quantity,
+            no_price,
+            no_quantity,
+        )
+
+    def _get_predicted_sell_prices_and_quantity(
+        self, x_vals: np.ndarray, prev_ob: Orderbook, new_ob: Orderbook
+    ) -> Tuple[Price, Quantity, Price, Quantity]:
+        assert prev_ob.view == OrderbookView.SELL
+        assert new_ob.view == OrderbookView.SELL
+
+        sell_yes_price, _ = prev_ob.yes.get_largest_price_level()
+        sell_no_price, _ = prev_ob.no.get_largest_price_level()
+
+        predicted_yes_price = self._get_predicted_price(
+            x_vals, sell_yes_price, Side.YES
+        )
+        predicted_no_price = self._get_predicted_price(x_vals, sell_no_price, Side.NO)
+
+        predicted_yes_quantity = self._get_predicted_yes_quantity(x_vals, prev_ob)
+        predicted_no_quantity = self._get_predicted_no_quantity(x_vals, prev_ob)
+
+        return (
+            predicted_yes_price,
+            predicted_yes_quantity,
+            predicted_no_price,
+            predicted_no_quantity,
+        )
 
     def _make_prediction(
         self,
@@ -229,65 +276,55 @@ class Experiment1Predictor:
         new_ob: Orderbook,
         portfolio: Portfolio,
     ):
-        # TODO re-write this whole function. Wrong sides
-        max_no_price, no_quantity = prev_ob.no.get_largest_price_level()
-        max_yes_price, yes_quantity = prev_ob.yes.get_largest_price_level()
+        assert prev_ob.view == OrderbookView.SELL
+        assert new_ob.view == OrderbookView.SELL
+        (
+            buy_yes_price,
+            buy_yes_quantity,
+            buy_no_price,
+            buy_no_quantity,
+        ) = self._get_buy_prices_and_quantities(prev_ob)
 
-        no_price_model = self._models[0]
-        assert no_price_model._name == ModelNames.PRICE_NO
-        yes_price_model = self._models[1]
-        assert yes_price_model._name == ModelNames.PRICE_YES
+        (
+            sell_yes_predicted_price,
+            sell_yes_predicted_quantity,
+            sell_no_predicted_price,
+            sell_no_predicted_quantity,
+        ) = self._get_predicted_sell_prices_and_quantity(x_vals, prev_ob, new_ob)
 
-        # TODO: these calculation ignore fees, mecnet, and whether an order
-        # will actually be filled.
-        # TODO: this also ignores orders placed by the user themselves
-        # Remember models represent change from the bid / ask
-        predicted_no_price_change = no_price_model.predict(x_vals)
-        predicted_yes_price_change = yes_price_model.predict(x_vals)
-
-        # Price to sell at
-        # TODO: revisit if you want to take the floor here
-        predicted_no_price = Cents(
-            int(min(max(max_no_price + predicted_no_price_change, 1), 99))
-        )
-        predicted_yes_price = Cents(
-            int(min(max(max_yes_price + predicted_yes_price_change, 1), 99))
+        # We only want to buy as much as there is to sell
+        yes_quantity_to_buy = min(
+            buy_yes_quantity,
+            sell_yes_predicted_quantity,
         )
 
-        # Quantity to buy
-        predicted_yes_quantity = max(
-            self._get_predicted_yes_quantity(x_vals, prev_ob), 1
+        no_quantity_to_buy = min(
+            buy_no_quantity,
+            sell_no_predicted_quantity,
         )
-        yes_quantity_to_buy = min(no_quantity, predicted_yes_quantity)
-        predicted_no_quantity = max(self._get_predicted_no_quantity(x_vals, prev_ob), 1)
-        no_quantity_to_buy = min(yes_quantity, predicted_no_quantity)
-
-        predicted_profit_per_yes_contract = (
-            max_no_price
-            + predicted_yes_price
-            - 100
-            - compute_fee(get_opposite_side_price(max_no_price), yes_quantity_to_buy)
+        yes_predicted_profit = (
+            (sell_yes_predicted_price - buy_yes_price) * yes_quantity_to_buy
+            - compute_fee(buy_yes_price, yes_quantity_to_buy)
             - compute_fee(
-                predicted_yes_price, yes_quantity_to_buy  # type:ignore[arg-type]
+                sell_yes_predicted_price, yes_quantity_to_buy  # type:ignore[arg-type]
             )
         )
-        predicted_profit_per_no_contract = (
-            max_yes_price
-            + predicted_no_price
-            - 100
-            - compute_fee(get_opposite_side_price(max_yes_price), no_quantity_to_buy)
+        no_predicted_profit = (
+            (sell_no_predicted_price - buy_no_price) * no_quantity_to_buy
+            - compute_fee(buy_no_price, no_quantity_to_buy)
             - compute_fee(
-                predicted_no_price, no_quantity_to_buy  # type:ignore[arg-type]
+                sell_no_predicted_price, no_quantity_to_buy  # type:ignore[arg-type]
             )
         )
-
+        print(f"Predicted yes: {yes_predicted_profit}")
+        print(f"Predicted no: {no_predicted_profit}")
         # Only buy if the predicted profit is at least 2 cents
-        if (
-            predicted_profit_per_yes_contract >= 2
-            or predicted_profit_per_no_contract >= 2
-        ):
+        if yes_predicted_profit >= 0 or no_predicted_profit >= 0:
+            print(f"   Expect profit for ticker: {prev_ob.market_ticker}")
             # buy and sell a yes contract
-            if predicted_profit_per_yes_contract > predicted_profit_per_no_contract:
+            if yes_predicted_profit > no_predicted_profit:
+                print(f"   Expected profits on yes side: ${yes_predicted_profit/100}")
+                print(f"   Buying {yes_quantity_to_buy} @ {buy_yes_price} cents ")
                 (
                     actual_yes_price,
                     actual_yes_quantity,
@@ -297,15 +334,15 @@ class Experiment1Predictor:
                     portfolio,
                     prev_ob.market_ticker,
                     Side.NO,
-                    get_opposite_side_price(max_no_price),
-                    no_quantity,
-                    predicted_yes_price,  # type:ignore[arg-type]
-                    predicted_yes_quantity,
+                    buy_yes_price,
+                    yes_quantity_to_buy,
                     actual_yes_price,
                     actual_yes_quantity,
                 )
 
             else:
+                print(f"   Expected profits on no side: ${no_predicted_profit/100}")
+                print(f"   Buying {no_quantity_to_buy} @ {buy_no_price} cents ")
                 # We will make more profit from buying the no
                 (
                     actual_no_price,
@@ -316,10 +353,8 @@ class Experiment1Predictor:
                     portfolio,
                     prev_ob.market_ticker,
                     Side.NO,
-                    get_opposite_side_price(max_yes_price),
-                    yes_quantity,
-                    predicted_no_price,  # type:ignore[arg-type]
-                    predicted_no_quantity,
+                    buy_no_price,
+                    no_quantity_to_buy,
                     actual_no_price,
                     actual_no_quantity,
                 )
@@ -332,7 +367,7 @@ class Experiment1Predictor:
         predicted_yes_quantity_ratio = yes_quantity_model.predict(x_vals)
         sum_of_quantity = current_orderbook.yes.get_total_quantity()
         predicted_yes_quantity = predicted_yes_quantity_ratio * sum_of_quantity
-        return predicted_yes_quantity
+        return max(predicted_yes_quantity, 1)
 
     def _get_predicted_no_quantity(
         self, x_vals: np.ndarray, current_orderbook: Orderbook
@@ -342,7 +377,24 @@ class Experiment1Predictor:
         predicted_no_quantity_ratio = no_quantity_model.predict(x_vals)
         sum_of_quantity = current_orderbook.no.get_total_quantity()
         predicted_no_quantity = predicted_no_quantity_ratio * sum_of_quantity
-        return predicted_no_quantity
+        return max(predicted_no_quantity, 1)
+
+    def _get_predicted_price(
+        self, x_vals: np.ndarray, sell_price: Price, side: Side
+    ) -> Price:
+        price_model: Model
+        if side == Side.NO:
+            price_model = self._models[0]
+            assert price_model._name == ModelNames.PRICE_NO
+        else:
+            price_model = self._models[1]
+            assert price_model._name == ModelNames.PRICE_YES
+
+        predicted_price_change = float(price_model.predict(x_vals))
+
+        # Price to sell at
+        predicted_price = Price(min(max(sell_price + predicted_price_change, 1), 99))
+        return predicted_price
 
     def _compute_side_profits(
         self,
@@ -350,60 +402,25 @@ class Experiment1Predictor:
         ticker: MarketTicker,
         side: Side,
         price_to_buy: Price,
-        quantity_available: Quantity,
-        predicted_price: Price,
-        predicted_quantity: Quantity,
+        quantity_to_buy: Quantity,
         actual_price: Price,
         actual_quantity: Quantity,
     ):
-        if predicted_quantity <= 0:
-            # Don't buy if we don't expect anything to be there to sell
-            print(f"Negative quantity at {predicted_quantity}. Avoiding buy")
-            return 0, 0
-        quantity_to_buy = min(quantity_available, predicted_quantity)
-        change_in_price = predicted_price - price_to_buy
-        expected_profit = (
-            quantity_to_buy * change_in_price
-            - compute_fee(
-                price_to_buy,
-                quantity_to_buy,
-            )
-            - compute_fee(
-                predicted_price,
-                quantity_to_buy,
-            )
-        )
-        if expected_profit <= 0:
-            print(f"Negative profit with fees: {expected_profit/100}")
-            return
         try:
             portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
         except PortfolioError as e:
-            print(f"Could not buy because: {e}")
+            print(f"   Could not buy because: {e}")
             return
         # Worst case actual profit
         actual_price_change = actual_price - price_to_buy
-        if actual_price_change == 0:
-            print(
-                f"Holding position {ticker} on side {side} at price "
-                + f"{price_to_buy} with quantity {quantity_to_buy}"
-            )
+        if actual_price_change <= 0:
+            print(f"   Holding position")
             return
-        actual_quantity_sold = (
-            max(quantity_to_buy, actual_quantity)  # Lose the most money
-            if actual_price_change < 0
-            else min(quantity_to_buy, actual_quantity)  # Make the least money
-        )
-        actual_profit_no_fees = portfolio.sell(
-            ticker, actual_price, actual_quantity_sold, side
-        )
-        actual_profit = actual_profit_no_fees - compute_fee(
-            price_to_buy, actual_quantity_sold
-        )
-        print(f"  Expected profit: ${expected_profit / 100}")
-        print(f"  Actual profit: ${actual_profit / 100}")
+        actual_quantity_sold = min(quantity_to_buy, actual_quantity)
+        actual_profit = portfolio.sell(ticker, actual_price, actual_quantity_sold, side)
+        print(f"   Actual profit: ${actual_profit / 100}")
         self.trade_profits.append(actual_profit)
-        return expected_profit, actual_profit
+        return actual_profit
 
 
 if __name__ == "__main__":

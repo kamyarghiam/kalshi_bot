@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, Price
-from src.helpers.types.orderbook import Orderbook
+from src.helpers.types.orderbook import Orderbook, OrderbookView
 from src.helpers.types.orders import Quantity, QuantityDelta, Side, compute_fee
 
 
@@ -20,8 +20,8 @@ class Position:
 
     def add_position(self, price: Price, quantity: Quantity):
         assert len(self.prices) == len(self.quantities)
-        self.prices.append(price)
-        self.quantities.append(quantity)
+        self.prices.append(Price(price))
+        self.quantities.append(Quantity(quantity))
 
     def sell_position(self, quantity_to_sell: Quantity) -> Cents:
         assert len(self.prices) == len(self.quantities)
@@ -36,24 +36,35 @@ class Position:
         remaining_quantitites: List[Quantity] = []
 
         total_purchase_amount_cents: Cents = Cents(0)
+        # TODO: fees are computed slightly off here because of rounding errors
+        fees_paid: Cents = Cents(0)
         for price, quantity_holding in zip(self.prices, self.quantities):
             if quantity_to_sell >= quantity_holding:
                 total_purchase_amount_cents += Cents(price * quantity_holding)
+                fees_paid += compute_fee(price, quantity_holding)
                 quantity_to_sell -= QuantityDelta(quantity_holding)
             else:
                 quantity_holding -= QuantityDelta(quantity_to_sell)
                 total_purchase_amount_cents += Cents(price * quantity_to_sell)
+                fees_paid += compute_fee(price, quantity_to_sell)
                 remaining_prices.append(price)
                 remaining_quantitites.append(quantity_holding)
                 quantity_to_sell = Quantity(0)
         self.prices = remaining_prices
         self.quantities = remaining_quantitites
-        return total_purchase_amount_cents
+        return total_purchase_amount_cents - fees_paid
 
     def is_empty(self):
         return len(self.prices) == 0 and len(self.quantities) == 0
 
     def get_value(self) -> Cents:
+        # TODO: there is some bug here that says
+        # ValueError: setting an array element with a sequence.
+        # The requested array has an inhomogeneous shape after 1 dimensions.
+        # The detected shape was (2,) + inhomogeneous part.
+        # So we print below for debugging
+        print(self.prices)
+        print(self.quantities)
         return np.dot(self.prices, self.quantities)
 
 
@@ -92,8 +103,7 @@ class Portfolio:
         max_quantity_to_sell: Quantity,
         side: Side,
     ) -> Cents:
-        # TODO: refector this
-        """Returns pnl from sell using fifo. DOES NOT INCLUDE FEES FROM BUYING
+        """Returns pnl from sell using fifo
 
         Sells min of what you have the max_quantity_to_sell"""
         if ticker not in self._positions:
@@ -111,11 +121,11 @@ class Portfolio:
         if position.is_empty():
             del self._positions[ticker]
 
-        # Returns profit without buying fees
         return Cents(amount_made - amount_paid)
 
     def find_sell_opportunities(self, orderbook: Orderbook) -> Cents | None:
         """Finds a selling opportunity from an orderbook if there is one"""
+        assert orderbook.view == OrderbookView.SELL
         ticker = orderbook.market_ticker
         if ticker in self._positions:
             position = self._positions[ticker]
@@ -126,8 +136,18 @@ class Portfolio:
                 sell_price, sell_quantity = orderbook.yes.get_largest_price_level()
             # TODO: maybe do weighted cost by quantity?
             max_price = max(position.prices)
-            if sell_price > max_price:
-                return self.sell(ticker, sell_price, sell_quantity, position.side)
+
+            quantity_to_sell = min(
+                sum(position.quantities),
+                sell_quantity,
+            )
+            if (
+                sell_price * quantity_to_sell
+                - max_price * quantity_to_sell
+                - compute_fee(sell_price, quantity_to_sell)
+                - compute_fee(max_price, quantity_to_sell)
+            ) > 0:
+                return self.sell(ticker, sell_price, quantity_to_sell, position.side)
         return None
 
     def get_positions_value(self) -> Cents:

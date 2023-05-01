@@ -282,7 +282,7 @@ def test_find_sell_opportunites():
     assert len(portfolio._positions[MarketTicker("hi")].prices) == 1
     assert opportunity == (75 - 5) * 100 + (75 - 6) * 50 - compute_fee(
         Price(75), Quantity(150)
-    )
+    ) - compute_fee(Price(5), 100) - compute_fee(Price(6), 50)
 
     # Other market ticker
     orderbook.market_ticker = MarketTicker("hi2")
