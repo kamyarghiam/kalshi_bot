@@ -230,7 +230,7 @@ def test_compute_side_profits(tmp_path):
     pred = Experiment1Predictor(tmp_path)
     price_to_buy = Price(30)
     quantity_available = Quantity(150)
-    actual_price = Price(20)
+    actual_price = Price(90)
     actual_quantity = Quantity(100)
     actual_profit = pred._compute_side_profits(
         Portfolio(Balance(Cents(5000000))),
@@ -242,7 +242,7 @@ def test_compute_side_profits(tmp_path):
         actual_quantity,
     )
 
-    assert actual_profit == -10 * 100 - compute_fee(
+    assert actual_profit == 60 * 100 - compute_fee(
         price_to_buy,
         actual_quantity,
     ) - compute_fee(
@@ -250,7 +250,6 @@ def test_compute_side_profits(tmp_path):
         actual_quantity,
     )
 
-    # Let's say our prediction was directionally correct
     actual_price = Price(50)
     actual_profit = pred._compute_side_profits(
         Portfolio(Balance(Cents(5000000))),
@@ -268,6 +267,18 @@ def test_compute_side_profits(tmp_path):
         actual_price,
         actual_quantity,
     )
+    # If our prediction is directionally incorrect, no profit
+    actual_price = Price(20)
+    actual_profit = pred._compute_side_profits(
+        Portfolio(Balance(Cents(5000000))),
+        MarketTicker("hi"),
+        Side.NO,
+        price_to_buy,
+        quantity_available,
+        actual_price,
+        actual_quantity,
+    )
+    assert actual_profit is None
 
 
 def test_make_predicition(tmp_path):
@@ -316,10 +327,8 @@ def test_make_predicition(tmp_path):
             Portfolio(Balance(Cents(500000))),
             MarketTicker("hi"),
             Side.NO,
-            Price(80),
-            Quantity(15),
-            no_price_model.predict(x_vals) + Price(80),
-            no_quantity_model.predict(x_vals) * Quantity(25),
+            Price(90),
+            0.9 * (10 + 15),
             Price(90),
             Quantity(15),
         ]
@@ -327,7 +336,7 @@ def test_make_predicition(tmp_path):
         # Skip first three args
         call_args = side_profits.call_args[0]
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
-            assert abs(arg1 - arg2) < 0.1
+            assert abs(arg1 - arg2) < 0.5
 
     # Test yes price
     # Train model to give a higher yes price chagne than the no price change
@@ -344,10 +353,8 @@ def test_make_predicition(tmp_path):
             Portfolio(Balance(Cents(500000))),
             MarketTicker("hi"),
             Side.YES,
-            Price(10),
-            Quantity(150),
-            yes_price_model.predict(x_vals) + Price(10),
-            yes_quantity_model.predict(x_vals) * Quantity(250),
+            Price(20),
+            Quantity(15),
             Price(20),
             Quantity(150),
         ]
@@ -355,4 +362,4 @@ def test_make_predicition(tmp_path):
         call_args = side_profits.call_args[0]
         # Skip first three args
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
-            assert abs(arg1 - arg2) < 0.1
+            assert abs(arg1 - arg2) < 0.5

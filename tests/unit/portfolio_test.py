@@ -52,7 +52,9 @@ def test_add_remove_get_value_positions():
         position.sell_position(Quantity(751))
 
     sold = position.sell_position(Quantity(200))
-    assert sold == 5 * 100 + 10 * 100
+    assert sold == 5 * 100 + 10 * 100 + compute_fee(
+        Price(5), Quantity(100)
+    ) + compute_fee(Price(10), Quantity(100))
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
         Quantity(50),
@@ -61,7 +63,7 @@ def test_add_remove_get_value_positions():
     ]
 
     sold = position.sell_position(Quantity(20))
-    assert sold == 10 * 20
+    assert sold == 10 * 20 + compute_fee(Price(10), Quantity(20))
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
         Quantity(30),
@@ -70,7 +72,7 @@ def test_add_remove_get_value_positions():
     ]
 
     sold = position.sell_position(Quantity(30))
-    assert sold == 10 * 30
+    assert sold == 10 * 30 + compute_fee(Price(10), Quantity(30))
     assert position.prices == [Price(15), Price(20)]
     assert position.quantities == [
         Quantity(200),
@@ -78,7 +80,9 @@ def test_add_remove_get_value_positions():
     ]
 
     sold = position.sell_position(Quantity(500))
-    assert sold == 15 * 200 + 20 * 300
+    assert sold == 15 * 200 + 20 * 300 + compute_fee(
+        Price(15), Quantity(200)
+    ) + compute_fee(Price(20), Quantity(300))
     assert position.prices == []
     assert position.quantities == []
     assert position.is_empty()
@@ -207,7 +211,9 @@ def test_portfolio_sell():
         Side.NO,
     )
 
-    assert profit1 == (100 - 50) * (6 - 5) - compute_fee(Price(6), Quantity(50))
+    assert profit1 == (100 - 50) * (6 - 5) - compute_fee(
+        Price(6), Quantity(50)
+    ) - compute_fee(Price(5), Quantity(50))
 
     assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 - compute_fee(
         Price(5), Quantity(100)
@@ -231,7 +237,9 @@ def test_portfolio_sell():
         - compute_fee(Price(3), Quantity(50))
     )
 
-    assert profit2 == (100 - 50) * (3 - 5) - compute_fee(Price(3), Quantity(50))
+    assert profit2 == (100 - 50) * (3 - 5) - compute_fee(
+        Price(3), Quantity(50)
+    ) - compute_fee(Price(5), Quantity(50))
     assert len(portfolio._positions) == 0
 
 
@@ -282,14 +290,16 @@ def test_find_sell_opportunites():
     assert len(portfolio._positions[MarketTicker("hi")].prices) == 1
     assert opportunity == (75 - 5) * 100 + (75 - 6) * 50 - compute_fee(
         Price(75), Quantity(150)
-    ) - compute_fee(Price(5), 100) - compute_fee(Price(6), 50)
+    ) - compute_fee(Price(5), Quantity(100)) - compute_fee(Price(6), Quantity(50))
 
     # Other market ticker
     orderbook.market_ticker = MarketTicker("hi2")
 
     len(portfolio._positions) == 2
     opportunity = portfolio.find_sell_opportunities(orderbook)
-    assert opportunity == (50 - 10) * 10 - compute_fee(Price(50), Quantity(10))
+    assert opportunity == (50 - 10) * 10 - compute_fee(
+        Price(50), Quantity(10)
+    ) - compute_fee(Price(10), Quantity(10))
     len(portfolio._positions) == 1
 
     assert portfolio.get_positions_value() == 50 * 6

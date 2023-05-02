@@ -1,7 +1,6 @@
 import copy
 from enum import Enum
 from pathlib import Path
-import pdb
 from typing import Dict, List, Tuple
 
 import joblib
@@ -11,7 +10,7 @@ from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Balance, Cents, get_opposite_side_price
+from src.helpers.types.money import Balance, Cents
 from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
@@ -411,10 +410,10 @@ class Experiment1Predictor:
         except PortfolioError as e:
             print(f"   Could not buy because: {e}")
             return
-        # Worst case actual profit
+
         actual_price_change = actual_price - price_to_buy
         if actual_price_change <= 0:
-            print(f"   Holding position")
+            print("   Holding position")
             return
         actual_quantity_sold = min(quantity_to_buy, actual_quantity)
         actual_profit = portfolio.sell(ticker, actual_price, actual_quantity_sold, side)

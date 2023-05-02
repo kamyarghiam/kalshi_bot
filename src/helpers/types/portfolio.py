@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 
@@ -52,19 +52,12 @@ class Position:
                 quantity_to_sell = Quantity(0)
         self.prices = remaining_prices
         self.quantities = remaining_quantitites
-        return total_purchase_amount_cents - fees_paid
+        return total_purchase_amount_cents + fees_paid
 
     def is_empty(self):
         return len(self.prices) == 0 and len(self.quantities) == 0
 
     def get_value(self) -> Cents:
-        # TODO: there is some bug here that says
-        # ValueError: setting an array element with a sequence.
-        # The requested array has an inhomogeneous shape after 1 dimensions.
-        # The detected shape was (2,) + inhomogeneous part.
-        # So we print below for debugging
-        print(self.prices)
-        print(self.quantities)
         return np.dot(self.prices, self.quantities)
 
 
@@ -137,13 +130,15 @@ class Portfolio:
             # TODO: maybe do weighted cost by quantity?
             max_price = max(position.prices)
 
-            quantity_to_sell = min(
-                sum(position.quantities),
-                sell_quantity,
+            quantity_to_sell = Quantity(
+                min(
+                    sum(position.quantities),
+                    sell_quantity,
+                )
             )
             if (
-                sell_price * quantity_to_sell
-                - max_price * quantity_to_sell
+                float(sell_price) * quantity_to_sell
+                - float(max_price) * quantity_to_sell
                 - compute_fee(sell_price, quantity_to_sell)
                 - compute_fee(max_price, quantity_to_sell)
             ) > 0:
