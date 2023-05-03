@@ -90,14 +90,15 @@ class Websocket:
     ):
         self._connection_adapter = connection_adapter
         self._rate_limiter = rate_limiter
-        if isinstance(connection_adapter, SessionsWrapper):
-            # Connects to the exchange
-            self._base_url = connection_adapter.base_url.remove_protocol().add_protocol(
-                "wss"
-            )
-        elif isinstance(connection_adapter, TestClient):
-            # Connects to a local exchange
-            self._base_url = URL("")
+        match connection_adapter:
+            case SessionsWrapper():
+                # Connects to the exchange
+                self._base_url = (
+                    connection_adapter.base_url.remove_protocol().add_protocol("wss")
+                )
+            case TestClient():
+                # Connects to a local exchange
+                self._base_url = URL("")
 
         self._ws: ExternalWebsocket | WebSocketTestSession | None = None
         self._subscriptions: List[SubscriptionId] = []
@@ -108,54 +109,59 @@ class Websocket:
 
         Automaitcally unsubscribes you from all subscriptions after session is
         closed."""
-        if isinstance(self._connection_adapter, SessionsWrapper):
-            ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            with external_websocket_connect(
-                self._base_url.add(websocket_url),
-                additional_headers={"Authorization": f"Bearer {member_id}:{api_token}"},
-                ssl_context=ssl_context,
-            ) as websocket:
-                self._ws = websocket
-                try:
-                    yield self
-                finally:
-                    self.unsubscribe(self._subscriptions)
-                    self._ws.close()
-        elif isinstance(self._connection_adapter, TestClient):
-            with self._connection_adapter.connect(  # type:ignore[attr-defined]
-                websocket_url
-            ) as websocket:
-                websocket: WebSocketTestSession  # type:ignore[no-redef]
-                self._ws = websocket
-                try:
-                    yield self
-                finally:
-                    self.unsubscribe(self._subscriptions)
-                    self._ws.close()
+        match self._connection_adapter:
+            case SessionsWrapper():
+                ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                with external_websocket_connect(
+                    self._base_url.add(websocket_url),
+                    additional_headers={
+                        "Authorization": f"Bearer {member_id}:{api_token}"
+                    },
+                    ssl_context=ssl_context,
+                ) as websocket:
+                    self._ws = websocket
+                    try:
+                        yield self
+                    finally:
+                        self.unsubscribe(self._subscriptions)
+                        self._ws.close()
+            case TestClient():
+                with self._connection_adapter.connect(  # type:ignore[attr-defined]
+                    websocket_url
+                ) as websocket:
+                    websocket: WebSocketTestSession  # type:ignore[no-redef]
+                    self._ws = websocket
+                    try:
+                        yield self
+                    finally:
+                        self.unsubscribe(self._subscriptions)
+                        self._ws.close()
 
     def send(self, request: WebsocketRequest):
         """Send single message"""
         self._rate_limiter.check_limits()
         if self._ws is None:
             raise ValueError("Send: Did not intialize the websocket")
-        if isinstance(self._ws, ExternalWebsocket):
-            self._ws.send(request.json())
-        elif isinstance(self._ws, WebSocketTestSession):
-            self._ws.send_text(request.json())
+        match self._ws:
+            case ExternalWebsocket():  # type:ignore[misc]
+                self._ws.send(request.json())
+            case WebSocketTestSession():
+                self._ws.send_text(request.json())
 
     def receive(self) -> type[WebsocketResponse]:
         """Receive single message"""
         message: type[WebsocketResponse]
-        if self._ws is None:
-            raise ValueError("Receive: Did not intialize the websocket")
-        if isinstance(self._ws, ExternalWebsocket):
-            message = self._parse_response(self._ws.recv())
-        elif isinstance(self._ws, WebSocketTestSession):
-            message = self._parse_response(self._ws.receive_text())
-        else:
-            raise ValueError("Receive: websocket wrong type")
+        match self._ws:
+            case ExternalWebsocket():  # type:ignore[misc]
+                message = self._parse_response(self._ws.recv())
+            case WebSocketTestSession():
+                message = self._parse_response(self._ws.receive_text())
+            case None:
+                raise ValueError("Receive: Did not intialize the websocket")
+            case _:
+                raise ValueError("Receive: websocket wrong type")
         if isinstance(message, ErrorWR):
             raise WebsocketError(message.msg)
         return message

@@ -223,6 +223,22 @@ def test_get_largest_price_level():
     assert book.get_largest_price_level() == (Price(15), Quantity(4))
 
 
+def test_get_smallest_price_level():
+    book = OrderbookSide()
+
+    with pytest.raises(EmptyOrderbookSideError):
+        # Book is empty
+        book.get_smallest_price_level()
+
+    book.add_level(Price(10), Quantity(1))
+    book.add_level(Price(12), Quantity(2))
+    book.add_level(Price(9), Quantity(3))
+    book.add_level(Price(15), Quantity(4))
+    book.add_level(Price(4), Quantity(5))
+
+    assert book.get_smallest_price_level() == (Price(4), Quantity(5))
+
+
 def test_invert_prices():
     side = OrderbookSide()
     assert side.invert_prices() == side

@@ -100,12 +100,13 @@ class Orderbook:
             raise ValueError(
                 f"Market tickers don't match. Orderbook: {self}. Delta: {delta}"
             )
-        if delta.side == Side.NO:
-            self.no.apply_delta(delta.price, delta.delta)
-        elif delta.side == Side.YES:
-            self.yes.apply_delta(delta.price, delta.delta)
-        else:
-            raise ValueError(f"Invalid side: {delta.side}")
+        match delta.side:
+            case Side.NO:
+                self.no.apply_delta(delta.price, delta.delta)
+            case Side.YES:
+                self.yes.apply_delta(delta.price, delta.delta)
+            case _:
+                raise ValueError(f"Invalid side: {delta.side}")
 
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):

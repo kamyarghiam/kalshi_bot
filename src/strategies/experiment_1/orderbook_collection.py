@@ -77,20 +77,21 @@ def process_message(
 ):
     print(f"{data.type}", flush=True)
     market_ticker = data.msg.market_ticker
-    if isinstance(data, OrderbookSnapshotWR):
-        orderbook = Orderbook.from_snapshot(data.msg)
-        if market_ticker in previous_snapshots:
-            model.update(previous_snapshots[market_ticker], orderbook)
-        previous_snapshots[market_ticker] = orderbook
-    elif isinstance(data, OrderbookDeltaWR):
-        if market_ticker not in previous_snapshots:
-            print(f"ERROR: skipping, could not find snapshot for {data}.")
-        else:
-            orderbook = previous_snapshots[market_ticker]
-            prev_orderbook = copy.deepcopy(orderbook)
-            # automatically updates orderbook in dict
-            orderbook.apply_delta(data.msg)
-            model.update(prev_orderbook, orderbook)
+    match data:
+        case OrderbookSnapshotWR():
+            orderbook = Orderbook.from_snapshot(data.msg)
+            if market_ticker in previous_snapshots:
+                model.update(previous_snapshots[market_ticker], orderbook)
+            previous_snapshots[market_ticker] = orderbook
+        case OrderbookDeltaWR():
+            if market_ticker not in previous_snapshots:
+                print(f"ERROR: skipping, could not find snapshot for {data}.")
+            else:
+                orderbook = previous_snapshots[market_ticker]
+                prev_orderbook = copy.deepcopy(orderbook)
+                # automatically updates orderbook in dict
+                orderbook.apply_delta(data.msg)
+                model.update(prev_orderbook, orderbook)
 
 
 class ModelNames(Enum):
