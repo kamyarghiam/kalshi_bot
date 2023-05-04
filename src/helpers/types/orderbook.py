@@ -1,3 +1,4 @@
+import copy
 import typing
 from dataclasses import dataclass, field
 from enum import Enum
@@ -95,18 +96,21 @@ class Orderbook:
     # Initially all orderbooks are in the maker (aka sell view) view from the websocket
     view: OrderbookView = field(default_factory=lambda: OrderbookView.SELL)
 
-    def apply_delta(self, delta: "OrderbookDeltaRM"):
+    def apply_delta(self, delta: "OrderbookDeltaRM") -> "Orderbook":
+        """Non-destructively applie an orderbook delta to an orderbook snapshot"""
         if delta.market_ticker != self.market_ticker:
             raise ValueError(
                 f"Market tickers don't match. Orderbook: {self}. Delta: {delta}"
             )
+        new_orderbook = copy.deepcopy(self)
         match delta.side:
             case Side.NO:
-                self.no.apply_delta(delta.price, delta.delta)
+                new_orderbook.no.apply_delta(delta.price, delta.delta)
             case Side.YES:
-                self.yes.apply_delta(delta.price, delta.delta)
+                new_orderbook.yes.apply_delta(delta.price, delta.delta)
             case _:
                 raise ValueError(f"Invalid side: {delta.side}")
+        return new_orderbook
 
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):

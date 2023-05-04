@@ -1,4 +1,3 @@
-import copy
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -88,10 +87,10 @@ def process_message(
                 print(f"ERROR: skipping, could not find snapshot for {data}.")
             else:
                 orderbook = previous_snapshots[market_ticker]
-                prev_orderbook = copy.deepcopy(orderbook)
+                new_orderbook = orderbook.apply_delta(data.msg)
                 # automatically updates orderbook in dict
-                orderbook.apply_delta(data.msg)
-                model.update(prev_orderbook, orderbook)
+                model.update(orderbook, new_orderbook)
+                previous_snapshots[market_ticker] = new_orderbook
 
 
 class ModelNames(Enum):

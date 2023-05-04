@@ -80,7 +80,7 @@ def test_orderbook_apply_delta():
         delta=QuantityDelta(50),
         side=Side.NO,
     )
-    book.apply_delta(delta)
+    book = book.apply_delta(delta)
     assert len(book.yes.levels) == 0
     assert len(book.no.levels) == 1
     assert book.no.levels[Price(11)] == Quantity(50)
@@ -91,7 +91,7 @@ def test_orderbook_apply_delta():
         delta=QuantityDelta(40),
         side=Side.YES,
     )
-    book.apply_delta(delta)
+    book = book.apply_delta(delta)
     assert len(book.yes.levels) == 1
     assert book.yes.levels[Price(12)] == Quantity(40)
     assert len(book.no.levels) == 1
@@ -135,7 +135,7 @@ def test_orderbook_apply_delta_copied():
         delta=QuantityDelta(50),
         side=Side.NO,
     )
-    book.apply_delta(delta)
+    book = book.apply_delta(delta)
     assert len(book.yes.levels) == 0
     assert len(book.no.levels) == 1
     assert book.no.levels[Price(11)] == Quantity(50)
@@ -148,7 +148,7 @@ def test_orderbook_apply_delta_copied():
         delta=QuantityDelta(40),
         side=Side.NO,
     )
-    book.apply_delta(delta)
+    book = book.apply_delta(delta)
     assert len(book.yes.levels) == 0
     assert len(book.no.levels) == 2
     assert book.no.levels[Price(11)] == Quantity(50)
@@ -168,8 +168,8 @@ def test_orderbook_apply_delta_copied():
         delta=QuantityDelta(-10),
         side=Side.NO,
     )
-    orderbook_in_dict = orderbook_dict[book.market_ticker]
-    orderbook_in_dict.apply_delta(delta)
+    orderbook_in_dict = orderbook_dict[book.market_ticker].apply_delta(delta)
+    orderbook_dict[book.market_ticker] = orderbook_in_dict
 
     assert len(orderbook_dict[book.market_ticker].yes.levels) == 0
     assert len(orderbook_dict[book.market_ticker].no.levels) == 2
@@ -189,7 +189,7 @@ def test_is_empty():
         delta=QuantityDelta(50),
         side=Side.NO,
     )
-    book.apply_delta(delta)
+    book = book.apply_delta(delta)
 
     assert book.yes.is_empty()
     assert not book.no.is_empty()
@@ -201,7 +201,7 @@ def test_is_empty():
         delta=QuantityDelta(-50),
         side=Side.NO,
     )
-    book.apply_delta(delta)
+    book = book.apply_delta(delta)
 
     assert book.yes.is_empty()
     assert book.no.is_empty()
