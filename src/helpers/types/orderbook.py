@@ -36,7 +36,7 @@ class OrderbookSide:
         self.levels[price] = quantity
 
     def apply_delta(self, price: Price, delta: QuantityDelta):
-        """Applies an orderbook delta to the orderbook side"""
+        """Destrucively applies an orderbook delta to the orderbook side"""
         if price not in self.levels:
             self.levels[price] = Quantity(0)
         self.levels[price] += delta
@@ -97,7 +97,7 @@ class Orderbook:
     view: OrderbookView = field(default_factory=lambda: OrderbookView.SELL)
 
     def apply_delta(self, delta: "OrderbookDeltaRM") -> "Orderbook":
-        """Non-destructively applie an orderbook delta to an orderbook snapshot"""
+        """Non-destructively applies an orderbook delta to an orderbook snapshot"""
         if delta.market_ticker != self.market_ticker:
             raise ValueError(
                 f"Market tickers don't match. Orderbook: {self}. Delta: {delta}"
