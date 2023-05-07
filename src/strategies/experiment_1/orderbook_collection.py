@@ -341,7 +341,7 @@ class Experiment1Predictor:
             )
         )
         # Only buy if the predicted profit is at least $10
-        if yes_predicted_profit >= 1000 or no_predicted_profit >= 1000:
+        if yes_predicted_profit >= 0 or no_predicted_profit >= 0:
             print(f"   Expect profit for ticker: {prev_ob.market_ticker}")
             # buy and sell a yes contract
             if yes_predicted_profit > no_predicted_profit:
@@ -431,11 +431,10 @@ class Experiment1Predictor:
         try:
             # Check to make sure we don't already have the position
             if (position := portfolio.get_position(ticker)) is not None:
-                last_price = position.prices[-1]
-                last_quantity = position.quantities[-1]
-                if last_price == price_to_buy and last_quantity == quantity_to_buy:
-                    print("already bought")
-                    return
+                for price, quantity in zip(position.prices, position.quantities):
+                    if price == price_to_buy and quantity == quantity_to_buy:
+                        print("already bought")
+                        return
             portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
         except PortfolioError as e:
             print(f"   Could not buy because: {e}")
