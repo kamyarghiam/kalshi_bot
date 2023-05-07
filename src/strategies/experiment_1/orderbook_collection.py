@@ -11,7 +11,7 @@ from sklearn.linear_model import SGDRegressor
 
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Balance, Cents
+from src.helpers.types.money import Cents
 from src.helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
@@ -23,6 +23,7 @@ from src.helpers.types.portfolio import Portfolio, PortfolioError
 from src.helpers.types.websockets.common import Type
 from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 from tests.fake_exchange import Price
+from tests.unit.common_test import Balance
 from tests.unit.orderbook_test import Quantity
 
 
@@ -52,11 +53,15 @@ class Printer:
 
 def main(
     exchange_interface: ExchangeInterface | None = None,
-    models_root_path: Path = Path("src/strategies/experiment_1/models"),
+    root_path: Path = Path("src/strategies/experiment_1/models"),
     num_runs: int | None = None,
     is_test_run: bool = True,
 ):
-    portfolio = Portfolio(Balance(Cents(500000)))  # $5k
+    # load portfolio from memory
+    if Portfolio.saved_portfolio_exists(root_path):
+        portfolio = Portfolio.load(root_path)
+    else:
+        portfolio = Portfolio(Balance(Cents(500_000)))  # $5,000
     stat_printer = Printer(portfolio)
     print("Fetching open markets...")
     exchange_interface = (
@@ -73,7 +78,7 @@ def main(
     print()
     print("Loading model predictor...")
     model = Experiment1Predictor(
-        root_path=models_root_path, printer=stat_printer, portfolio=portfolio
+        root_path=root_path, printer=stat_printer, portfolio=portfolio
     )
     previous_snapshots: Dict[MarketTicker, Orderbook] = {}
 
@@ -235,6 +240,8 @@ class Experiment1Predictor:
 
         for model in self._models:
             model._save()
+        # Save portfolio in the models folder
+        self.portfolio.save(self._root_path)
 
     def _extract_x_values(self, prev_ob: Orderbook) -> np.ndarray:
         yes_side = self._extract_value_per_side(prev_ob.yes)

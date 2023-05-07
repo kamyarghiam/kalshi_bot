@@ -38,3 +38,6 @@ class Balance:
         if self._balance + delta < 0:
             raise OutOfMoney(f"Can't reduce balance {self._balance} by {delta}")
         self._balance += delta
+
+    def __eq__(self, other):
+        return isinstance(other, Balance) and self._balance == other._balance

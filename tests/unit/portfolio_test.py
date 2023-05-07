@@ -303,3 +303,28 @@ def test_find_sell_opportunites():
     len(portfolio._positions) == 1
 
     assert portfolio.get_positions_value() == 50 * 6
+
+
+def test_save_load(tmp_path):
+    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio.buy(
+        MarketTicker("hi"),
+        Price(5),
+        Quantity(100),
+        Side.NO,
+    )
+    portfolio.buy(
+        MarketTicker("hi"),
+        Price(6),
+        Quantity(100),
+        Side.NO,
+    )
+    portfolio.buy(
+        MarketTicker("hi2"),
+        Price(10),
+        Quantity(10),
+        Side.YES,
+    )
+    portfolio.save(tmp_path)
+
+    assert Portfolio.load(tmp_path) == portfolio

@@ -1,4 +1,6 @@
+import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
@@ -66,6 +68,8 @@ class PortfolioError(Exception):
 
 
 class Portfolio:
+    _pickle_file = Path("last_portfolio.pickle")
+
     def __init__(
         self,
         balance: Balance,
@@ -76,6 +80,13 @@ class Portfolio:
 
     def __str__(self):
         return str(self._positions.values())
+
+    def __eq__(self, other):
+        return isinstance(other, Portfolio) and (
+            self._cash_balance == other._cash_balance
+            and self._positions == other._positions
+            and self._fees_paid == other._fees_paid
+        )
 
     def get_position(self, ticker: MarketTicker) -> Position | None:
         return self._positions[ticker] if ticker in self._positions else None
@@ -156,3 +167,15 @@ class Portfolio:
         for _, position in self._positions.items():
             position_values += position.get_value()
         return Cents(position_values)
+
+    def save(self, root_path: Path):
+        (root_path / Portfolio._pickle_file).write_bytes(pickle.dumps(self))
+
+    @staticmethod
+    def saved_portfolio_exists(root_path: Path):
+        """Checks if there is a portfolio saved"""
+        return (root_path / Portfolio._pickle_file).exists()
+
+    @classmethod
+    def load(cls, root_path: Path) -> "Portfolio":
+        return pickle.loads((root_path / cls._pickle_file).read_bytes())
