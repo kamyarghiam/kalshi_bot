@@ -4,6 +4,8 @@ from typing import Dict, List, Tuple
 
 import joblib
 import numpy as np
+from rich.console import Console
+from rich.table import Table
 from sklearn.exceptions import NotFittedError
 from sklearn.linear_model import SGDRegressor
 
@@ -18,9 +20,34 @@ from src.helpers.types.orderbook import (
 )
 from src.helpers.types.orders import Side, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError
+from src.helpers.types.websockets.common import Type
 from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 from tests.fake_exchange import Price
 from tests.unit.orderbook_test import Quantity
+
+
+class Printer:
+    def __init__(self, portfolio: Portfolio):
+        self._console = Console()
+
+        self.portfolio = portfolio
+        self.num_snapshots = 0
+        self.num_deltas = 0
+        self.pnl_cents = 0
+
+    def run(self):
+        self._console.clear()
+        table = Table(title="Portfolio")
+        table.add_column("Name")
+        table.add_column("Value")
+        table.add_row("PnL", f"${self.pnl_cents/100}")
+        table.add_row("Snapshot msgs", str(self.num_snapshots))
+        table.add_row("Delta msgs", str(self.num_deltas))
+        table.add_row("Cash balance", f"${self.portfolio._cash_balance._balance/100}")
+        table.add_row("Fees paid", f"${self.portfolio._fees_paid/100}")
+        table.add_row("Positions value", f"${self.portfolio.get_positions_value()/100}")
+        table.add_row("Positions", str(self.portfolio))
+        self._console.print(table)
 
 
 def main(
@@ -29,6 +56,8 @@ def main(
     num_runs: int | None = None,
     is_test_run: bool = True,
 ):
+    portfolio = Portfolio(Balance(Cents(500000)))  # $5k
+    stat_printer = Printer(portfolio)
     print("Fetching open markets...")
     exchange_interface = (
         ExchangeInterface(is_test_run=is_test_run)
@@ -43,7 +72,9 @@ def main(
     print(f"Market tickers: {market_tickers}")
     print()
     print("Loading model predictor...")
-    model = Experiment1Predictor(root_path=models_root_path)
+    model = Experiment1Predictor(
+        root_path=models_root_path, printer=stat_printer, portfolio=portfolio
+    )
     previous_snapshots: Dict[MarketTicker, Orderbook] = {}
 
     print("Connection to websockets...")
@@ -54,7 +85,7 @@ def main(
             print("Waiting for messages...")
             while True:
                 data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
-                process_message(data, model, previous_snapshots)
+                process_message(data, model, previous_snapshots, stat_printer)
                 if num_runs is not None:
                     if num_runs == 0:
                         break
@@ -62,19 +93,20 @@ def main(
     finally:
         # Save the model before we error or exit
         model._save()
-        print(f"Money made this session: ${sum(model.trade_profits) / 100}")
-        print(f"Cash balance: ${model.portfolio._cash_balance._balance/100}")
-        print(f"Fees paid: ${model.portfolio._fees_paid/100}")
-        print(f"Cash locked in positions: ${model.portfolio.get_positions_value()/100}")
-        print(f"Amount made per trade: {model.trade_profits}")
+        stat_printer.run()
 
 
 def process_message(
     data: OrderbookSnapshotWR | OrderbookDeltaWR,
     model: "Experiment1Predictor",
     previous_snapshots: Dict[MarketTicker, Orderbook],
+    printer: Printer,
 ):
-    print(f"{data.type}", flush=True)
+    if data.type == Type.ORDERBOOK_SNAPSHOT:
+        printer.num_snapshots += 1
+    elif data.type == Type.ORDERBOOK_DELTA:
+        printer.num_deltas += 1
+    printer.run()
     market_ticker = data.msg.market_ticker
     match data:
         case OrderbookSnapshotWR():
@@ -155,7 +187,7 @@ class Model:
 class Experiment1Predictor:
     """This model is a linear regression with SGD"""
 
-    def __init__(self, root_path: Path):
+    def __init__(self, root_path: Path, printer: Printer, portfolio: Portfolio):
         self._root_path = root_path
         self._num_updates = 0
         if not self._root_path.exists():
@@ -167,8 +199,8 @@ class Experiment1Predictor:
             Model(ModelNames.QUANTITY_YES, self._root_path),
         ]
         # In cents
-        self.trade_profits: List = []
-        self.portfolio = Portfolio(Balance(Cents(500000)))  # $5k
+        self.portfolio = portfolio
+        self.printer = printer
 
     def update(self, prev_ob: Orderbook, curr_ob: Orderbook):
         try:
@@ -176,8 +208,7 @@ class Experiment1Predictor:
             try:
                 profit = self.portfolio.find_sell_opportunities(curr_ob)
                 if profit is not None:
-                    self.trade_profits.append(profit)
-                    print(f"Found profitable trade later on. Profit: ${profit/ 100}")
+                    self.printer.pnl_cents += profit
                 else:
                     self._make_prediction(x_vals, prev_ob, curr_ob, self.portfolio)
             except NotFittedError:
@@ -189,8 +220,6 @@ class Experiment1Predictor:
             for model in self._models:
                 model.update(x_vals, prev_ob, curr_ob)
         except EmptyOrderbookSideError:
-            # We don't update the model if things are empty
-            print(f"Empty orderbook. Market ticker: {prev_ob.market_ticker}")
             return
         self._num_updates += 1
         if self._should_save_models():
@@ -203,10 +232,6 @@ class Experiment1Predictor:
 
     def _save(self):
         print("Saving models...")
-        print(f"Profit so far: ${sum(self.trade_profits)/100}")
-        print(f"Cash balance: ${self.portfolio._cash_balance._balance/100}")
-        print(f"Fees paid: ${self.portfolio._fees_paid/100}")
-        print(f"Cash locked in positions: ${self.portfolio.get_positions_value()/100}")
 
         for model in self._models:
             model._save()
@@ -315,10 +340,8 @@ class Experiment1Predictor:
                 sell_no_predicted_price, no_quantity_to_buy  # type:ignore[arg-type]
             )
         )
-        print(f"Predicted yes: {yes_predicted_profit}")
-        print(f"Predicted no: {no_predicted_profit}")
-        # Only buy if the predicted profit is at least 2 cents
-        if yes_predicted_profit >= 0 or no_predicted_profit >= 0:
+        # Only buy if the predicted profit is at least $10
+        if yes_predicted_profit >= 1000 or no_predicted_profit >= 1000:
             print(f"   Expect profit for ticker: {prev_ob.market_ticker}")
             # buy and sell a yes contract
             if yes_predicted_profit > no_predicted_profit:
@@ -332,7 +355,7 @@ class Experiment1Predictor:
                 self._compute_side_profits(
                     portfolio,
                     prev_ob.market_ticker,
-                    Side.NO,
+                    Side.YES,
                     buy_yes_price,
                     yes_quantity_to_buy,
                     actual_yes_price,
@@ -375,7 +398,7 @@ class Experiment1Predictor:
         assert no_quantity_model._name == ModelNames.QUANTITY_NO
         predicted_no_quantity_ratio = no_quantity_model.predict(x_vals)
         sum_of_quantity = current_orderbook.no.get_total_quantity()
-        predicted_no_quantity = predicted_no_quantity_ratio * sum_of_quantity
+        predicted_no_quantity = int(predicted_no_quantity_ratio * sum_of_quantity)
         return max(predicted_no_quantity, 1)
 
     def _get_predicted_price(
@@ -406,6 +429,13 @@ class Experiment1Predictor:
         actual_quantity: Quantity,
     ):
         try:
+            # Check to make sure we don't already have the position
+            if (position := portfolio.get_position(ticker)) is not None:
+                last_price = position.prices[-1]
+                last_quantity = position.quantities[-1]
+                if last_price == price_to_buy and last_quantity == quantity_to_buy:
+                    print("already bought")
+                    return
             portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
         except PortfolioError as e:
             print(f"   Could not buy because: {e}")
@@ -413,12 +443,12 @@ class Experiment1Predictor:
 
         actual_price_change = actual_price - price_to_buy
         if actual_price_change <= 0:
-            print("   Holding position")
+            self.printer.run()
             return
         actual_quantity_sold = min(quantity_to_buy, actual_quantity)
         actual_profit = portfolio.sell(ticker, actual_price, actual_quantity_sold, side)
-        print(f"   Actual profit: ${actual_profit / 100}")
-        self.trade_profits.append(actual_profit)
+        self.printer.pnl_cents += actual_profit
+        self.printer.run()
         return actual_profit
 
 

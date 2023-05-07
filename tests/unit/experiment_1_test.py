@@ -75,7 +75,7 @@ def test_SGD_model(tmp_path):
 
 
 def test_experiment1_Predictor(tmp_path):
-    pred = Experiment1Predictor(root_path=tmp_path)
+    pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
     # test save
     pred._save()
     # test update on empty orderbook
@@ -174,13 +174,13 @@ def test_process_message():
     ### Test empty prev_snapshots
     with patch.object(model, "update") as update:
         # Orderbook snapshot
-        process_message(data_orderbook_snap, model, previous_snapshots)
+        process_message(data_orderbook_snap, model, previous_snapshots, MagicMock())
         assert len(previous_snapshots) == 1
         assert previous_snapshots[MarketTicker("hi")] == expected_orderbook
         update.assert_not_called()
         # Orderbook delta
         previous_snapshots = {}
-        process_message(data_orderbook_delta, model, previous_snapshots)
+        process_message(data_orderbook_delta, model, previous_snapshots, MagicMock())
         assert len(previous_snapshots) == 0
         update.assert_not_called()
     ### Test with something in the snapshot
@@ -195,7 +195,7 @@ def test_process_message():
         )
         previous_snapshots = {MarketTicker("hi"): previous_orderbook}
         # Test orderbook snapshot
-        process_message(data_orderbook_snap, model, previous_snapshots)
+        process_message(data_orderbook_snap, model, previous_snapshots, MagicMock())
         assert previous_snapshots[MarketTicker("hi")] == expected_orderbook
         update.assert_called_once_with(previous_orderbook, expected_orderbook)
 
@@ -204,7 +204,7 @@ def test_process_message():
         previous_snapshots = {MarketTicker("hi"): previous_orderbook}
         # We don't want to alter the orderbook at hand
         previous_orderbook = copy.deepcopy(previous_orderbook)
-        process_message(data_orderbook_delta, model, previous_snapshots)
+        process_message(data_orderbook_delta, model, previous_snapshots, MagicMock())
         assert len(previous_snapshots) == 1
         # Apply the delta
         new_expected_orderbook = Orderbook(
@@ -227,7 +227,7 @@ def test_main_experiment1(exchange_interface: ExchangeInterface, tmp_path):
 
 
 def test_compute_side_profits(tmp_path):
-    pred = Experiment1Predictor(tmp_path)
+    pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
     price_to_buy = Price(30)
     quantity_available = Quantity(150)
     actual_price = Price(90)
@@ -300,7 +300,7 @@ def test_make_predicition(tmp_path):
 
     orderbook = Orderbook(
         market_ticker=MarketTicker("hi"),
-        yes=OrderbookSide(levels={Price(5): Quantity(100), Price(10): Quantity(150)}),
+        yes=OrderbookSide(levels={Price(5): Quantity(100), Price(60): Quantity(150)}),
         no=OrderbookSide(levels={Price(70): Quantity(10), Price(80): Quantity(15)}),
     )
 
@@ -310,7 +310,7 @@ def test_make_predicition(tmp_path):
         no=OrderbookSide(levels={Price(60): Quantity(10), Price(90): Quantity(15)}),
     )
 
-    pred = Experiment1Predictor(tmp_path)
+    pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
     pred._models = [
         no_price,
         yes_price,
@@ -327,20 +327,22 @@ def test_make_predicition(tmp_path):
             Portfolio(Balance(Cents(500000))),
             MarketTicker("hi"),
             Side.NO,
-            Price(90),
+            Price(40),
             0.9 * (10 + 15),
             Price(90),
             Quantity(15),
         ]
         side_profits.assert_called_once()
-        # Skip first three args
+
         call_args = side_profits.call_args[0]
+        assert call_args[2] == Side.NO
+        # Skip first three args
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
-            assert abs(arg1 - arg2) < 0.5
+            assert abs(arg1 - arg2) <= 0.5
 
     # Test yes price
     # Train model to give a higher yes price chagne than the no price change
-    yes_price_model = get_model_to_return_y(x_vals, y_val=np.array([30]))
+    yes_price_model = get_model_to_return_y(x_vals, y_val=np.array([40]))
     yes_price = Model(ModelNames.PRICE_YES, tmp_path)
     yes_price._model = yes_price_model
     pred._models[1] = yes_price
@@ -360,6 +362,7 @@ def test_make_predicition(tmp_path):
         ]
         side_profits.assert_called_once()
         call_args = side_profits.call_args[0]
+        assert call_args[2] == Side.YES
         # Skip first three args
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
             assert abs(arg1 - arg2) < 0.5

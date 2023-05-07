@@ -74,6 +74,12 @@ class Portfolio:
         self._positions: Dict[MarketTicker, Position] = {}
         self._fees_paid: Cents = Cents(0)
 
+    def __str__(self):
+        return str(self._positions.values())
+
+    def get_position(self, ticker: MarketTicker) -> Position | None:
+        return self._positions[ticker] if ticker in self._positions else None
+
     def buy(self, ticker: MarketTicker, price: Price, quantity: Quantity, side: Side):
         """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
         fee = compute_fee(price, quantity)
