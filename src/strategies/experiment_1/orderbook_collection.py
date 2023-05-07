@@ -428,13 +428,12 @@ class Experiment1Predictor:
         actual_price: Price,
         actual_quantity: Quantity,
     ):
+        # Check to make sure we don't already have the position
+        if (position := portfolio.get_position(ticker)) is not None:
+            if price_to_buy in position.prices:
+                print("already bought")
+                return
         try:
-            # Check to make sure we don't already have the position
-            if (position := portfolio.get_position(ticker)) is not None:
-                for price, quantity in zip(position.prices, position.quantities):
-                    if price == price_to_buy and quantity == quantity_to_buy:
-                        print("already bought")
-                        return
             portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
         except PortfolioError as e:
             print(f"   Could not buy because: {e}")
