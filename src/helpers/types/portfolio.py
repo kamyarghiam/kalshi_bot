@@ -38,23 +38,19 @@ class Position:
         remaining_quantitites: List[Quantity] = []
 
         total_purchase_amount_cents: Cents = Cents(0)
-        # TODO: fees are computed slightly off here because of rounding errors
-        fees_paid: Cents = Cents(0)
         for price, quantity_holding in zip(self.prices, self.quantities):
             if quantity_to_sell >= quantity_holding:
                 total_purchase_amount_cents += Cents(price * quantity_holding)
-                fees_paid += compute_fee(price, quantity_holding)
                 quantity_to_sell -= QuantityDelta(quantity_holding)
             else:
                 quantity_holding -= QuantityDelta(quantity_to_sell)
                 total_purchase_amount_cents += Cents(price * quantity_to_sell)
-                fees_paid += compute_fee(price, quantity_to_sell)
                 remaining_prices.append(price)
                 remaining_quantitites.append(quantity_holding)
                 quantity_to_sell = Quantity(0)
         self.prices = remaining_prices
         self.quantities = remaining_quantitites
-        return total_purchase_amount_cents + fees_paid
+        return total_purchase_amount_cents
 
     def is_empty(self):
         return len(self.prices) == 0 and len(self.quantities) == 0
@@ -77,6 +73,7 @@ class Portfolio:
         self._cash_balance: Balance = balance
         self._positions: Dict[MarketTicker, Position] = {}
         self._fees_paid: Cents = Cents(0)
+        self.pnl: Cents = Cents(0)
 
     def __str__(self):
         return str(self._positions.values())
@@ -93,10 +90,9 @@ class Portfolio:
 
     def buy(self, ticker: MarketTicker, price: Price, quantity: Quantity, side: Side):
         """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
-        fee = compute_fee(price, quantity)
-        price_to_pay = price * quantity + fee
+        price_to_pay = price * quantity
         self._cash_balance.add_balance(Cents(-1 * price_to_pay))
-        self._fees_paid += fee
+        self._fees_paid += compute_fee(price, quantity)
 
         if ticker in self._positions:
             holding = self._positions[ticker]
@@ -124,14 +120,16 @@ class Portfolio:
         quantity_to_sell = min(max_quantity_to_sell, Quantity(sum(position.quantities)))
         fee = compute_fee(price, quantity_to_sell)
         amount_paid = position.sell_position(quantity_to_sell)
-        amount_made = Cents(price * quantity_to_sell) - fee
         self._fees_paid += fee
+        amount_made = Cents(price * quantity_to_sell)
         self._cash_balance.add_balance(Cents(amount_made))
 
         if position.is_empty():
             del self._positions[ticker]
 
-        return Cents(amount_made - amount_paid)
+        pnl = Cents(amount_made - amount_paid)
+        self.pnl += pnl
+        return pnl
 
     def find_sell_opportunities(self, orderbook: Orderbook) -> Cents | None:
         """Finds a selling opportunity from an orderbook if there is one"""

@@ -34,14 +34,13 @@ class Printer:
         self.portfolio = portfolio
         self.num_snapshots = 0
         self.num_deltas = 0
-        self.pnl_cents = 0
 
     def run(self):
         self._console.clear()
         table = Table(title="Portfolio")
         table.add_column("Name")
         table.add_column("Value")
-        table.add_row("PnL", f"${self.pnl_cents/100}")
+        table.add_row("PnL", f"${self.portfolio.pnl/100}")
         table.add_row("Snapshot msgs", str(self.num_snapshots))
         table.add_row("Delta msgs", str(self.num_deltas))
         table.add_row("Cash balance", f"${self.portfolio._cash_balance._balance/100}")
@@ -212,9 +211,7 @@ class Experiment1Predictor:
             x_vals = self._extract_x_values(prev_ob).reshape(1, -1)
             try:
                 profit = self.portfolio.find_sell_opportunities(curr_ob)
-                if profit is not None:
-                    self.printer.pnl_cents += profit
-                else:
+                if profit is None:
                     self._make_prediction(x_vals, prev_ob, curr_ob, self.portfolio)
             except NotFittedError:
                 print("Model not ready to predict yet")
@@ -452,7 +449,6 @@ class Experiment1Predictor:
             return
         actual_quantity_sold = min(quantity_to_buy, actual_quantity)
         actual_profit = portfolio.sell(ticker, actual_price, actual_quantity_sold, side)
-        self.printer.pnl_cents += actual_profit
         self.printer.run()
         return actual_profit
 

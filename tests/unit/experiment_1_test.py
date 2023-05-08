@@ -232,8 +232,9 @@ def test_compute_side_profits(tmp_path):
     quantity_available = Quantity(150)
     actual_price = Price(90)
     actual_quantity = Quantity(100)
+    portfolio = Portfolio(Balance(Cents(5000000)))
     actual_profit = pred._compute_side_profits(
-        Portfolio(Balance(Cents(5000000))),
+        portfolio,
         MarketTicker("hi"),
         Side.NO,
         price_to_buy,
@@ -242,31 +243,43 @@ def test_compute_side_profits(tmp_path):
         actual_quantity,
     )
 
-    assert actual_profit == 60 * 100 - compute_fee(
-        price_to_buy,
+    fees_paid = compute_fee(
+        actual_price,
         actual_quantity,
-    ) - compute_fee(
+    ) + compute_fee(price_to_buy, quantity_available)
+
+    assert portfolio._fees_paid == fees_paid
+    assert actual_profit == 60 * 100
+
+    # Already bought
+    actual_profit = pred._compute_side_profits(
+        portfolio,
+        MarketTicker("hi"),
+        Side.NO,
+        price_to_buy,
+        quantity_available,
         actual_price,
         actual_quantity,
     )
+    assert actual_profit is None
 
     actual_price = Price(50)
     actual_profit = pred._compute_side_profits(
-        Portfolio(Balance(Cents(5000000))),
-        MarketTicker("hi"),
+        portfolio,
+        MarketTicker("hi2"),
         Side.NO,
         price_to_buy,
         quantity_available,
         actual_price,
         actual_quantity,
     )
-    assert actual_profit == 20 * 100 - compute_fee(
-        price_to_buy,
-        actual_quantity,
-    ) - compute_fee(
+
+    fees_paid += compute_fee(
         actual_price,
         actual_quantity,
-    )
+    ) + compute_fee(price_to_buy, quantity_available)
+    assert portfolio._fees_paid == fees_paid
+    assert actual_profit == 20 * 100
     # If our prediction is directionally incorrect, no profit
     actual_price = Price(20)
     actual_profit = pred._compute_side_profits(
