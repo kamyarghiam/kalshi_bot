@@ -345,7 +345,7 @@ class Experiment1Predictor:
             )
         )
         # Only buy if the predicted profit is at least $10
-        if yes_predicted_profit >= 0 or no_predicted_profit >= 0:
+        if yes_predicted_profit >= 1000 or no_predicted_profit >= 1000:
             print(f"   Expect profit for ticker: {prev_ob.market_ticker}")
             # buy and sell a yes contract
             if yes_predicted_profit > no_predicted_profit:
