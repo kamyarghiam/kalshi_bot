@@ -60,7 +60,7 @@ def main(
     if Portfolio.saved_portfolio_exists(root_path):
         portfolio = Portfolio.load(root_path)
     else:
-        portfolio = Portfolio(Balance(Cents(500_000)))  # $5,000
+        portfolio = Portfolio(Balance(Cents(1_000_000)))  # $10,000
     stat_printer = Printer(portfolio)
     print("Fetching open markets...")
     exchange_interface = (
@@ -452,7 +452,9 @@ class Experiment1Predictor:
             self.printer.run()
             return
         actual_quantity_sold = min(quantity_to_buy, actual_quantity)
-        actual_profit = portfolio.sell(ticker, actual_price, actual_quantity_sold, side)
+        actual_profit, _ = portfolio.sell(
+            ticker, actual_price, actual_quantity_sold, side
+        )
         self.printer.run()
         return actual_profit
 

@@ -1,7 +1,7 @@
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -15,20 +15,29 @@ from src.helpers.types.orders import Quantity, QuantityDelta, Side, compute_fee
 class Position:
     ticker: MarketTicker
     # We can be holding a position at several different price points
-    # Assumes two lists are the same size
+    # Assumes the prices and quantity lists are the same size
     prices: List[Price]
     quantities: List[Quantity]
     side: Side
 
-    def add_position(self, price: Price, quantity: Quantity):
+    def add(self, price: Price, quantity: Quantity):
+        """Adds a new price point for this position"""
         assert len(self.prices) == len(self.quantities)
-        self.prices.append(Price(price))
-        self.quantities.append(Quantity(quantity))
+        if price in self.prices:
+            index = self.prices.index(price)
+            self.quantities[index] += QuantityDelta(quantity)
+        else:
+            self.prices.append(Price(price))
+            self.quantities.append(Quantity(quantity))
 
-    def sell_position(self, quantity_to_sell: Quantity) -> Cents:
+    def sell(self, quantity_to_sell: Quantity, for_info: bool = False) -> Cents:
         assert len(self.prices) == len(self.quantities)
         """Using fifo, sell the quantity and return how much you paid
-        in total for those contracts"""
+        in total for those contracts
+
+        :param bool for_info: if true, does not actually sell the position. Only
+        provides info about what the position would do
+        """
         if quantity_to_sell > sum(self.quantities):
             raise ValueError(
                 f"Selling too much. You have {sum(self.quantities)} "
@@ -48,8 +57,11 @@ class Position:
                 remaining_prices.append(price)
                 remaining_quantitites.append(quantity_holding)
                 quantity_to_sell = Quantity(0)
-        self.prices = remaining_prices
-        self.quantities = remaining_quantitites
+
+        if not for_info:
+            # If it's not just for information, we lock in sell
+            self.prices = remaining_prices
+            self.quantities = remaining_quantitites
         return total_purchase_amount_cents
 
     def is_empty(self):
@@ -99,7 +111,7 @@ class Portfolio:
             holding = self._positions[ticker]
             if side != holding.side:
                 raise PortfolioError("Already holding a position on the other side")
-            holding.add_position(price, quantity)
+            holding.add(price, quantity)
         else:
             self._positions[ticker] = Position(ticker, [price], [quantity], side)
 
@@ -109,28 +121,34 @@ class Portfolio:
         price: Price,
         max_quantity_to_sell: Quantity,
         side: Side,
-    ) -> Cents:
-        """Returns pnl from sell using fifo without fees
+        for_info: bool = False,
+    ) -> Tuple[Cents, Cents]:
+        """Returns pnl from sell using fifo, and fees from just selling
 
-        Sells min of what you have the max_quantity_to_sell"""
+        Sells min of what you have the max_quantity_to_sel
+
+        :param bool for_info: if true, we don't apply the sell. We just
+        return information
+        l"""
         if ticker not in self._positions:
             raise PortfolioError(f"Not holding anything with ticker {ticker}")
         position = self._positions[ticker]
         if position.side != side:
             raise PortfolioError("Holding a different side when trying to sell")
         quantity_to_sell = min(max_quantity_to_sell, Quantity(sum(position.quantities)))
-        fee = compute_fee(price, quantity_to_sell)
-        amount_paid = position.sell_position(quantity_to_sell)
-        self._fees_paid += fee
+
+        amount_paid = position.sell(quantity_to_sell, for_info)
         amount_made = Cents(price * quantity_to_sell)
-        self._cash_balance.add_balance(Cents(amount_made - fee))
-
-        if position.is_empty():
-            del self._positions[ticker]
-
         pnl = Cents(amount_made - amount_paid)
-        self.pnl += pnl
-        return pnl
+        fee = compute_fee(price, quantity_to_sell)
+
+        if not for_info:
+            self._fees_paid += fee
+            self._cash_balance.add_balance(Cents(amount_made - fee))
+            if position.is_empty():
+                del self._positions[ticker]
+            self.pnl += pnl
+        return pnl, fee
 
     def find_sell_opportunities(self, orderbook: Orderbook) -> Cents | None:
         """Finds a selling opportunity from an orderbook if there is one"""
@@ -143,8 +161,6 @@ class Portfolio:
             else:
                 assert position.side == Side.YES
                 sell_price, sell_quantity = orderbook.yes.get_largest_price_level()
-            # TODO: maybe do weighted cost by quantity?
-            max_price = max(position.prices)
 
             quantity_to_sell = Quantity(
                 min(
@@ -152,13 +168,15 @@ class Portfolio:
                     sell_quantity,
                 )
             )
-            if (
-                float(sell_price) * quantity_to_sell
-                - float(max_price) * quantity_to_sell
-                - compute_fee(sell_price, quantity_to_sell)
-                - compute_fee(max_price, quantity_to_sell)
-            ) > 0:
-                return self.sell(ticker, sell_price, quantity_to_sell, position.side)
+            # TODO: does not consider buy fee
+            pnl, fee = self.sell(
+                ticker, sell_price, quantity_to_sell, position.side, for_info=True
+            )
+            if pnl - fee > 0:
+                actual_pnl, _ = self.sell(
+                    ticker, sell_price, quantity_to_sell, position.side
+                )
+                return actual_pnl
         return None
 
     def get_positions_value(self) -> Cents:
