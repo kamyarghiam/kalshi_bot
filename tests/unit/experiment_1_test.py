@@ -293,6 +293,29 @@ def test_compute_side_profits(tmp_path):
     )
     assert actual_profit is None
 
+    # If the total position is greater than $50, we reduce it
+    price_to_buy = Price(50)
+    actual_price = Price(60)
+    quantity_available = Quantity(1000)
+    actual_quantity = Quantity(1000)
+    actual_profit = pred._compute_side_profits(
+        portfolio,
+        MarketTicker("hi3"),
+        Side.NO,
+        price_to_buy,
+        quantity_available,
+        actual_price,
+        actual_quantity,
+    )
+    # We only by 100 contracts
+    quantity_bought = Quantity(100)
+    fees_paid += compute_fee(
+        actual_price,
+        quantity_bought,
+    ) + compute_fee(price_to_buy, quantity_bought)
+    assert portfolio._fees_paid == fees_paid
+    assert actual_profit == 10 * 100
+
 
 def test_make_predicition(tmp_path):
     x_vals = np.array([[1, 2, 3]])

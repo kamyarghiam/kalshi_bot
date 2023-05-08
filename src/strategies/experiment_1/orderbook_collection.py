@@ -205,6 +205,8 @@ class Experiment1Predictor:
         # In cents
         self.portfolio = portfolio
         self.printer = printer
+        # No more than $50 per position
+        self._max_position = Cents(5_000)
 
     def update(self, prev_ob: Orderbook, curr_ob: Orderbook):
         try:
@@ -438,6 +440,8 @@ class Experiment1Predictor:
                 print("already bought")
                 return
         try:
+            if price_to_buy * quantity_to_buy > self._max_position:
+                quantity_to_buy = Quantity(int(self._max_position // price_to_buy))
             portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
         except PortfolioError as e:
             print(f"   Could not buy because: {e}")
