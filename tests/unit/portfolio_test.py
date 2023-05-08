@@ -93,7 +93,7 @@ def test_portfolio_buy():
         Side.NO,
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - fees_paid
     assert portfolio._fees_paid == fees_paid
     portfolio.buy(
         MarketTicker("hi2"),
@@ -101,8 +101,8 @@ def test_portfolio_buy():
         Quantity(10),
         Side.YES,
     )
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10
     fees_paid += compute_fee(Price(10), Quantity(10))
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - fees_paid
     assert portfolio._fees_paid == fees_paid
     portfolio.buy(
         MarketTicker("hi2"),
@@ -111,7 +111,10 @@ def test_portfolio_buy():
         Side.YES,
     )
     fees_paid += compute_fee(Price(15), Quantity(5))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - 15 * 5
+    assert (
+        portfolio._cash_balance._balance
+        == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - fees_paid
+    )
     assert portfolio._fees_paid == fees_paid
     portfolio.buy(
         MarketTicker("hi2"),
@@ -121,7 +124,8 @@ def test_portfolio_buy():
     )
     fees_paid += compute_fee(Price(20), Quantity(25))
     assert (
-        portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25
+        portfolio._cash_balance._balance
+        == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25 - fees_paid
     )
     assert portfolio._fees_paid == fees_paid
 
@@ -165,7 +169,7 @@ def test_portfolio_sell():
         Side.NO,
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - fees_paid
     assert portfolio._fees_paid == fees_paid
     assert len(portfolio._positions) == 1
 
@@ -196,7 +200,7 @@ def test_portfolio_sell():
     assert portfolio._fees_paid == fees_paid
 
     assert profit1 == (100 - 50) * (6 - 5)
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6
+    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 - fees_paid
 
     profit2 = portfolio.sell(
         MarketTicker("hi"),
@@ -205,7 +209,9 @@ def test_portfolio_sell():
         Side.NO,
     )
     fees_paid += compute_fee(Price(3), Quantity(50))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3
+    assert (
+        portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3 - fees_paid
+    )
     assert portfolio._fees_paid == fees_paid
 
     assert profit2 == (100 - 50) * (3 - 5)

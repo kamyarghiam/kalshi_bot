@@ -90,9 +90,10 @@ class Portfolio:
 
     def buy(self, ticker: MarketTicker, price: Price, quantity: Quantity, side: Side):
         """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
-        price_to_pay = price * quantity
+        fee = compute_fee(price, quantity)
+        price_to_pay = price * quantity + fee
         self._cash_balance.add_balance(Cents(-1 * price_to_pay))
-        self._fees_paid += compute_fee(price, quantity)
+        self._fees_paid += fee
 
         if ticker in self._positions:
             holding = self._positions[ticker]
@@ -109,7 +110,7 @@ class Portfolio:
         max_quantity_to_sell: Quantity,
         side: Side,
     ) -> Cents:
-        """Returns pnl from sell using fifo
+        """Returns pnl from sell using fifo without fees
 
         Sells min of what you have the max_quantity_to_sell"""
         if ticker not in self._positions:
@@ -122,7 +123,7 @@ class Portfolio:
         amount_paid = position.sell_position(quantity_to_sell)
         self._fees_paid += fee
         amount_made = Cents(price * quantity_to_sell)
-        self._cash_balance.add_balance(Cents(amount_made))
+        self._cash_balance.add_balance(Cents(amount_made - fee))
 
         if position.is_empty():
             del self._positions[ticker]
