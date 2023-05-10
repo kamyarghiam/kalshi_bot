@@ -31,7 +31,7 @@ class Balance:
 
     def __init__(self, starting_balance_cents: Cents):
         if not isinstance(starting_balance_cents, Cents) or starting_balance_cents < 0:
-            raise ValueError("{num} invalid balance")
+            raise ValueError(f"{starting_balance_cents} invalid balance")
         self._balance: Cents = starting_balance_cents
 
     def add_balance(self, delta: Cents):

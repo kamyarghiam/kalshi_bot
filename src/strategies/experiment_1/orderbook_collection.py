@@ -459,5 +459,5 @@ class Experiment1Predictor:
         return actual_profit
 
 
-if __name__ == "__main__":
-    main(is_test_run=False)
+if __name__ == "__main__":  # pragma: no cover
+    main(is_test_run=False)  # pragma: no cover

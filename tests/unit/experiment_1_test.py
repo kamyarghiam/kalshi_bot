@@ -74,6 +74,22 @@ def test_SGD_model(tmp_path):
     assert np.isclose(prediction, expected, rtol=0.5)
 
 
+def test_update_bad_scenarios(tmp_path):
+    pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
+    pred._extract_value_per_side = MagicMock()  # type:ignore[method-assign]
+    pred._make_prediction = MagicMock()  # type:ignore[method-assign]
+    pred._models = []
+    with patch.object(pred.portfolio, "find_sell_opportunities") as extract:
+        extract.side_effect = KeyboardInterrupt()
+
+        with pytest.raises(KeyboardInterrupt):
+            pred.update(MagicMock(), MagicMock())
+
+        extract.side_effect = KeyError()
+        # Does not error
+        pred.update(MagicMock(), MagicMock())
+
+
 def test_experiment1_Predictor(tmp_path):
     pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
     # test save
@@ -224,6 +240,11 @@ def test_process_message():
 def test_main_experiment1(exchange_interface: ExchangeInterface, tmp_path):
     # test it runs
     main(exchange_interface, tmp_path, num_runs=2)
+
+    # test it with a portfolio saved
+    portfolio = Portfolio(balance=Balance(Cents(1_000)))
+    portfolio.save(tmp_path)
+    main(exchange_interface, tmp_path, num_runs=0)
 
 
 def test_compute_side_profits(tmp_path):
@@ -402,3 +423,36 @@ def test_make_predicition(tmp_path):
         # Skip first three args
         for arg1, arg2 in zip(call_args[3:], expected_call_args[3:]):
             assert abs(arg1 - arg2) < 0.5
+
+
+def test_portfolio_error_compute_side_profits(tmp_path):
+    # We're going to trigger a portfolio error by buying a position in which
+    # We're holding the opposite side of
+    pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
+    price_to_buy = Price(30)
+    quantity_available = Quantity(150)
+    actual_price = Price(90)
+    actual_quantity = Quantity(100)
+    portfolio = Portfolio(Balance(Cents(5000000)))
+    # Buy once
+    _ = pred._compute_side_profits(
+        portfolio,
+        MarketTicker("hi"),
+        Side.NO,
+        price_to_buy,
+        quantity_available,
+        actual_price,
+        actual_quantity,
+    )
+
+    # Buy again on the opposite side.
+    # Throws porfolio error, but error is caught
+    _ = pred._compute_side_profits(
+        portfolio,
+        MarketTicker("hi"),
+        Side.YES,
+        Price(31),
+        quantity_available,
+        actual_price,
+        actual_quantity,
+    )
