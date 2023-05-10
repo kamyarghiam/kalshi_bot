@@ -115,6 +115,15 @@ class Portfolio:
         else:
             self._positions[ticker] = Position(ticker, [price], [quantity], side)
 
+    def potential_pnl(
+        self,
+        ticker: MarketTicker,
+        price: Price,
+        max_quantity_to_sell: Quantity,
+        side: Side,
+    ):
+        return self.sell(ticker, price, max_quantity_to_sell, side, for_info=True)
+
     def sell(
         self,
         ticker: MarketTicker,
@@ -162,20 +171,16 @@ class Portfolio:
                 assert position.side == Side.YES
                 sell_price, sell_quantity = orderbook.yes.get_largest_price_level()
 
-            quantity_to_sell = Quantity(
+            quantity = Quantity(
                 min(
                     sum(position.quantities),
                     sell_quantity,
                 )
             )
             # TODO: does not consider buy fee
-            pnl, fee = self.sell(
-                ticker, sell_price, quantity_to_sell, position.side, for_info=True
-            )
+            pnl, fee = self.potential_pnl(ticker, sell_price, quantity, position.side)
             if pnl - fee > 0:
-                actual_pnl, _ = self.sell(
-                    ticker, sell_price, quantity_to_sell, position.side
-                )
+                actual_pnl, _ = self.sell(ticker, sell_price, quantity, position.side)
                 return actual_pnl
         return None
 
