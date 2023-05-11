@@ -7,7 +7,7 @@ class Price(float):
         return super(Price, cls).__new__(cls, num)
 
 
-class Cents(int):
+class Cents(float):
     """The total amount of something in cents (could be negative)"""
 
     def __add__(self, other):

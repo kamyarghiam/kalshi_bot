@@ -19,3 +19,7 @@ def random_data_from_basemodel(
         __model__ = base_model_class
 
     return Factory.build()
+
+
+def almost_equal(x: float, y: float):
+    return abs(x - y) < 0.01

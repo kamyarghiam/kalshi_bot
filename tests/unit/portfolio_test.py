@@ -6,6 +6,7 @@ from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, Side, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError, Position
 from tests.fake_exchange import Price
+from tests.utils import almost_equal
 
 
 def test_empty_position():
@@ -13,6 +14,7 @@ def test_empty_position():
         ticker=MarketTicker("hi"),
         prices=[],
         quantities=[],
+        fees=[],
         side=Side.NO,
     )
     assert empty_position.is_empty()
@@ -21,6 +23,7 @@ def test_empty_position():
         ticker=MarketTicker("hi"),
         prices=[Price(1)],
         quantities=[Quantity(1)],
+        fees=[compute_fee(Price(1), Quantity(1))],
         side=Side.NO,
     )
 
@@ -32,6 +35,11 @@ def test_add_remove_get_value_positions():
         ticker=MarketTicker("hi"),
         prices=[Price(5), Price(10), Price(15)],
         quantities=[Quantity(100), Quantity(150), Quantity(200)],
+        fees=[
+            compute_fee(Price(5), Quantity(100)),
+            compute_fee(Price(10), Quantity(150)),
+            compute_fee(Price(15), Quantity(200)),
+        ],
         side=Side.NO,
     )
     assert position.get_value() == 5 * 100 + 10 * 150 + 15 * 200
@@ -46,14 +54,15 @@ def test_add_remove_get_value_positions():
         Quantity(200),
         Quantity(300),
     ]
+    assert position.fees[-1] == compute_fee(Price(20), Quantity(300))
 
     # Remove too much
     with pytest.raises(ValueError):
         position.sell(Quantity(751))
 
     # Does not actually sell position
-    cost = position.sell(Quantity(200), for_info=True)
-    assert cost == 5 * 100 + 10 * 100
+    buy_cost, buy_fees = position.sell(Quantity(200), for_info=True)
+    assert buy_cost == 5 * 100 + 10 * 100
     assert position.prices == [Price(5), Price(10), Price(15), Price(20)]
     assert position.quantities == [
         Quantity(100),
@@ -61,38 +70,52 @@ def test_add_remove_get_value_positions():
         Quantity(200),
         Quantity(300),
     ]
+    assert len(position.fees) == 4
+    assert buy_fees == compute_fee(Price(5), Quantity(100)) + (
+        Cents(100 / 150) * (compute_fee(Price(10), Quantity(150)))
+    )
 
-    sold = position.sell(Quantity(200))
-    assert sold == 5 * 100 + 10 * 100
+    buy_cost, buy_fees = position.sell(Quantity(200))
+    assert buy_cost == 5 * 100 + 10 * 100
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
         Quantity(50),
         Quantity(200),
         Quantity(300),
     ]
-
-    sold = position.sell(Quantity(20))
-    assert sold == 10 * 20
+    assert len(position.fees) == 3
+    assert buy_fees == compute_fee(Price(5), Quantity(100)) + (
+        (100 / 150) * (compute_fee(Price(10), Quantity(150)))
+    )
+    buy_cost, buy_fees = position.sell(Quantity(20))
+    assert buy_cost == 10 * 20
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
         Quantity(30),
         Quantity(200),
         Quantity(300),
     ]
+    assert len(position.fees) == 3
+    assert almost_equal(buy_fees, (20 / 150) * compute_fee(Price(10), Quantity(150)))
 
-    sold = position.sell(Quantity(30))
-    assert sold == 10 * 30
+    buy_cost, buy_fees = position.sell(Quantity(30))
+    assert buy_cost == 10 * 30
     assert position.prices == [Price(15), Price(20)]
     assert position.quantities == [
         Quantity(200),
         Quantity(300),
     ]
+    assert len(position.fees) == 2
+    assert almost_equal(buy_fees, (30 / 150) * compute_fee(Price(10), Quantity(150)))
 
-    sold = position.sell(Quantity(500))
-    assert sold == 15 * 200 + 20 * 300
+    buy_cost, buy_fees = position.sell(Quantity(500))
+    assert buy_cost == 15 * 200 + 20 * 300
     assert position.prices == []
     assert position.quantities == []
     assert position.is_empty()
+    assert buy_fees == compute_fee(Price(15), Quantity(200)) + compute_fee(
+        Price(20), Quantity(300)
+    )
 
 
 def test_add_duplicate_price_point():
@@ -100,6 +123,7 @@ def test_add_duplicate_price_point():
         ticker=MarketTicker("hi"),
         prices=[Price(10)],
         quantities=[Quantity(30)],
+        fees=[compute_fee(Price(10), Quantity(30))],
         side=Side.NO,
     )
     position.add(Price(10), Quantity(40))
@@ -223,8 +247,10 @@ def test_portfolio_sell():
         Quantity(50),
         Side.NO,
     )
-    assert fee == compute_fee(Price(6), Quantity(50))
-    fees_paid += fee
+    buy_fee = (50 / 100) * compute_fee(Price(5), Quantity(100))
+    sell_fee = compute_fee(Price(6), Quantity(50))
+    assert fee == buy_fee + sell_fee
+    fees_paid += sell_fee
     assert portfolio._fees_paid == fees_paid
 
     assert profit1 == (100 - 50) * (6 - 5)
@@ -236,8 +262,10 @@ def test_portfolio_sell():
         Quantity(100),  # sell more than there is available
         Side.NO,
     )
-    assert fee == compute_fee(Price(3), Quantity(50))
-    fees_paid += fee
+    buy_fee = (50 / 100) * compute_fee(Price(5), Quantity(100))
+    sell_fee = compute_fee(Price(3), Quantity(50))
+    assert fee == buy_fee + sell_fee
+    fees_paid += sell_fee
     assert (
         portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3 - fees_paid
     )
