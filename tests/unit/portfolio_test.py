@@ -72,7 +72,7 @@ def test_add_remove_get_value_positions():
     ]
     assert len(position.fees) == 4
     assert buy_fees == compute_fee(Price(5), Quantity(100)) + (
-        Cents(100 / 150) * (compute_fee(Price(10), Quantity(150)))
+        (Quantity(100) / Quantity(150)) * (compute_fee(Price(10), Quantity(150)))
     )
 
     buy_cost, buy_fees = position.sell(Quantity(200))
@@ -85,7 +85,7 @@ def test_add_remove_get_value_positions():
     ]
     assert len(position.fees) == 3
     assert buy_fees == compute_fee(Price(5), Quantity(100)) + (
-        (100 / 150) * (compute_fee(Price(10), Quantity(150)))
+        (Quantity(100) / Quantity(150)) * (compute_fee(Price(10), Quantity(150)))
     )
     buy_cost, buy_fees = position.sell(Quantity(20))
     assert buy_cost == 10 * 20
@@ -96,7 +96,9 @@ def test_add_remove_get_value_positions():
         Quantity(300),
     ]
     assert len(position.fees) == 3
-    assert almost_equal(buy_fees, (20 / 150) * compute_fee(Price(10), Quantity(150)))
+    assert almost_equal(
+        buy_fees, (Quantity(20) / Quantity(150)) * compute_fee(Price(10), Quantity(150))
+    )
 
     buy_cost, buy_fees = position.sell(Quantity(30))
     assert buy_cost == 10 * 30
@@ -106,7 +108,9 @@ def test_add_remove_get_value_positions():
         Quantity(300),
     ]
     assert len(position.fees) == 2
-    assert almost_equal(buy_fees, (30 / 150) * compute_fee(Price(10), Quantity(150)))
+    assert almost_equal(
+        buy_fees, (Quantity(30) / Quantity(150)) * compute_fee(Price(10), Quantity(150))
+    )
 
     buy_cost, buy_fees = position.sell(Quantity(500))
     assert buy_cost == 15 * 200 + 20 * 300

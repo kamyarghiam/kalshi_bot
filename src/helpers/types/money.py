@@ -1,13 +1,10 @@
-class Price(float):
-    """Provides a type for prices"""
+from fractions import Fraction
+from typing import Union
 
-    def __new__(cls, num: float | int):
-        if num < 1 or num > 99:
-            raise ValueError(f"{num} invalid price")
-        return super(Price, cls).__new__(cls, num)
+from src.helpers.types.common import BaseFraction
 
 
-class Cents(float):
+class Cents(BaseFraction):
     """The total amount of something in cents (could be negative)"""
 
     def __add__(self, other):
@@ -15,6 +12,25 @@ class Cents(float):
 
     def __sub__(self, other):
         return Cents(super().__sub__(other))
+
+
+class Price(BaseFraction):
+    """Provides a type for prices"""
+
+    def __new__(cls, num: Union[int, Fraction]):
+        if (
+            (not (isinstance(num, int) or isinstance(num, Fraction)))
+            or num < 1
+            or num > 99
+        ):
+            raise ValueError(f"{num} invalid price")
+        return super(Price, cls).__new__(cls, num)
+
+    def __mul__(self, other) -> Cents:
+        return Cents(Fraction(self) * Fraction(other))
+
+    def __truediv__(self, other) -> Cents:
+        return Cents(Fraction(self) / Fraction(other))
 
 
 def get_opposite_side_price(price: Price) -> Price:

@@ -1,3 +1,5 @@
+from fractions import Fraction
+from functools import wraps
 import urllib.parse
 from typing import Union
 
@@ -48,3 +50,38 @@ class URL(NonNullStr):
 
     def __hash__(self):
         return hash((str(self)))
+
+
+def wrap_fraction_method(method):
+    @wraps(method)
+    def wrapped_method(self, other):
+        result = method(self, other)
+        return type(self)(result)
+
+    return wrapped_method
+
+
+class BaseFraction(Fraction):
+    """Same as fraction class, but also has validation for pydantic"""
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        try:
+            return Fraction(v)
+        except ValueError:
+            raise ValueError(f"Invalid fraction: {v}")
+
+    def __deepcopy__(self, _):
+        if type(self) == Fraction:
+            return self  # My components are also immutable
+        return self.__class__(self)
+
+    __add__ = wrap_fraction_method(Fraction.__add__)
+    __sub__ = wrap_fraction_method(Fraction.__sub__)
+    __mul__ = wrap_fraction_method(Fraction.__mul__)
+    __truediv__ = wrap_fraction_method(Fraction.__truediv__)
+    __floordiv__ = wrap_fraction_method(Fraction.__floordiv__)

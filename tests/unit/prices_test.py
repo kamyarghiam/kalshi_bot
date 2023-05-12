@@ -11,11 +11,11 @@ def test_prices():
         # Above 99
         Price(100)
 
-    # Allows float
-    Price(90.1)
+    # Does not allow float
+    with pytest.raises(ValueError):
+        Price(90.1)
 
     assert Price(10) + Price(20) == Price(30)
-
     assert get_opposite_side_price(Price(10)) == Price(90)
     assert get_opposite_side_price(Price(1)) == Price(99)
     assert get_opposite_side_price(Price(99)) == Price(1)

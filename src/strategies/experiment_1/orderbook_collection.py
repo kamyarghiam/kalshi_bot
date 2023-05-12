@@ -1,4 +1,5 @@
 from enum import Enum
+from fractions import Fraction
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -166,17 +167,17 @@ class Model:
     def _save(self):
         joblib.dump(self._model, self._full_path)
 
-    def _get_y_val(self, prev_ob: Orderbook, new_ob: Orderbook) -> float:
+    def _get_y_val(self, prev_ob: Orderbook, new_ob: Orderbook) -> Cents | Quantity:
         assert prev_ob.view == OrderbookView.SELL
         assert new_ob.view == OrderbookView.SELL
         if self._name == ModelNames.PRICE_NO:
             price_new, _ = new_ob.no.get_largest_price_level()
             price_old, _ = prev_ob.no.get_largest_price_level()
-            return float(price_new - price_old)
+            return Cents(price_new) - Cents(price_old)
         if self._name == ModelNames.PRICE_YES:
             price_new, _ = new_ob.yes.get_largest_price_level()
             price_old, _ = prev_ob.yes.get_largest_price_level()
-            return float(price_new - price_old)
+            return Cents(price_new) - Cents(price_old)
         if self._name == ModelNames.QUANTITY_NO:
             _, quantity = new_ob.no.get_largest_price_level()
             prev_ob_total_quantity = prev_ob.no.get_total_quantity()
@@ -421,7 +422,9 @@ class Experiment1Predictor:
         predicted_price_change = float(price_model.predict(x_vals))
 
         # Price to sell at
-        predicted_price = Price(min(max(sell_price + predicted_price_change, 1), 99))
+        predicted_price = Price(
+            Fraction(min(max(float(sell_price) + predicted_price_change, 1), 99))
+        )
         return predicted_price
 
     def _compute_side_profits(
@@ -447,7 +450,7 @@ class Experiment1Predictor:
             print(f"   Could not buy because: {e}")
             return
 
-        actual_price_change = actual_price - price_to_buy
+        actual_price_change = Cents(actual_price) - Cents(price_to_buy)
         if actual_price_change <= 0:
             self.printer.run()
             return

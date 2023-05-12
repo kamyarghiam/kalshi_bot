@@ -1,8 +1,9 @@
 import pytest
 
-from src.helpers.types.common import URL, NonNullStr
+from src.helpers.types.common import URL, BaseFraction, NonNullStr
 from src.helpers.types.money import Balance, Cents
 from src.helpers.utils import PendingMessages
+import unittest
 
 
 def test_basic_urls():
@@ -67,3 +68,30 @@ def test_pending_messages():
 def test_negative_balance():
     with pytest.raises(ValueError):
         Balance(Cents(-50))
+
+
+class TestBaseFraction(unittest.TestCase):
+    def test_add(self):
+        self.assertEqual(BaseFraction(1, 2) + BaseFraction(1, 3), BaseFraction(5, 6))
+        self.assertEqual(BaseFraction(1, 2) + 1, BaseFraction(3, 2))
+        self.assertEqual(BaseFraction(1, 2) + 0.5, BaseFraction(1, 1))
+
+    def test_sub(self):
+        self.assertEqual(BaseFraction(3, 4) - BaseFraction(1, 4), BaseFraction(1, 2))
+        self.assertEqual(BaseFraction(3, 4) - 1, BaseFraction(-1, 4))
+        self.assertEqual(BaseFraction(3, 4) - 0.25, BaseFraction(1, 2))
+
+    def test_mul(self):
+        self.assertEqual(BaseFraction(1, 2) * BaseFraction(2, 3), BaseFraction(1, 3))
+        self.assertEqual(BaseFraction(1, 2) * 2, BaseFraction(1, 1))
+        self.assertEqual(BaseFraction(1, 2) * 0.5, BaseFraction(1, 4))
+
+    def test_truediv(self):
+        self.assertEqual(BaseFraction(1, 2) / BaseFraction(1, 3), BaseFraction(3, 2))
+        self.assertEqual(BaseFraction(1, 2) / 2, BaseFraction(1, 4))
+        self.assertEqual(BaseFraction(1, 2) / 0.5, BaseFraction(1, 1))
+
+    def test_floordiv(self):
+        self.assertEqual(BaseFraction(1, 2) // BaseFraction(1, 3), BaseFraction(1, 1))
+        self.assertEqual(BaseFraction(1, 2) // 2, BaseFraction(0, 1))
+        self.assertEqual(BaseFraction(1, 2) // 0.5, BaseFraction(1, 1))

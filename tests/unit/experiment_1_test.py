@@ -54,14 +54,16 @@ def test_SGD_model(tmp_path):
     with pytest.raises(ValueError):
         model._get_y_val(old_orderbook, new_orderbook)
     model._name = ModelNames.PRICE_NO
-    assert model._get_y_val(old_orderbook, new_orderbook) == 90 - 80
+    assert model._get_y_val(old_orderbook, new_orderbook) == Cents(90) - Cents(80)
     model._name = ModelNames.PRICE_YES
-    assert model._get_y_val(old_orderbook, new_orderbook) == 3 - 10
+    assert model._get_y_val(old_orderbook, new_orderbook) == Cents(3) - Cents(10)
 
     model._name = ModelNames.QUANTITY_YES
-    assert model._get_y_val(old_orderbook, new_orderbook) == 250 / 250
+    assert model._get_y_val(old_orderbook, new_orderbook) == Quantity(250) / Quantity(
+        250
+    )
     model._name = ModelNames.QUANTITY_NO
-    assert model._get_y_val(old_orderbook, new_orderbook) == 20 / 25
+    assert model._get_y_val(old_orderbook, new_orderbook) == Quantity(20) / Quantity(25)
 
     x_vals = [[1, 2, 3]]
     # y_val will be 20 / 25 since we're trainging on the quantity no model
