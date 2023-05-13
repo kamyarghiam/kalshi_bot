@@ -32,6 +32,7 @@ class Printer:
         self._console = Console()
 
         self.portfolio = portfolio
+        self.missed_opportunities: Cents = Cents(0)
         self.num_snapshots = 0
         self.num_deltas = 0
 
@@ -47,6 +48,7 @@ class Printer:
         table.add_row("Fees paid", f"${self.portfolio._fees_paid/100}")
         table.add_row("Positions value", f"${self.portfolio.get_positions_value()/100}")
         table.add_row("Positions", str(self.portfolio))
+        table.add_row("Missed opportunities", f"${self.missed_opportunities / 100}")
         self._console.print(table)
 
 
@@ -346,6 +348,15 @@ class Experiment1Predictor:
                 sell_no_predicted_price, no_quantity_to_buy  # type:ignore[arg-type]
             )
         )
+        (
+            actual_yes_price,
+            actual_yes_quantity,
+        ) = new_ob.yes.get_largest_price_level()
+
+        (
+            actual_no_price,
+            actual_no_quantity,
+        ) = new_ob.no.get_largest_price_level()
         # Only buy if the predicted profit is at least $10
         if yes_predicted_profit >= 1000 or no_predicted_profit >= 1000:
             print(f"   Expect profit for ticker: {prev_ob.market_ticker}")
@@ -353,10 +364,6 @@ class Experiment1Predictor:
             if yes_predicted_profit > no_predicted_profit:
                 print(f"   Expected profits on yes side: ${yes_predicted_profit/100}")
                 print(f"   Buying {yes_quantity_to_buy} @ {buy_yes_price} cents ")
-                (
-                    actual_yes_price,
-                    actual_yes_quantity,
-                ) = new_ob.yes.get_largest_price_level()
 
                 self._compute_side_profits(
                     portfolio,
@@ -371,11 +378,6 @@ class Experiment1Predictor:
             else:
                 print(f"   Expected profits on no side: ${no_predicted_profit/100}")
                 print(f"   Buying {no_quantity_to_buy} @ {buy_no_price} cents ")
-                # We will make more profit from buying the no
-                (
-                    actual_no_price,
-                    actual_no_quantity,
-                ) = new_ob.no.get_largest_price_level()
 
                 self._compute_side_profits(
                     portfolio,
@@ -386,6 +388,17 @@ class Experiment1Predictor:
                     actual_no_price,
                     actual_no_quantity,
                 )
+        else:
+            potential_yes_profit = (actual_yes_price - buy_yes_price) * min(
+                actual_yes_quantity, yes_quantity_to_buy
+            )
+            potential_no_profit = (actual_no_price - buy_no_price) * min(
+                actual_no_quantity, no_quantity_to_buy
+            )
+            if potential_yes_profit > 0:
+                self.printer.missed_opportunities += potential_yes_profit
+            if potential_no_profit > 0:
+                self.printer.missed_opportunities += potential_no_profit
 
     def _get_predicted_yes_quantity(
         self, x_vals: np.ndarray, current_orderbook: Orderbook
