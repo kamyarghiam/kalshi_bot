@@ -11,8 +11,9 @@ def test_prices():
         # Above 99
         Price(100)
 
-    # Allows float
-    Price(90.1)
+    # Does not allow float
+    with pytest.raises(ValueError):
+        Price(90.1)  # type:ignore[arg-type]
 
     assert Price(10) + Price(20) == Price(30)
 

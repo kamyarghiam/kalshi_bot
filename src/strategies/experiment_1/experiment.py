@@ -420,8 +420,10 @@ class Experiment1Predictor:
 
         predicted_price_change = float(price_model.predict(x_vals))
 
-        # Price to sell at
-        predicted_price = Price(min(max(sell_price + predicted_price_change, 1), 99))
+        # Price to sell at (rounded down)
+        predicted_price = Price(
+            int(min(max(sell_price + predicted_price_change, 1), 99))
+        )
         return predicted_price
 
     def _compute_side_profits(

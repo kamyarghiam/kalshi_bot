@@ -84,7 +84,7 @@ class Position:
         )
 
     def get_value(self) -> Cents:
-        return np.dot(self.prices, self.quantities)
+        return Cents(np.dot(self.prices, self.quantities))
 
 
 class PortfolioError(Exception):
