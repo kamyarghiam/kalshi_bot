@@ -10,7 +10,7 @@ version = "0.1.0"
 description = ""
 authors = ["kamyarghiam <kamyarghiam@gmail.com>"]
 readme = "README.md"
-packages = [{include = "kalshi_bot"}]
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -37,3 +37,6 @@ rich = "^13.3.5"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+exp1 = "src.strategies.experiment_1.experiment:actual_run"

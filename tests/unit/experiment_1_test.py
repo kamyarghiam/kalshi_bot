@@ -19,7 +19,7 @@ from src.helpers.types.websockets.response import (
     OrderbookSnapshotRM,
     OrderbookSnapshotWR,
 )
-from src.strategies.experiment_1.orderbook_collection import (
+from src.strategies.experiment_1.experiment import (
     Experiment1Predictor,
     Model,
     ModelNames,

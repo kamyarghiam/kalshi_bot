@@ -459,5 +459,6 @@ class Experiment1Predictor:
         return actual_profit
 
 
-if __name__ == "__main__":  # pragma: no cover
+def actual_run():
+    """Danger! This runs the code with protections off"""
     main(is_test_run=False)  # pragma: no cover
