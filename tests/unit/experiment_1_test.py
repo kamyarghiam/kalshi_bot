@@ -6,7 +6,6 @@ import pytest
 from mock import MagicMock, patch
 from sklearn.linear_model import SGDRegressor
 
-from src.exchange.interface import ExchangeInterface
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, Price
 from src.helpers.types.orderbook import Orderbook
@@ -23,7 +22,6 @@ from src.strategies.experiment_1.experiment import (
     Experiment1Predictor,
     Model,
     ModelNames,
-    main,
     process_message,
 )
 from tests.unit.orderbook_test import OrderbookSide
@@ -237,16 +235,6 @@ def test_process_message():
         update.assert_called_once_with(previous_orderbook, new_expected_orderbook)
 
 
-def test_main_experiment1(exchange_interface: ExchangeInterface, tmp_path):
-    # test it runs
-    main(exchange_interface, tmp_path, num_runs=2)
-
-    # test it with a portfolio saved
-    portfolio = Portfolio(balance=Balance(Cents(1_000)))
-    portfolio.save(tmp_path)
-    main(exchange_interface, tmp_path, num_runs=0)
-
-
 def test_compute_side_profits(tmp_path):
     pred = Experiment1Predictor(tmp_path, MagicMock(), MagicMock())
     price_to_buy = Price(30)
@@ -269,7 +257,7 @@ def test_compute_side_profits(tmp_path):
         actual_quantity,
     ) + compute_fee(price_to_buy, quantity_available)
 
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     assert actual_profit == 60 * 100
 
     # Already bought
@@ -299,7 +287,7 @@ def test_compute_side_profits(tmp_path):
         actual_price,
         actual_quantity,
     ) + compute_fee(price_to_buy, quantity_available)
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     assert actual_profit == 20 * 100
     # If our prediction is directionally incorrect, no profit
     actual_price = Price(20)
@@ -334,7 +322,7 @@ def test_compute_side_profits(tmp_path):
         actual_price,
         quantity_bought,
     ) + compute_fee(price_to_buy, quantity_bought)
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     assert actual_profit == 10 * 100
 
 

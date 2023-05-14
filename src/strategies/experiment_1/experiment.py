@@ -18,7 +18,7 @@ from src.helpers.types.orderbook import (
     OrderbookSide,
     OrderbookView,
 )
-from src.helpers.types.orders import Side, compute_fee
+from src.helpers.types.orders import Order, Side, Trade, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError
 from src.helpers.types.websockets.common import Type
 from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
@@ -45,7 +45,7 @@ class Printer:
         table.add_row("Snapshot msgs", str(self.num_snapshots))
         table.add_row("Delta msgs", str(self.num_deltas))
         table.add_row("Cash balance", f"${self.portfolio._cash_balance._balance/100}")
-        table.add_row("Fees paid", f"${self.portfolio._fees_paid/100}")
+        table.add_row("Fees paid", f"${self.portfolio.fees_paid/100}")
         table.add_row("Positions value", f"${self.portfolio.get_positions_value()/100}")
         table.add_row("Positions", str(self.portfolio))
         table.add_row("Missed opportunities", f"${self.missed_opportunities / 100}")
@@ -457,7 +457,15 @@ class Experiment1Predictor:
         try:
             if price_to_buy * quantity_to_buy > self._max_position:
                 quantity_to_buy = Quantity(int(self._max_position // price_to_buy))
-            portfolio.buy(ticker, price_to_buy, quantity_to_buy, side)
+            portfolio.buy(
+                Order(
+                    ticker=ticker,
+                    price=price_to_buy,
+                    quantity=quantity_to_buy,
+                    side=side,
+                    trade=Trade.BUY,
+                )
+            )
         except PortfolioError as e:
             print(f"   Could not buy because: {e}")
             return
@@ -466,9 +474,21 @@ class Experiment1Predictor:
         if actual_price_change <= 0:
             self.printer.run()
             return
-        actual_quantity_sold = min(quantity_to_buy, actual_quantity)
+        position = portfolio.get_position(ticker)
+        assert position is not None
+        actual_quantity_sold = min(
+            quantity_to_buy,
+            actual_quantity,
+            position.total_quantity,
+        )
         actual_profit, _ = portfolio.sell(
-            ticker, actual_price, actual_quantity_sold, side
+            Order(
+                ticker=MarketTicker(ticker),
+                side=side,
+                price=actual_price,
+                quantity=actual_quantity_sold,
+                trade=Trade.SELL,
+            )
         )
         self.printer.run()
         return actual_profit

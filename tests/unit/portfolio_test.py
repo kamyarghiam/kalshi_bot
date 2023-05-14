@@ -3,47 +3,72 @@ import pytest
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, OutOfMoney
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
-from src.helpers.types.orders import Quantity, Side, compute_fee
+from src.helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError, Position
 from tests.fake_exchange import Price
 from tests.utils import almost_equal
 
 
 def test_empty_position():
-    empty_position = Position(
-        ticker=MarketTicker("hi"),
-        prices=[],
-        quantities=[],
-        fees=[],
-        side=Side.NO,
-    )
-    assert empty_position.is_empty()
-
     position = Position(
-        ticker=MarketTicker("hi"),
-        prices=[Price(1)],
-        quantities=[Quantity(1)],
-        fees=[compute_fee(Price(1), Quantity(1))],
-        side=Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(10),
+            quantity=Quantity(10),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
+    assert not position.is_empty()
+
+    position.sell(
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(10),
+            quantity=Quantity(10),
+            side=Side.NO,
+            trade=Trade.SELL,
+        )
     )
 
-    assert not position.is_empty()
+    assert position.is_empty()
 
 
 def test_add_remove_get_value_positions():
-    position = Position(
-        ticker=MarketTicker("hi"),
-        prices=[Price(5), Price(10), Price(15)],
-        quantities=[Quantity(100), Quantity(150), Quantity(200)],
-        fees=[
-            compute_fee(Price(5), Quantity(100)),
-            compute_fee(Price(10), Quantity(150)),
-            compute_fee(Price(15), Quantity(200)),
-        ],
+    order1 = Order(
+        ticker=MarketTicker("ticker"),
         side=Side.NO,
+        price=Price(5),
+        quantity=Quantity(100),
+        trade=Trade.BUY,
     )
+    order2 = Order(
+        ticker=MarketTicker("ticker"),
+        side=Side.NO,
+        price=Price(10),
+        quantity=Quantity(150),
+        trade=Trade.BUY,
+    )
+    order3 = Order(
+        ticker=MarketTicker("ticker"),
+        side=Side.NO,
+        price=Price(15),
+        quantity=Quantity(200),
+        trade=Trade.BUY,
+    )
+    position = Position(order1)
+    position.buy(order2)
+    position.buy(order3)
+
     assert position.get_value() == 5 * 100 + 10 * 150 + 15 * 200
-    position.add(Price(20), Quantity(300))
+    order4 = Order(
+        ticker=MarketTicker("ticker"),
+        side=Side.NO,
+        price=Price(20),
+        quantity=Quantity(300),
+        trade=Trade.BUY,
+    )
+    position.buy(order4)
 
     assert position.get_value() == 5 * 100 + 10 * 150 + 15 * 200 + 20 * 300
 
@@ -54,14 +79,23 @@ def test_add_remove_get_value_positions():
         Quantity(200),
         Quantity(300),
     ]
-    assert position.fees[-1] == compute_fee(Price(20), Quantity(300))
+    fees = [order1.fee, order2.fee, order3.fee, order4.fee]
+    assert position.fees == fees
 
     # Remove too much
+    sell_order = Order(
+        ticker=MarketTicker("ticker"),
+        side=Side.NO,
+        price=Price(30),
+        quantity=Quantity(751),  # too much
+        trade=Trade.SELL,
+    )
     with pytest.raises(ValueError):
-        position.sell(Quantity(751))
+        position.sell(sell_order)
 
+    sell_order.quantity = Quantity(200)  # put normal quantity
     # Does not actually sell position
-    buy_cost, buy_fees = position.sell(Quantity(200), for_info=True)
+    buy_cost, buy_fees = position.sell(sell_order, for_info=True)
     assert buy_cost == 5 * 100 + 10 * 100
     assert position.prices == [Price(5), Price(10), Price(15), Price(20)]
     assert position.quantities == [
@@ -75,7 +109,7 @@ def test_add_remove_get_value_positions():
         Cents(100 / 150) * (compute_fee(Price(10), Quantity(150)))
     )
 
-    buy_cost, buy_fees = position.sell(Quantity(200))
+    buy_cost, buy_fees = position.sell(sell_order)
     assert buy_cost == 5 * 100 + 10 * 100
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
@@ -87,7 +121,8 @@ def test_add_remove_get_value_positions():
     assert buy_fees == compute_fee(Price(5), Quantity(100)) + (
         (100 / 150) * (compute_fee(Price(10), Quantity(150)))
     )
-    buy_cost, buy_fees = position.sell(Quantity(20))
+    sell_order.quantity = Quantity(20)
+    buy_cost, buy_fees = position.sell(sell_order)
     assert buy_cost == 10 * 20
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
@@ -98,7 +133,8 @@ def test_add_remove_get_value_positions():
     assert len(position.fees) == 3
     assert almost_equal(buy_fees, (20 / 150) * compute_fee(Price(10), Quantity(150)))
 
-    buy_cost, buy_fees = position.sell(Quantity(30))
+    sell_order.quantity = Quantity(30)
+    buy_cost, buy_fees = position.sell(sell_order)
     assert buy_cost == 10 * 30
     assert position.prices == [Price(15), Price(20)]
     assert position.quantities == [
@@ -108,7 +144,8 @@ def test_add_remove_get_value_positions():
     assert len(position.fees) == 2
     assert almost_equal(buy_fees, (30 / 150) * compute_fee(Price(10), Quantity(150)))
 
-    buy_cost, buy_fees = position.sell(Quantity(500))
+    sell_order.quantity = Quantity(500)
+    buy_cost, buy_fees = position.sell(sell_order)
     assert buy_cost == 15 * 200 + 20 * 300
     assert position.prices == []
     assert position.quantities == []
@@ -120,17 +157,35 @@ def test_add_remove_get_value_positions():
 
 def test_add_duplicate_price_point():
     position = Position(
-        ticker=MarketTicker("hi"),
-        prices=[Price(10)],
-        quantities=[Quantity(30)],
-        fees=[compute_fee(Price(10), Quantity(30))],
-        side=Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(10),
+            quantity=Quantity(30),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
-    position.add(Price(10), Quantity(40))
+    position.buy(
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(10),
+            quantity=Quantity(40),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
     assert position.prices == [Price(10)]
     assert position.quantities == [Quantity(70)]
 
-    position.add(Price(10), Quantity(50))
+    position.buy(
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(10),
+            quantity=Quantity(50),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
     assert position.prices == [Price(10)]
     assert position.quantities == [Quantity(120)]
 
@@ -138,75 +193,96 @@ def test_add_duplicate_price_point():
 def test_portfolio_buy():
     portfolio = Portfolio(Balance(Cents(5000)))
     portfolio.buy(
-        MarketTicker("hi"),
-        Price(5),
-        Quantity(100),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(5),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
     assert portfolio._cash_balance._balance == 5000 - 5 * 100 - fees_paid
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     portfolio.buy(
-        MarketTicker("hi2"),
-        Price(10),
-        Quantity(10),
-        Side.YES,
+        Order(
+            ticker=MarketTicker("hi2"),
+            price=Price(10),
+            quantity=Quantity(10),
+            side=Side.YES,
+            trade=Trade.BUY,
+        )
     )
     fees_paid += compute_fee(Price(10), Quantity(10))
     assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - fees_paid
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     portfolio.buy(
-        MarketTicker("hi2"),
-        Price(15),
-        Quantity(5),
-        Side.YES,
+        Order(
+            ticker=MarketTicker("hi2"),
+            price=Price(15),
+            quantity=Quantity(5),
+            side=Side.YES,
+            trade=Trade.BUY,
+        )
     )
     fees_paid += compute_fee(Price(15), Quantity(5))
     assert (
         portfolio._cash_balance._balance
         == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - fees_paid
     )
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     portfolio.buy(
-        MarketTicker("hi2"),
-        Price(20),
-        Quantity(25),
-        Side.YES,
+        Order(
+            ticker=MarketTicker("hi2"),
+            price=Price(20),
+            quantity=Quantity(25),
+            side=Side.YES,
+            trade=Trade.BUY,
+        )
     )
     fees_paid += compute_fee(Price(20), Quantity(25))
     assert (
         portfolio._cash_balance._balance
         == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25 - fees_paid
     )
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
 
     assert portfolio.get_positions_value() == 5 * 100 + 10 * 10 + 15 * 5 + 20 * 25
 
     # Buying too much raises OutOfMoney error
     with pytest.raises(OutOfMoney):
         portfolio.buy(
-            MarketTicker("hi2"),
-            Price(20),
-            Quantity(50000),
-            Side.YES,
+            Order(
+                ticker=MarketTicker("hi2"),
+                price=Price(20),
+                quantity=Quantity(50000),
+                side=Side.YES,
+                trade=Trade.BUY,
+            )
         )
     money_remaining = portfolio._cash_balance._balance
     assert portfolio.get_positions_value() == 5 * 100 + 10 * 10 + 15 * 5 + 20 * 25
 
     # Does not raise out of money error
     portfolio.buy(
-        MarketTicker("hi2"),
-        Price(1),
-        Quantity(money_remaining - 250),  # subtract some fee
-        Side.YES,
+        Order(
+            ticker=MarketTicker("hi2"),
+            price=Price(1),
+            quantity=Quantity(money_remaining - 250),  # subtract some fee
+            side=Side.YES,
+            trade=Trade.BUY,
+        )
     )
 
     with pytest.raises(OutOfMoney):
         portfolio.buy(
-            MarketTicker("hi2"),
-            Price(1),
-            Quantity(money_remaining + 1),
-            Side.YES,
+            Order(
+                ticker=MarketTicker("hi2"),
+                price=Price(1),
+                quantity=Quantity(money_remaining + 1),
+                side=Side.YES,
+                trade=Trade.BUY,
+            )
         )
 
 
@@ -214,53 +290,82 @@ def test_portfolio_sell():
     portfolio = Portfolio(Balance(Cents(5000)))
     assert len(portfolio._positions) == 0
     portfolio.buy(
-        MarketTicker("hi"),
-        Price(5),
-        Quantity(100),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(5),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
     assert portfolio._cash_balance._balance == 5000 - 5 * 100 - fees_paid
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
     assert len(portfolio._positions) == 1
 
     # Wrong ticker
     with pytest.raises(PortfolioError):
         portfolio.sell(
-            MarketTicker("wrong_ticker"),
-            Price(5),
-            Quantity(100),
-            Side.NO,
+            Order(
+                ticker=MarketTicker("wrong_ticker"),
+                price=Price(5),
+                quantity=Quantity(100),
+                side=Side.NO,
+                trade=Trade.SELL,
+            )
         )
     # Wrong side
     with pytest.raises(PortfolioError):
         portfolio.sell(
-            MarketTicker("hi"),
-            Price(5),
-            Quantity(100),
-            Side.YES,
+            Order(
+                ticker=MarketTicker("hi"),
+                price=Price(5),
+                quantity=Quantity(100),
+                side=Side.YES,
+                trade=Trade.SELL,
+            )
         )
 
     profit1, fee = portfolio.sell(
-        MarketTicker("hi"),
-        Price(6),
-        Quantity(50),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(6),
+            quantity=Quantity(50),
+            side=Side.NO,
+            trade=Trade.SELL,
+        )
     )
     buy_fee = (50 / 100) * compute_fee(Price(5), Quantity(100))
     sell_fee = compute_fee(Price(6), Quantity(50))
     assert fee == buy_fee + sell_fee
     fees_paid += sell_fee
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
 
     assert profit1 == (100 - 50) * (6 - 5)
     assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 - fees_paid
 
+    # Sell more than there is available
+    with pytest.raises(ValueError):
+        portfolio.sell(
+            Order(
+                ticker=MarketTicker("hi"),
+                price=Price(3),
+                quantity=Quantity(100),  # More than what's available
+                side=Side.NO,
+                trade=Trade.SELL,
+            )
+        )
+    # Sell exactly what's available
+    position = portfolio.get_position(MarketTicker("hi"))
+    assert position is not None
     profit2, fee = portfolio.sell(
-        MarketTicker("hi"),
-        Price(3),
-        Quantity(100),  # sell more than there is available
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(3),
+            quantity=position.total_quantity,
+            side=Side.NO,
+            trade=Trade.SELL,
+        )
     )
     buy_fee = (50 / 100) * compute_fee(Price(5), Quantity(100))
     sell_fee = compute_fee(Price(3), Quantity(50))
@@ -269,7 +374,7 @@ def test_portfolio_sell():
     assert (
         portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3 - fees_paid
     )
-    assert portfolio._fees_paid == fees_paid
+    assert portfolio.fees_paid == fees_paid
 
     assert profit2 == (100 - 50) * (3 - 5)
     assert len(portfolio._positions) == 0
@@ -278,31 +383,43 @@ def test_portfolio_sell():
 def test_find_sell_opportunites():
     portfolio = Portfolio(Balance(Cents(5000)))
     portfolio.buy(
-        MarketTicker("hi"),
-        Price(5),
-        Quantity(100),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(5),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
     portfolio.buy(
-        MarketTicker("hi"),
-        Price(6),
-        Quantity(100),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(6),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
     portfolio.buy(
-        MarketTicker("hi2"),
-        Price(10),
-        Quantity(10),
-        Side.YES,
+        Order(
+            ticker=MarketTicker("hi2"),
+            price=Price(10),
+            quantity=Quantity(10),
+            side=Side.YES,
+            trade=Trade.BUY,
+        )
     )
 
     # Wrong buy side (already holding a Yes)
     with pytest.raises(PortfolioError):
         portfolio.buy(
-            MarketTicker("hi"),
-            Price(6),
-            Quantity(100),
-            Side.YES,
+            Order(
+                ticker=MarketTicker("hi"),
+                price=Price(6),
+                quantity=Quantity(100),
+                side=Side.YES,
+                trade=Trade.BUY,
+            )
         )
 
     # Wrong ticker
@@ -335,22 +452,31 @@ def test_find_sell_opportunites():
 def test_save_load(tmp_path):
     portfolio = Portfolio(Balance(Cents(5000)))
     portfolio.buy(
-        MarketTicker("hi"),
-        Price(5),
-        Quantity(100),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(5),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
     portfolio.buy(
-        MarketTicker("hi"),
-        Price(6),
-        Quantity(100),
-        Side.NO,
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(6),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
     )
     portfolio.buy(
-        MarketTicker("hi2"),
-        Price(10),
-        Quantity(10),
-        Side.YES,
+        Order(
+            ticker=MarketTicker("hi2"),
+            price=Price(10),
+            quantity=Quantity(10),
+            side=Side.YES,
+            trade=Trade.BUY,
+        )
     )
     portfolio.save(tmp_path)
 

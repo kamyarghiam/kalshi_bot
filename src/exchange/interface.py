@@ -49,6 +49,7 @@ class ExchangeInterface:
         The credentials are picked up from the env variables.
 
         """
+        self.is_test_run = is_test_run
         self._connection = Connection(test_client, is_test_run)
         self._subsciptions: List[SubscriptionId] = []
 
