@@ -395,10 +395,8 @@ class Experiment1Predictor:
             potential_no_profit = (actual_no_price - buy_no_price) * min(
                 actual_no_quantity, no_quantity_to_buy
             )
-            if potential_yes_profit > 0:
-                self.printer.missed_opportunities += potential_yes_profit
-            if potential_no_profit > 0:
-                self.printer.missed_opportunities += potential_no_profit
+            self.printer.missed_opportunities += max(potential_yes_profit, 0)
+            self.printer.missed_opportunities += max(potential_no_profit, 0)
 
     def _get_predicted_yes_quantity(
         self, x_vals: np.ndarray, current_orderbook: Orderbook

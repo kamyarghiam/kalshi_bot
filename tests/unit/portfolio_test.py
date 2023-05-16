@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 
 from src.helpers.types.markets import MarketTicker
@@ -481,3 +483,80 @@ def test_save_load(tmp_path):
     portfolio.save(tmp_path)
 
     assert Portfolio.load(tmp_path) == portfolio
+
+
+def test_position_error_scenarios():
+    # Buy order ticker
+    order = Order(
+        ticker=MarketTicker("hi"),
+        side=Side.NO,
+        price=Price(10),
+        quantity=Quantity(50),
+        trade=Trade.SELL,
+    )
+    with pytest.raises(ValueError) as err:
+        Position(order)
+    assert err.match("Order must be a buy order to open a new position")
+
+    order.trade = Trade.BUY
+    position = Position(order)
+
+    bad_order = copy.deepcopy(order)
+    bad_order.trade = Trade.SELL
+
+    with pytest.raises(ValueError) as err:
+        position.buy(bad_order)
+    assert err.match("Not a buy order: .*")
+
+    # Make order trade good
+    bad_order.trade = Trade.BUY
+    # Make order side bad
+    bad_order.side = Side.YES
+
+    with pytest.raises(ValueError) as err:
+        position.buy(bad_order)
+    assert err.match(
+        f"Position has side {order.side} but order has side {bad_order.side}"
+    )
+
+    # Make order side good
+    bad_order.side = Side.NO
+    # Make ticker bad
+    bad_order.ticker = MarketTicker("bad_ticker")
+
+    with pytest.raises(ValueError) as err:
+        position.buy(bad_order)
+    assert err.match(
+        f"Position ticker: {order.ticker}, but order ticker: {bad_order.ticker}"
+    )
+
+    # Make order ticker good
+    bad_order.ticker = order.ticker
+    # Make order trade bad
+    bad_order.trade = Trade.BUY
+
+    with pytest.raises(ValueError) as err:
+        position.sell(bad_order)
+    assert err.match("Not a buy order: .*")
+
+    # Make order trade bad
+    bad_order.trade = Trade.SELL
+    # Make side bad
+    bad_order.side = Side.YES
+
+    with pytest.raises(ValueError) as err:
+        position.sell(bad_order)
+    assert err.match(
+        f"Position has side {order.side} but order has side {bad_order.side}"
+    )
+
+    # Make side good
+    bad_order.side = Side.NO
+    # Make ticker bad
+    bad_order.ticker = MarketTicker("bad ticker")
+
+    with pytest.raises(ValueError) as err:
+        position.sell(bad_order)
+    assert err.match(
+        f"Position ticker: {order.ticker}, but order ticker: {bad_order.ticker}"
+    )
