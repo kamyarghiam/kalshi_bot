@@ -87,17 +87,17 @@ class Position:
         remaining_fees: List[Cents] = []
 
         total_purchase_amount_cents: Cents = Cents(0)
-        total_purchasefees_paid: Cents = Cents(0)
+        total_purchase_fees_paid: Cents = Cents(0)
         for price, quantity_holding, fees in zip(
             self.prices, self.quantities, self.fees
         ):
             if quantity_to_sell >= quantity_holding:
                 total_purchase_amount_cents += Cents(price * quantity_holding)
                 quantity_to_sell -= QuantityDelta(quantity_holding)
-                total_purchasefees_paid += fees
+                total_purchase_fees_paid += fees
             else:
                 fees_paid = (quantity_to_sell / quantity_holding) * fees
-                total_purchasefees_paid += fees_paid
+                total_purchase_fees_paid += fees_paid
                 quantity_holding -= QuantityDelta(quantity_to_sell)
                 total_purchase_amount_cents += Cents(price * quantity_to_sell)
                 remaining_prices.append(price)
@@ -110,7 +110,7 @@ class Position:
             self.prices = remaining_prices
             self.quantities = remaining_quantitites
             self.fees = remaining_fees
-        return total_purchase_amount_cents, total_purchasefees_paid
+        return total_purchase_amount_cents, total_purchase_fees_paid
 
     def is_empty(self):
         return (
