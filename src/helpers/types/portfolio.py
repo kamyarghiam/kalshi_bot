@@ -183,8 +183,6 @@ class Portfolio:
     ) -> Tuple[Cents, Cents]:
         """Returns pnl from sell using fifo, and fees from both buying and selling
 
-        Sells min of (what you have) and the (max_quantity_to_sel)
-
         :param bool for_info: if true, we don't apply the sell. We just
         return information
         l"""
@@ -230,7 +228,6 @@ class Portfolio:
                 side=position.side,
                 trade=Trade.SELL,
             )
-            # TODO: does not consider buy fee
             pnl, fee = self.potential_pnl(order)
             if pnl - fee > 0:
                 actual_pnl, _ = self.sell(order)
