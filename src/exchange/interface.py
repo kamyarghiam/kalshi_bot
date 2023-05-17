@@ -48,6 +48,10 @@ class ExchangeInterface:
 
         The credentials are picked up from the env variables.
 
+        :param TestClient test_client: local test client
+        :param bool is_test_run: makes sure we don't pick up prod credentials.
+        is_test_run still could be used for demo though
+
         """
         self.is_test_run = is_test_run
         self._connection = Connection(test_client, is_test_run)
