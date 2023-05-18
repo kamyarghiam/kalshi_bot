@@ -87,7 +87,7 @@ class SubscribedWR(WebsocketResponse):
 
 
 class ErrorWR(WebsocketResponse):
-    id: CommandId
+    id: CommandId | None = None
     msg: ErrorRM
 
 
