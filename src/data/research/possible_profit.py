@@ -91,7 +91,7 @@ class PossibleProfit:
                 ].no.quantity_at_min = buy_no_quantity
 
             yes_profit: Cents = Cents(
-                Price(
+                Cents(
                     sell_yes_price
                     - self._profit_metadata[msg.market_ticker].yes.min_value
                 )
@@ -103,7 +103,7 @@ class PossibleProfit:
                 )
             )
             no_profit = Cents(
-                Price(
+                Cents(
                     sell_no_price
                     - self._profit_metadata[msg.market_ticker].no.min_value
                 )
@@ -157,4 +157,4 @@ def main(data_path: Path):
 
 
 if __name__ == "__main__":
-    main(Path("src/data/store/orderbook_data/05-17-2023"))
+    main(Path("src/data/store/orderbook_data/05-18-2023"))
