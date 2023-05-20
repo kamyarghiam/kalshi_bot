@@ -120,6 +120,9 @@ class Position:
     def get_value(self) -> Cents:
         return Cents(np.dot(self.prices, self.quantities))
 
+    def __str__(self):
+        return f"{self.ticker}: {self.prices} at quantityies {self.quantities}"
+
 
 class PortfolioError(Exception):
     """Some issue with buying or selling"""
