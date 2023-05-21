@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from enum import Enum
+from typing import Union
 
 from attr import field, frozen
 
@@ -22,7 +23,9 @@ class Quantity(int):
             raise ValueError(f"{num} invalid quantitiy")
         return super(Quantity, cls).__new__(cls, num)
 
-    def __add__(self, delta: QuantityDelta) -> "Quantity":  # type:ignore[override]
+    def __add__(
+        self, delta: Union[QuantityDelta, "Quantity"]  # type:ignore[override]
+    ) -> "Quantity":
         """Takes the original quantity and applies the delta"""
         return Quantity(super().__add__(delta))
 

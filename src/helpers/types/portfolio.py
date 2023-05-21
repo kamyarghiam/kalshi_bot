@@ -121,7 +121,7 @@ class Position:
         return Cents(np.dot(self.prices, self.quantities))
 
     def __str__(self):
-        return f"{self.ticker}: {self.prices} at quantityies {self.quantities}"
+        return f"{self.ticker}: {self.prices} cents at quantities {self.quantities}"
 
 
 class PortfolioError(Exception):

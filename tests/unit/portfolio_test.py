@@ -560,3 +560,16 @@ def test_position_error_scenarios():
     assert err.match(
         f"Position ticker: {order.ticker}, but order ticker: {bad_order.ticker}"
     )
+
+
+def test_position_print():
+    position = Position(
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(10),
+            quantity=Quantity(10),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
+    assert str(position) == "hi: [10] cents at quantities [10]"

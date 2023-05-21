@@ -287,3 +287,19 @@ def test_change_view():
         buy_book.get_view(OrderbookView.BUY)
 
     assert buy_book.get_view(OrderbookView.SELL) == book
+
+
+def test_get_total_quantity():
+    book = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+    )
+    assert book.no.get_total_quantity() == Quantity(300) + Quantity(400) + Quantity(500)
+    assert book.yes.get_total_quantity() == Quantity(100) + Quantity(200)
