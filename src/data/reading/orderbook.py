@@ -8,7 +8,7 @@ from tests.conftest import ExchangeInterface
 from tests.fake_exchange import OrderbookDeltaRM
 
 
-class OrderbookReader(Generator):
+class OrderbookReader(Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None]):
     """Reads orderbook data either from a websocket or historical data
 
     You can use it like:
