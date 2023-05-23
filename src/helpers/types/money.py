@@ -6,6 +6,9 @@ class Price(int):
             raise ValueError(f"{num} invalid price")
         return super(Price, cls).__new__(cls, num)
 
+    def __str__(self):
+        return f"{super().__str__()}¢"
+
 
 class Cents(float):
     """The total amount of something in cents (could be negative)"""
@@ -15,6 +18,9 @@ class Cents(float):
 
     def __sub__(self, other):
         return Cents(super().__sub__(other))
+
+    def __str__(self):
+        return "$%0.2f" % (self / 100)
 
 
 def get_opposite_side_price(price: Price) -> Price:
@@ -29,10 +35,10 @@ class OutOfMoney(Exception):
 class Balance:
     """Balance in cents"""
 
-    def __init__(self, starting_balance_cents: Cents):
-        if not isinstance(starting_balance_cents, Cents) or starting_balance_cents < 0:
-            raise ValueError(f"{starting_balance_cents} invalid balance")
-        self._balance: Cents = starting_balance_cents
+    def __init__(self, initial_balance: Cents):
+        if not isinstance(initial_balance, Cents) or initial_balance < 0:
+            raise ValueError(f"{initial_balance} invalid balance")
+        self._balance: Cents = initial_balance
 
     def add_balance(self, delta: Cents):
         if self._balance + delta < 0:
@@ -41,3 +47,6 @@ class Balance:
 
     def __eq__(self, other):
         return isinstance(other, Balance) and self._balance == other._balance
+
+    def __str__(self):
+        return str(self._balance)

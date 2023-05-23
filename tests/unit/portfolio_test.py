@@ -480,7 +480,9 @@ def test_save_load(tmp_path):
             trade=Trade.BUY,
         )
     )
+    assert not Portfolio.saved_portfolio_exists(tmp_path)
     portfolio.save(tmp_path)
+    assert Portfolio.saved_portfolio_exists(tmp_path)
 
     assert Portfolio.load(tmp_path) == portfolio
 
@@ -572,4 +574,59 @@ def test_position_print():
             trade=Trade.BUY,
         )
     )
-    assert str(position) == "hi: [10] cents at quantities [10]"
+    position.buy(
+        Order(
+            ticker=MarketTicker("hi"),
+            price=Price(15),
+            quantity=Quantity(20),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
+    assert str(position) == "hi: NO | 10 @ 10¢ | 20 @ 15¢"
+
+
+def test_potfolio_print():
+    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio.buy(
+        Order(
+            ticker=MarketTicker("Ticker1"),
+            price=Price(5),
+            quantity=Quantity(100),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
+    portfolio.buy(
+        Order(
+            ticker=MarketTicker("Ticker2"),
+            price=Price(6),
+            quantity=Quantity(200),
+            side=Side.NO,
+            trade=Trade.BUY,
+        )
+    )
+    portfolio.sell(
+        Order(
+            ticker=MarketTicker("Ticker2"),
+            price=Price(5),
+            quantity=Quantity(150),
+            side=Side.NO,
+            trade=Trade.SELL,
+        )
+    )
+
+    assert (
+        str(portfolio)
+        == """PnL (no fees): $-1.50
+Fees paid: $1.63
+PnL (with fees): $-3.13
+Cash left: $38.87
+Current positions:
+  Ticker1: NO | 100 @ 5¢
+  Ticker2: NO | 50 @ 6¢
+Orders:
+  Ticker1: Bought NO | 100 @ 5¢
+  Ticker2: Bought NO | 200 @ 6¢
+  Ticker2: Sold NO | 150 @ 5¢"""
+    )

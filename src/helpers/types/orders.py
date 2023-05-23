@@ -81,3 +81,9 @@ class Order:
         if self._price_times_quantity is None:
             self._price_times_quantity = Cents(self.price * self.quantity)
         return self._price_times_quantity
+
+    def __str__(self):
+        return (
+            f"{self.ticker}: {'Bought' if self.trade == Trade.BUY else 'Sold'} "
+            + f"{self.side.name} | {self.quantity} @ {self.price}"
+        )

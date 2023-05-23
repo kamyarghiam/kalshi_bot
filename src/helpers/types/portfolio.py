@@ -121,7 +121,10 @@ class Position:
         return Cents(np.dot(self.prices, self.quantities))
 
     def __str__(self):
-        return f"{self.ticker}: {self.prices} cents at quantities {self.quantities}"
+        s = f"{self.ticker}: {self.side.name}"
+        for price, quantity in zip(self.prices, self.quantities):
+            s += f" | {quantity} @ {price}"
+        return s
 
 
 class PortfolioError(Exception):
@@ -148,7 +151,20 @@ class Portfolio:
         return fees
 
     def __str__(self):
-        return str(self._positions.values())
+        # Only compute fees paid once
+        fees_paid = self.fees_paid
+        positions_str = "\n".join(
+            ["  " + str(position) for position in self._positions.values()]
+        )
+        orders_str = "\n".join(["  " + str(order) for order in self.orders])
+        return (
+            f"PnL (no fees): {self.pnl}\n"
+            + f"Fees paid: {fees_paid}\n"
+            + f"PnL (with fees): {self.pnl - fees_paid}\n"
+            + f"Cash left: {self._cash_balance}\n"
+            + f"Current positions:\n{positions_str}\n"
+            + f"Orders:\n{orders_str}"
+        )
 
     def __eq__(self, other):
         return isinstance(other, Portfolio) and (
