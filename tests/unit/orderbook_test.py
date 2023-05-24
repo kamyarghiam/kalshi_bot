@@ -10,8 +10,9 @@ from src.helpers.types.orderbook import (
     OrderbookSide,
     OrderbookView,
 )
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
+from src.helpers.types.orders import Quantity, QuantityDelta, Side, Trade
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
+from tests.unit.common_test import Order
 
 
 def test_from_snapshot():
@@ -264,9 +265,8 @@ def test_change_view():
     )
     assert book.view == OrderbookView.SELL
 
-    # Can't change to the same view
-    with pytest.raises(ValueError):
-        book.get_view(OrderbookView.SELL)
+    # Get same view
+    assert book.get_view(OrderbookView.SELL) == book
 
     buy_book = book.get_view(OrderbookView.BUY)
     assert buy_book == Orderbook(
@@ -282,10 +282,8 @@ def test_change_view():
         view=OrderbookView.BUY,
     )
 
-    # Can't change to the same view
-    with pytest.raises(ValueError):
-        buy_book.get_view(OrderbookView.BUY)
-
+    # Get same view
+    assert buy_book.get_view(OrderbookView.BUY) == buy_book
     assert buy_book.get_view(OrderbookView.SELL) == book
 
 
@@ -303,3 +301,93 @@ def test_get_total_quantity():
     )
     assert book.no.get_total_quantity() == Quantity(300) + Quantity(400) + Quantity(500)
     assert book.yes.get_total_quantity() == Quantity(100) + Quantity(200)
+
+
+def test_buy_order():
+    sell_book = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+    )
+    assert sell_book.view == OrderbookView.SELL
+    assert sell_book.buy_order(Side.YES) == Order(
+        ticker=sell_book.market_ticker,
+        side=Side.YES,
+        price=Price(5),
+        quantity=Quantity(500),
+        trade=Trade.BUY,
+    )
+    assert sell_book.buy_order(Side.NO) == Order(
+        ticker=sell_book.market_ticker,
+        side=Side.NO,
+        price=Price(98),
+        quantity=Quantity(100),
+        trade=Trade.BUY,
+    )
+
+    buy_book = sell_book.get_view(OrderbookView.BUY)
+    assert buy_book.buy_order(Side.YES) == Order(
+        ticker=buy_book.market_ticker,
+        side=Side.YES,
+        price=Price(5),
+        quantity=Quantity(500),
+        trade=Trade.BUY,
+    )
+    assert buy_book.buy_order(Side.NO) == Order(
+        ticker=buy_book.market_ticker,
+        side=Side.NO,
+        price=Price(98),
+        quantity=Quantity(100),
+        trade=Trade.BUY,
+    )
+
+
+def test_sell_order():
+    sell_book = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+    )
+    assert sell_book.view == OrderbookView.SELL
+    assert sell_book.sell_order(Side.YES) == Order(
+        ticker=sell_book.market_ticker,
+        side=Side.YES,
+        price=Price(2),
+        quantity=Quantity(100),
+        trade=Trade.SELL,
+    )
+    assert sell_book.sell_order(Side.NO) == Order(
+        ticker=sell_book.market_ticker,
+        side=Side.NO,
+        price=Price(95),
+        quantity=Quantity(500),
+        trade=Trade.SELL,
+    )
+
+    buy_book = sell_book.get_view(OrderbookView.BUY)
+    assert buy_book.sell_order(Side.YES) == Order(
+        ticker=buy_book.market_ticker,
+        side=Side.YES,
+        price=Price(2),
+        quantity=Quantity(100),
+        trade=Trade.SELL,
+    )
+    assert buy_book.sell_order(Side.NO) == Order(
+        ticker=buy_book.market_ticker,
+        side=Side.NO,
+        price=Price(95),
+        quantity=Quantity(500),
+        trade=Trade.SELL,
+    )

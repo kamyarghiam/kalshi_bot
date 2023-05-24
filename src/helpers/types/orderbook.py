@@ -6,7 +6,7 @@ from typing import Dict, Tuple
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price, get_opposite_side_price
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
+from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 
 if typing.TYPE_CHECKING:
     from src.helpers.types.websockets.response import (
@@ -125,13 +125,51 @@ class Orderbook:
     def get_view(self, view: OrderbookView) -> "Orderbook":
         """Returns a different view of the orderbook"""
         if view == self.view:
-            raise ValueError(f"Already in view: {view}")
-        no_inverted = self.no.invert_prices()
-        yes_inverted = self.yes.invert_prices()
+            return self
 
         return Orderbook(
             market_ticker=self.market_ticker,
-            yes=no_inverted,
-            no=yes_inverted,
+            yes=self.no.invert_prices(),
+            no=self.yes.invert_prices(),
             view=view,
+        )
+
+    def buy_order(self, side: Side) -> Order:
+        """Spits out an order that would buy at the best price"""
+        ob = self.get_view(OrderbookView.BUY)
+
+        price: Price
+        quantity: Quantity
+        if side == Side.NO:
+            price, quantity = ob.no.get_smallest_price_level()
+        else:
+            assert side == Side.YES
+            price, quantity = ob.yes.get_smallest_price_level()
+
+        return Order(
+            ticker=ob.market_ticker,
+            side=side,
+            price=price,
+            quantity=quantity,
+            trade=Trade.BUY,
+        )
+
+    def sell_order(self, side: Side) -> Order:
+        """Spits out an order that would sell at the best price"""
+        ob = self.get_view(OrderbookView.SELL)
+
+        price: Price
+        quantity: Quantity
+        if side == Side.NO:
+            price, quantity = ob.no.get_largest_price_level()
+        else:
+            assert side == Side.YES
+            price, quantity = ob.yes.get_largest_price_level()
+
+        return Order(
+            ticker=ob.market_ticker,
+            side=side,
+            price=price,
+            quantity=quantity,
+            trade=Trade.SELL,
         )
