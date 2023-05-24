@@ -6,7 +6,7 @@ import numpy as np
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents, Price
-from src.helpers.types.orderbook import Orderbook, OrderbookView
+from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 
 
@@ -224,32 +224,22 @@ class Portfolio:
 
     def find_sell_opportunities(self, orderbook: Orderbook) -> Cents | None:
         """Finds a selling opportunity from an orderbook if there is one"""
-        assert orderbook.view == OrderbookView.SELL
         ticker = orderbook.market_ticker
         if ticker in self._positions:
             position = self._positions[ticker]
-            if position.side == Side.NO:
-                sell_price, sell_quantity = orderbook.no.get_largest_price_level()
-            else:
-                assert position.side == Side.YES
-                sell_price, sell_quantity = orderbook.yes.get_largest_price_level()
+            sell_order = orderbook.sell_order(position.side)
 
             quantity = Quantity(
                 min(
                     position.total_quantity,
-                    sell_quantity,
+                    sell_order.quantity,
                 )
             )
-            order = Order(
-                ticker=ticker,
-                price=sell_price,
-                quantity=quantity,
-                side=position.side,
-                trade=Trade.SELL,
-            )
-            pnl, fee = self.potential_pnl(order)
+            sell_order.quantity = quantity
+
+            pnl, fee = self.potential_pnl(sell_order)
             if pnl - fee > 0:
-                actual_pnl, _ = self.sell(order)
+                actual_pnl, _ = self.sell(sell_order)
                 return actual_pnl
         return None
 
