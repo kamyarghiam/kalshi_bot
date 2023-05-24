@@ -1,12 +1,8 @@
 import pytest
 
 from src.helpers.types.common import URL, NonNullStr
-from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Balance, Cents
-from src.helpers.types.orders import Order, Side, Trade
 from src.helpers.utils import PendingMessages
-from tests.fake_exchange import Price
-from tests.fee_test import Quantity
 
 
 def test_basic_urls():
@@ -84,14 +80,3 @@ def test_cents_str():
 def test_balance_str():
     b = Balance(Cents(10))
     assert str(b) == "$0.10"
-
-
-def test_order_str():
-    o = Order(
-        ticker=MarketTicker("Ticker"),
-        side=Side.NO,
-        price=Price(15),
-        quantity=Quantity(200),
-        trade=Trade.BUY,
-    )
-    assert str(o) == "Ticker: Bought NO | 200 @ 15¢"

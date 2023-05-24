@@ -1,3 +1,4 @@
+import copy
 import math
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
@@ -37,9 +38,6 @@ class Side(str, Enum):
     YES = "yes"
     NO = "no"
 
-    # for testing
-    TEST_INVALID_SIDE = "TEST_INVALID"
-
 
 class Trade(str, Enum):
     BUY = "buy"
@@ -72,15 +70,29 @@ class Order:
 
     @property
     def cost(self) -> Cents:
+        if self.trade != Trade.BUY:
+            raise ValueError("Cost only applies on buys")
         if self._price_times_quantity is None:
             self._price_times_quantity = Cents(self.price * self.quantity)
         return self._price_times_quantity
 
     @property
     def revenue(self) -> Cents:
+        if self.trade != Trade.SELL:
+            raise ValueError("Revenue only applies on sells")
         if self._price_times_quantity is None:
             self._price_times_quantity = Cents(self.price * self.quantity)
         return self._price_times_quantity
+
+    def get_predicted_pnl(self, sell_price: Price) -> Cents:
+        """Given the sell price, gets you the pnl after fees"""
+        if self.trade != Trade.BUY:
+            raise ValueError("Order must be a buy order")
+        sell_order = copy.deepcopy(self)
+        sell_order.price = sell_price
+        sell_order.trade = Trade.SELL
+
+        return sell_order.revenue - self.cost - sell_order.fee - self.fee
 
     def __str__(self):
         return (

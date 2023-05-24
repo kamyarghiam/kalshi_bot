@@ -102,14 +102,13 @@ class Orderbook:
             raise ValueError(
                 f"Market tickers don't match. Orderbook: {self}. Delta: {delta}"
             )
+        # TODO: this copy probably takes a while
         new_orderbook = copy.deepcopy(self)
-        match delta.side:
-            case Side.NO:
-                new_orderbook.no.apply_delta(delta.price, delta.delta)
-            case Side.YES:
-                new_orderbook.yes.apply_delta(delta.price, delta.delta)
-            case _:
-                raise ValueError(f"Invalid side: {delta.side}")
+        if delta.side == Side.NO:
+            new_orderbook.no.apply_delta(delta.price, delta.delta)
+        else:
+            assert delta.side == Side.YES
+            new_orderbook.yes.apply_delta(delta.price, delta.delta)
         return new_orderbook
 
     @classmethod

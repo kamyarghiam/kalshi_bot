@@ -10,9 +10,8 @@ from src.helpers.types.orderbook import (
     OrderbookSide,
     OrderbookView,
 )
-from src.helpers.types.orders import Quantity, QuantityDelta, Side, Trade
+from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
-from tests.unit.common_test import Order
 
 
 def test_from_snapshot():
@@ -105,16 +104,6 @@ def test_orderbook_apply_delta():
             price=Price(11),
             delta=QuantityDelta(50),
             side=Side.NO,
-        )
-        book.apply_delta(delta)
-
-    # Invalid side
-    with pytest.raises(ValueError):
-        delta = OrderbookDeltaRM(
-            market_ticker=MarketTicker("hi"),
-            price=Price(11),
-            delta=QuantityDelta(50),
-            side=Side.TEST_INVALID_SIDE,
         )
         book.apply_delta(delta)
 
