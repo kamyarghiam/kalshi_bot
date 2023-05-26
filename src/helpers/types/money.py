@@ -1,3 +1,6 @@
+from functools import total_ordering
+
+
 class Price(int):
     """Provides a type for prices"""
 
@@ -32,6 +35,7 @@ class OutOfMoney(Exception):
     """Raised when we're out of money"""
 
 
+@total_ordering
 class Balance:
     """Balance in cents"""
 
@@ -50,3 +54,6 @@ class Balance:
 
     def __str__(self):
         return str(self._balance)
+
+    def __gt__(self, other):
+        return self._balance > other

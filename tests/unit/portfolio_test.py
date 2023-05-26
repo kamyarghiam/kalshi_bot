@@ -3,7 +3,7 @@ import copy
 import pytest
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Balance, Cents, OutOfMoney
+from src.helpers.types.money import Balance, Cents
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError, Position
@@ -251,8 +251,8 @@ def test_portfolio_buy():
 
     assert portfolio.get_positions_value() == 5 * 100 + 10 * 10 + 15 * 5 + 20 * 25
 
-    # Buying too much raises OutOfMoney error
-    with pytest.raises(OutOfMoney):
+    # Buying too much raises PortfolioError error
+    with pytest.raises(PortfolioError):
         portfolio.buy(
             Order(
                 ticker=MarketTicker("hi2"),
@@ -276,7 +276,8 @@ def test_portfolio_buy():
         )
     )
 
-    with pytest.raises(OutOfMoney):
+    with pytest.raises(PortfolioError):
+        # Out of money
         portfolio.buy(
             Order(
                 ticker=MarketTicker("hi2"),

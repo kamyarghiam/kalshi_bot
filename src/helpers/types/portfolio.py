@@ -176,15 +176,31 @@ class Portfolio:
     def get_position(self, ticker: MarketTicker) -> Position | None:
         return self._positions[ticker] if ticker in self._positions else None
 
-    def buy(self, order: Order):
-        """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
-        self._cash_balance.add_balance(Cents(-1 * (order.cost + order.fee)))
-
+    def can_buy(self, order: Order) -> bool:
         if order.ticker in self._positions:
             holding = self._positions[order.ticker]
             if order.side != holding.side:
-                raise PortfolioError("Already holding a position on the other side")
-            holding.buy(order)
+                return False
+        return self._cash_balance >= order.cost + order.fee
+
+    def can_sell(self, order: Order) -> bool:
+        if order.ticker not in self._positions:
+            return False
+        position = self._positions[order.ticker]
+        if position.side != order.side:
+            return False
+        return True
+
+    def buy(self, order: Order):
+        """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
+        if not self.can_buy(order):
+            raise PortfolioError(
+                "Either not enough balance or already holding position on other side"
+            )
+        self._cash_balance.add_balance(Cents(-1 * (order.cost + order.fee)))
+
+        if order.ticker in self._positions:
+            self._positions[order.ticker].buy(order)
         else:
             self._positions[order.ticker] = Position(order)
         self.orders.append(order)
@@ -205,11 +221,11 @@ class Portfolio:
         :param bool for_info: if true, we don't apply the sell. We just
         return information
         l"""
-        if order.ticker not in self._positions:
-            raise PortfolioError(f"Not holding anything with ticker {order.ticker}")
+        if not self.can_sell(order):
+            raise PortfolioError(
+                "Either not holding position or position held has other side"
+            )
         position = self._positions[order.ticker]
-        if position.side != order.side:
-            raise PortfolioError("Holding a different side when trying to sell")
 
         amount_paid, buy_fees = position.sell(order, for_info)
         pnl = Cents(order.revenue - amount_paid)
