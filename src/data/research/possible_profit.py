@@ -1,3 +1,5 @@
+"""This file lets us compute the total possible amount of profit"""
+
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
