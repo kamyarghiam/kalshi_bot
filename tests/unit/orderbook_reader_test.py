@@ -53,6 +53,8 @@ def test_historical_orderbook_reader(tmp_path: Path):
     reader.previous_snapshot(MarketTicker("ticker2")) == orderbook2
 
     expected_messages = [
+        orderbook1,
+        orderbook2,
         orderbook1.apply_delta(delta1),
         orderbook2.apply_delta(delta2),
         Orderbook.from_snapshot(snapshot3),

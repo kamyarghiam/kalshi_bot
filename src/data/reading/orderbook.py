@@ -22,36 +22,17 @@ class OrderbookReader(Generator[Orderbook, None, None]):
         self, reader: Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None]
     ):
         self._reader = reader
-        # We accumulate messages here in case we pop them from the reader
-        # but don't want to return them yet
-        self._message_backlog = []
         self._snapshots: Dict[MarketTicker, Orderbook] = {}
 
-        # Load all the messages into the snapshot
-        # TODO: this relies on at least one message after the initial snapshot
-        # to show up and requires us to have a message backlog. A better design would
-        # know all the market tickers we're looking for and wait for the snapshot
-        for msg in self._reader:
-            if msg.market_ticker not in self._snapshots:
-                assert isinstance(msg, OrderbookSnapshotRM)
-                self._snapshots[msg.market_ticker] = Orderbook.from_snapshot(msg)
-            else:
-                self._message_backlog.append(msg)
-                break
-
-    def previous_snapshot(self, ticker: MarketTicker):
-        """Returns the last snapshot of a ticker"""
-        return self._snapshots[ticker]
+    def previous_snapshot(self, ticker: MarketTicker) -> Orderbook | None:
+        """Returns the last snapshot of a ticker if it exists"""
+        return self._snapshots[ticker] if ticker in self._snapshots else None
 
     def __iter__(self):
         return self
 
     def __next__(self) -> Orderbook:
-        msg: OrderbookSnapshotRM | OrderbookDeltaRM
-        if self._message_backlog:
-            msg = self._message_backlog.pop(0)
-        else:
-            msg = next(self._reader)
+        msg = next(self._reader)
 
         if isinstance(msg, OrderbookSnapshotRM):
             self._snapshots[msg.market_ticker] = Orderbook.from_snapshot(msg)
