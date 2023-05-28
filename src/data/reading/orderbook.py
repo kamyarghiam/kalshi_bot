@@ -46,7 +46,7 @@ class OrderbookReader(Generator[Orderbook, None, None]):
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def __next__(self) -> Orderbook:
         msg: OrderbookSnapshotRM | OrderbookDeltaRM
         if self._message_backlog:
             msg = self._message_backlog.pop(0)
