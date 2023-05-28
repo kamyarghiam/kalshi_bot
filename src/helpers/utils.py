@@ -1,5 +1,8 @@
 import itertools
-from typing import Generic, Iterable, Iterator, TypeVar
+from typing import Dict, Generic, Iterable, Iterator, TypeVar
+
+from rich.console import Console
+from rich.table import Table
 
 T = TypeVar("T")
 
@@ -30,3 +33,37 @@ class PendingMessages(Generic[T]):
 
     def __iter__(self) -> Iterator[T]:
         return self
+
+
+class Printer:
+    """Abstract printer that allows us to print things to the console
+
+    # TODO: maybe generate a printer object that be updated outside the printer
+    # TODO: checkout rich.live. Allows for auto-refresh
+    # TODO: should this run in another loop so that you can just hit run once and
+    # refresh interval?
+    """
+
+    def __init__(self):
+        self._console = Console()
+        self._values: Dict[str, str | None] = {}
+
+    def run(self):
+        self._console.clear()
+        self._console.print(self._generate_table())
+
+    def add(self, row_name: str):
+        """Add a new row to the table"""
+        self._values[row_name] = None
+
+    def _generate_table(self) -> Table:
+        """Make a new table."""
+        table = Table()
+        for row, value in self._values.items():
+            if value is not None:
+                table.add_row(row, value)
+
+        return table
+
+    def update(self, row_name: str, value: str):
+        self._values[row_name] = value

@@ -1,8 +1,9 @@
 import pytest
+from mock import patch
 
 from src.helpers.types.common import URL, NonNullStr
 from src.helpers.types.money import Balance, Cents
-from src.helpers.utils import PendingMessages
+from src.helpers.utils import PendingMessages, Printer
 
 
 def test_basic_urls():
@@ -80,3 +81,18 @@ def test_cents_str():
 def test_balance_str():
     b = Balance(Cents(10))
     assert str(b) == "$0.10"
+
+
+def test_printer_class():
+    printer = Printer()
+    row_name = "ROW"
+    with patch.object(printer, "_console") as console:
+        printer.add(row_name)
+        assert printer._values == {row_name: None}
+        printer.run()
+        console.clear.assert_called_once()
+        console.print.assert_called_once()
+
+        printer.update(row_name, "SOMETHING")
+        assert printer._values == {row_name: "SOMETHING"}
+        printer.run()

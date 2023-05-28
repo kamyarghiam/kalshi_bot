@@ -89,8 +89,6 @@ def historical_data_reader(
                 msg: OrderbookSnapshotRM | OrderbookDeltaRM = pickle.load(f)
                 yield msg
                 msg_num += 1
-                if msg_num % 10000 == 0:
-                    print(f"Processed: {msg_num}")
             except EOFError:
                 break
 
