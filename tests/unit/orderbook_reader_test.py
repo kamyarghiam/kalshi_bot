@@ -1,6 +1,8 @@
 import pickle
 from pathlib import Path
 
+from mock import MagicMock
+
 from src.data.reading.orderbook import OrderbookReader
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
@@ -50,6 +52,23 @@ def test_historical_orderbook_reader(tmp_path: Path):
     reader.previous_snapshot(MarketTicker("ticker1")) == orderbook1
     reader.previous_snapshot(MarketTicker("ticker2")) == orderbook2
 
-    assert next(reader) == orderbook1.apply_delta(delta1)
-    assert next(reader) == orderbook2.apply_delta(delta2)
-    assert next(reader) == Orderbook.from_snapshot(snapshot3)
+    expected_messages = [
+        orderbook1.apply_delta(delta1),
+        orderbook2.apply_delta(delta2),
+        Orderbook.from_snapshot(snapshot3),
+    ]
+
+    i = 0
+    for msg in reader:
+        assert msg == expected_messages[i]
+        i += 1
+
+
+def test_send_throw():
+    """Test that the send and throw methods exist to make OrderbookReader
+    class a generator"""
+    o = OrderbookReader(MagicMock())
+
+    # No ops
+    o.send()
+    o.throw()

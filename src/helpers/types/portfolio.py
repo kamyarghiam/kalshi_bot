@@ -197,7 +197,7 @@ class Portfolio:
             raise PortfolioError(
                 "Either not enough balance or already holding position on other side"
             )
-        self._cash_balance.add_balance(Cents(-1 * (order.cost + order.fee)))
+        self._cash_balance -= order.cost + order.fee
 
         if order.ticker in self._positions:
             self._positions[order.ticker].buy(order)
@@ -231,7 +231,7 @@ class Portfolio:
         pnl = Cents(order.revenue - amount_paid)
 
         if not for_info:
-            self._cash_balance.add_balance(order.revenue - order.fee)
+            self._cash_balance += order.revenue - order.fee
             if position.is_empty():
                 del self._positions[order.ticker]
             self.pnl += pnl

@@ -39,18 +39,19 @@ class OutOfMoney(Exception):
 class Balance:
     """Balance in cents"""
 
-    def __init__(self, initial_balance: Cents):
-        if not isinstance(initial_balance, Cents) or initial_balance < 0:
-            raise ValueError(f"{initial_balance} invalid balance")
-        self._balance: Cents = initial_balance
+    def __init__(self, initial_balance: Cents | int):
+        if initial_balance < 0:
+            raise ValueError(f"{initial_balance} negative balance")
+        self._balance: Cents = Cents(initial_balance)
 
-    def add_balance(self, delta: Cents):
-        if self._balance + delta < 0:
-            raise OutOfMoney(f"Can't reduce balance {self._balance} by {delta}")
-        self._balance += delta
+    def __add__(self, other):
+        return Balance(self._balance + other)
+
+    def __sub__(self, other):
+        return Balance(self._balance - other)
 
     def __eq__(self, other):
-        return isinstance(other, Balance) and self._balance == other._balance
+        return self._balance == other
 
     def __str__(self):
         return str(self._balance)
