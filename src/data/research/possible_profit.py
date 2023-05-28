@@ -1,6 +1,5 @@
 """This file lets us compute the total possible amount of profit"""
 
-import pickle
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
@@ -12,9 +11,9 @@ from src.helpers.types.orderbook import (
     OrderbookView,
 )
 from src.helpers.types.orders import Quantity
-from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 from tests.fake_exchange import Price
 from tests.unit.common_test import Cents
+from tests.unit.orderbook_reader_test import OrderbookReader
 
 
 class PossibleProfit:
@@ -45,23 +44,16 @@ class PossibleProfit:
 
         return total_profit
 
-    def add_msg(self, msg: OrderbookSnapshotRM | OrderbookDeltaRM):
-        snapshot: Orderbook
-        if isinstance(msg, OrderbookDeltaRM):
-            prev_snapshot = self._previous_snapshot[msg.market_ticker]
-            snapshot = prev_snapshot.apply_delta(msg)
-        else:
-            assert isinstance(msg, OrderbookSnapshotRM)
-            snapshot = Orderbook.from_snapshot(msg)
-        self._previous_snapshot[msg.market_ticker] = snapshot
+    def add_msg(self, msg: Orderbook):
+        self._previous_snapshot[msg.market_ticker] = msg
 
         try:
             # Sell prices
-            sell_yes_price, sell_yes_quantity = snapshot.yes.get_largest_price_level()
-            sell_no_price, sell_no_quantity = snapshot.no.get_largest_price_level()
+            sell_yes_price, sell_yes_quantity = msg.yes.get_largest_price_level()
+            sell_no_price, sell_no_quantity = msg.no.get_largest_price_level()
 
             # Buy prices
-            snapshot_buy = snapshot.get_view(OrderbookView.BUY)
+            snapshot_buy = msg.get_view(OrderbookView.BUY)
             (
                 buy_yes_price,
                 buy_yes_quantity,
@@ -140,23 +132,16 @@ class ProfitMetadata:
     no: SideProfitMetadata
 
 
-def main(data_path: Path):
+def get_possible_profit(reader: OrderbookReader):
+    possible_profit = PossibleProfit()
+    for msg in reader:
+        possible_profit.add_msg(msg)
+    total_profit = possible_profit.compute_total_profit()
+    print(f"Total possible profit: ${total_profit/100}")
+    return total_profit
+
+
+def run_historical_profit_reader(data_path: Path):
     """Takes a path to a dataset that contains pickled orderbook info
     and returns the possible moeny you could have made as a taker"""
-    possible_profit = PossibleProfit()
-    with open(str(data_path), "rb") as f:
-        msg_num = 0
-        while True:
-            try:
-                msg: OrderbookSnapshotRM | OrderbookDeltaRM = pickle.load(f)
-                possible_profit.add_msg(msg)
-                msg_num += 1
-                if msg_num % 10000 == 0:
-                    print(f"Processed: {msg_num}")
-            except EOFError:
-                break
-    print(f"Total possible profit: ${possible_profit.compute_total_profit()/100}")
-
-
-if __name__ == "__main__":
-    main(Path("src/data/store/orderbook_data/05-18-2023"))
+    return get_possible_profit(OrderbookReader.historical(data_path))
