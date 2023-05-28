@@ -51,9 +51,7 @@ def compute_fee(price: Price, quantity: Quantity) -> Cents:
 
 
 @dataclass()
-class Order:
-    ticker: MarketTicker = field(on_setattr=frozen)
-    side: Side = field(on_setattr=frozen)
+class MinimalOrder:
     price: Price = field(on_setattr=frozen)
     quantity: Quantity = field(on_setattr=frozen)
     trade: Trade = field(on_setattr=frozen)
@@ -93,6 +91,12 @@ class Order:
         sell_order.trade = Trade.SELL
 
         return sell_order.revenue - self.cost - sell_order.fee - self.fee
+
+
+@dataclass()
+class Order(MinimalOrder):
+    ticker: MarketTicker = field(on_setattr=frozen)
+    side: Side = field(on_setattr=frozen)
 
     def __str__(self):
         return (

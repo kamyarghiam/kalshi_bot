@@ -1,9 +1,12 @@
+import random
+
 import pytest
 from mock import patch
 
 from src.helpers.types.common import URL, NonNullStr
-from src.helpers.types.money import Balance, Cents
-from src.helpers.utils import PendingMessages, Printer
+from src.helpers.types.money import Balance, Cents, Price
+from src.helpers.types.orders import Quantity, compute_fee
+from src.helpers.utils import PendingMessages, Printer, compute_pnl
 
 
 def test_basic_urls():
@@ -96,3 +99,22 @@ def test_printer_class():
         printer.update(row_name, "SOMETHING")
         assert printer._values == {row_name: "SOMETHING"}
         printer.run()
+
+
+def test_compute_pnl():
+    for _ in range(10):
+        buy_price = Price(random.randint(1, 99))
+        sell_price = Price(random.randint(1, 99))
+        quantity = Quantity(random.randint(1, 10000))
+
+        actual = compute_pnl(buy_price, sell_price, quantity)
+        expected = (
+            (sell_price - buy_price) * quantity
+            - compute_fee(buy_price, quantity)
+            - compute_fee(sell_price, quantity)
+        )
+        assert actual == expected, (
+            buy_price,
+            sell_price,
+            quantity,
+        )

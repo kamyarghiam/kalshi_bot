@@ -4,6 +4,9 @@ from typing import Dict, Generic, Iterable, Iterator, TypeVar
 from rich.console import Console
 from rich.table import Table
 
+from src.helpers.types.money import Price
+from src.helpers.types.orders import MinimalOrder, Quantity, Trade
+
 T = TypeVar("T")
 
 
@@ -67,3 +70,9 @@ class Printer:
 
     def update(self, row_name: str, value: str):
         self._values[row_name] = value
+
+
+def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):
+    """Computes pnl after fees"""
+    buy_order = MinimalOrder(buy_price, quantity, Trade.BUY)
+    return buy_order.get_predicted_pnl(sell_price)
