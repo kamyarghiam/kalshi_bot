@@ -245,6 +245,9 @@ class Portfolio:
             position = self._positions[ticker]
             sell_order = orderbook.sell_order(position.side)
 
+            if sell_order is None:
+                return None
+
             quantity = Quantity(
                 min(
                     position.total_quantity,

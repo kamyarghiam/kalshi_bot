@@ -425,6 +425,11 @@ def test_find_sell_opportunites():
             )
         )
 
+    # No sell opportunities
+    orderbook = Orderbook(market_ticker=MarketTicker("hi"))
+    opportunity = portfolio.find_sell_opportunities(orderbook)
+    assert opportunity is None
+
     # Wrong ticker
     orderbook = Orderbook(
         market_ticker=MarketTicker("ticker not found"),

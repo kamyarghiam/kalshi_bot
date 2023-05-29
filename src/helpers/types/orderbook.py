@@ -157,18 +157,28 @@ class Orderbook:
             view=view,
         )
 
-    def buy_order(self, side: Side) -> Order:
+    def _get_small_price_level(self, side) -> Tuple[Price, Quantity]:
+        if side == Side.NO:
+            return self.no.get_smallest_price_level()
+        else:
+            assert side == Side.YES
+            return self.yes.get_smallest_price_level()
+
+    def _get_largest_price_level(self, side) -> Tuple[Price, Quantity]:
+        if side == Side.NO:
+            return self.no.get_largest_price_level()
+        else:
+            assert side == Side.YES
+            return self.yes.get_largest_price_level()
+
+    def buy_order(self, side: Side) -> Order | None:
         """Spits out an order that would buy at the best price"""
         ob = self.get_view(OrderbookView.ASK)
 
-        price: Price
-        quantity: Quantity
-        if side == Side.NO:
-            price, quantity = ob.no.get_smallest_price_level()
-        else:
-            assert side == Side.YES
-            price, quantity = ob.yes.get_smallest_price_level()
-
+        try:
+            price, quantity = ob._get_small_price_level(side)
+        except EmptyOrderbookSideError:
+            return None
         return Order(
             ticker=ob.market_ticker,
             side=side,
@@ -177,18 +187,14 @@ class Orderbook:
             trade=Trade.BUY,
         )
 
-    def sell_order(self, side: Side) -> Order:
+    def sell_order(self, side: Side) -> Order | None:
         """Spits out an order that would sell at the best price"""
         ob = self.get_view(OrderbookView.BID)
 
-        price: Price
-        quantity: Quantity
-        if side == Side.NO:
-            price, quantity = ob.no.get_largest_price_level()
-        else:
-            assert side == Side.YES
-            price, quantity = ob.yes.get_largest_price_level()
-
+        try:
+            price, quantity = ob._get_largest_price_level(side)
+        except EmptyOrderbookSideError:
+            return None
         return Order(
             ticker=ob.market_ticker,
             side=side,

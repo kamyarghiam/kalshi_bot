@@ -2,7 +2,6 @@ from pathlib import Path
 
 from src.data.reading.orderbook import OrderbookReader
 from src.helpers.types.money import Balance
-from src.helpers.types.orderbook import EmptyOrderbookSideError
 from src.helpers.types.orders import Order, Side
 from tests.unit.common_test import Cents
 from tests.unit.orderbook_test import Orderbook
@@ -24,22 +23,16 @@ def strategy(reader: OrderbookReader):
 
 
 def should_buy(orderbook: Orderbook, portfolio: Portfolio, side: Side) -> Order | None:
-    try:
-        order = orderbook.buy_order(side)
-    except EmptyOrderbookSideError:
-        return None
-    if portfolio.can_buy(order):
+    order = orderbook.buy_order(side)
+    if order is not None and portfolio.can_buy(order):
         # TODO: add more logic here
         return order
     return None
 
 
 def should_sell(orderbook: Orderbook, portfolio: Portfolio, side: Side) -> Order | None:
-    try:
-        order = orderbook.sell_order(side)
-    except EmptyOrderbookSideError:
-        return None
-    if portfolio.can_sell(order):
+    order = orderbook.sell_order(side)
+    if order is not None and portfolio.can_sell(order):
         order.quantity = min(
             portfolio._positions[order.ticker].total_quantity, order.quantity
         )

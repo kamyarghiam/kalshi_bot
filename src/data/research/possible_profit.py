@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import DefaultDict, Tuple
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.orderbook import EmptyOrderbookSideError, Orderbook
+from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.orders import Quantity, Side
 from src.helpers.utils import compute_pnl
 from tests.fake_exchange import Price
@@ -48,25 +48,22 @@ class PossibleProfit:
 
     def add_msg(self, msg: Orderbook):
         for side in Side:
-            try:
-                buy_order = msg.buy_order(side)
-                sell_order = msg.sell_order(side)
-            except EmptyOrderbookSideError:
-                continue
+            buy_order = msg.buy_order(side)
+            if buy_order is not None:
+                metadata = self._profit_metadata[(msg.market_ticker, side)]
+                if buy_order.price < metadata.min_price:
+                    # Set min price
+                    metadata.min_price = buy_order.price
+                    metadata.quantity_at_min = buy_order.quantity
 
-            metadata = self._profit_metadata[(msg.market_ticker, side)]
-            if buy_order.price < metadata.min_price:
-                # Set min price
-                metadata.min_price = buy_order.price
-                metadata.quantity_at_min = buy_order.quantity
-
-            profit = compute_pnl(
-                metadata.min_price,
-                sell_order.price,
-                min(metadata.quantity_at_min, sell_order.quantity),
-            )
-
-            metadata.max_profit = max(metadata.max_profit, profit)
+            sell_order = msg.sell_order(side)
+            if sell_order is not None:
+                profit = compute_pnl(
+                    metadata.min_price,
+                    sell_order.price,
+                    min(metadata.quantity_at_min, sell_order.quantity),
+                )
+                metadata.max_profit = max(metadata.max_profit, profit)
 
 
 @dataclass
