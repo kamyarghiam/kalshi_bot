@@ -1,6 +1,5 @@
-from pathlib import Path
-
 from src.data.reading.orderbook import OrderbookReader
+from src.helpers.constants import PATH_TO_ORDERBOOK_DATA
 from src.helpers.types.money import Balance
 from src.helpers.types.orders import Order, Side
 from tests.unit.common_test import Cents
@@ -42,9 +41,7 @@ def should_sell(orderbook: Orderbook, portfolio: Portfolio, side: Side) -> Order
 
 
 def main():
-    reader = OrderbookReader.historical(
-        Path("src/data/store/orderbook_data/05-17-2023")
-    )
+    reader = OrderbookReader.historical(PATH_TO_ORDERBOOK_DATA / "05-17-2023")
     strategy(reader)
 
 

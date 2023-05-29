@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 from src.exchange.interface import OrderbookSubscription
+from src.helpers.constants import PATH_TO_ORDERBOOK_DATA
 from src.helpers.types.websockets.response import OrderbookSnapshotWR
 from tests.conftest import ExchangeInterface
 from tests.fake_exchange import OrderbookDeltaWR
@@ -16,7 +17,7 @@ def get_data_path() -> Path:
     today = datetime.now()
     # Format the date as MM-DD-YYYY
     formatted_date = today.strftime("%m-%d-%Y")
-    return Path(f"src/data/store/orderbook_data/{formatted_date}")
+    return PATH_TO_ORDERBOOK_DATA / formatted_date
 
 
 def collect_orderbook_data(
