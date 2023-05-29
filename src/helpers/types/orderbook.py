@@ -78,9 +78,9 @@ class OrderbookSide:
 
 class OrderbookView(str, Enum):
     # The sell view is the same as the maker view on the website
-    SELL = "maker"
+    BID = "maker"
     # The buy view is the same as the take view on the website
-    BUY = "taker"
+    ASK = "taker"
 
 
 @dataclass
@@ -94,7 +94,7 @@ class Orderbook:
     yes: OrderbookSide = field(default_factory=OrderbookSide)
     no: OrderbookSide = field(default_factory=OrderbookSide)
     # Initially all orderbooks are in the maker (aka sell view) view from the websocket
-    view: OrderbookView = field(default_factory=lambda: OrderbookView.SELL)
+    view: OrderbookView = field(default_factory=lambda: OrderbookView.BID)
 
     def __post_init__(self):
         if not self._is_valid_orderbook():
@@ -106,12 +106,12 @@ class Orderbook:
             # Vacously true
             return True
 
-        if self.view == OrderbookView.SELL:
+        if self.view == OrderbookView.BID:
             yes_price, _ = self.yes.get_largest_price_level()
             no_price, _ = self.no.get_largest_price_level()
             return yes_price + no_price < Cents(100)
         else:
-            assert self.view == OrderbookView.BUY
+            assert self.view == OrderbookView.ASK
             yes_price, _ = self.yes.get_smallest_price_level()
             no_price, _ = self.no.get_smallest_price_level()
             return yes_price + no_price > Cents(100)
@@ -157,7 +157,7 @@ class Orderbook:
 
     def buy_order(self, side: Side) -> Order:
         """Spits out an order that would buy at the best price"""
-        ob = self.get_view(OrderbookView.BUY)
+        ob = self.get_view(OrderbookView.ASK)
 
         price: Price
         quantity: Quantity
@@ -177,7 +177,7 @@ class Orderbook:
 
     def sell_order(self, side: Side) -> Order:
         """Spits out an order that would sell at the best price"""
-        ob = self.get_view(OrderbookView.SELL)
+        ob = self.get_view(OrderbookView.BID)
 
         price: Price
         quantity: Quantity

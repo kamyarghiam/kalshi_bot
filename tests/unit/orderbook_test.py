@@ -252,12 +252,12 @@ def test_change_view():
             }
         ),
     )
-    assert book.view == OrderbookView.SELL
+    assert book.view == OrderbookView.BID
 
     # Get same view
-    assert book.get_view(OrderbookView.SELL) == book
+    assert book.get_view(OrderbookView.BID) == book
 
-    buy_book = book.get_view(OrderbookView.BUY)
+    buy_book = book.get_view(OrderbookView.ASK)
     assert buy_book == Orderbook(
         market_ticker=MarketTicker("hi"),
         yes=OrderbookSide(
@@ -268,12 +268,12 @@ def test_change_view():
             }
         ),
         no=OrderbookSide(levels={Price(98): Quantity(100), Price(99): Quantity(200)}),
-        view=OrderbookView.BUY,
+        view=OrderbookView.ASK,
     )
 
     # Get same view
-    assert buy_book.get_view(OrderbookView.BUY) == buy_book
-    assert buy_book.get_view(OrderbookView.SELL) == book
+    assert buy_book.get_view(OrderbookView.ASK) == buy_book
+    assert buy_book.get_view(OrderbookView.BID) == book
 
 
 def test_get_total_quantity():
@@ -304,7 +304,7 @@ def test_buy_order():
             }
         ),
     )
-    assert sell_book.view == OrderbookView.SELL
+    assert sell_book.view == OrderbookView.BID
     assert sell_book.buy_order(Side.YES) == Order(
         ticker=sell_book.market_ticker,
         side=Side.YES,
@@ -320,7 +320,7 @@ def test_buy_order():
         trade=Trade.BUY,
     )
 
-    buy_book = sell_book.get_view(OrderbookView.BUY)
+    buy_book = sell_book.get_view(OrderbookView.ASK)
     assert buy_book.buy_order(Side.YES) == Order(
         ticker=buy_book.market_ticker,
         side=Side.YES,
@@ -349,7 +349,7 @@ def test_sell_order():
             }
         ),
     )
-    assert sell_book.view == OrderbookView.SELL
+    assert sell_book.view == OrderbookView.BID
     assert sell_book.sell_order(Side.YES) == Order(
         ticker=sell_book.market_ticker,
         side=Side.YES,
@@ -365,7 +365,7 @@ def test_sell_order():
         trade=Trade.SELL,
     )
 
-    buy_book = sell_book.get_view(OrderbookView.BUY)
+    buy_book = sell_book.get_view(OrderbookView.ASK)
     assert buy_book.sell_order(Side.YES) == Order(
         ticker=buy_book.market_ticker,
         side=Side.YES,
@@ -398,14 +398,14 @@ def test_invalid_orderbooks():
             market_ticker=MarketTicker("hi"),
             yes=OrderbookSide(levels={Price(90): Quantity(10)}),
             no=OrderbookSide(levels={Price(5): Quantity(10)}),
-            view=OrderbookView.BUY,
+            view=OrderbookView.ASK,
         )
     assert err.match("Not a valid orderbook")
 
     o = Orderbook(
         market_ticker=MarketTicker("hi"),
         yes=OrderbookSide(levels={Price(90): Quantity(10)}),
-        view=OrderbookView.BUY,
+        view=OrderbookView.ASK,
     )
     with pytest.raises(ValueError) as err:
         o.apply_delta(

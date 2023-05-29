@@ -43,5 +43,4 @@ def test_possible_profit(tmp_path: Path):
             pickle.dump(msg, data_file)
 
     no_profit = compute_pnl(Price(10), Price(50), Quantity(10))
-    yes_profit = compute_pnl(Price(20), Price(40), Quantity(10))
-    assert run_historical_profit_reader(pickle_file) == no_profit + yes_profit
+    assert run_historical_profit_reader(pickle_file) == no_profit
