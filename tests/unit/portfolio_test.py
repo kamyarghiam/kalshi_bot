@@ -628,7 +628,7 @@ def test_potfolio_print():
 Fees paid: $1.63
 PnL (with fees): $-3.13
 Cash left: $38.87
-Current positions:
+Current positions ($8.00):
   Ticker1: NO | 100 @ 5¢
   Ticker2: NO | 50 @ 6¢
 Orders:

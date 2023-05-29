@@ -150,19 +150,22 @@ class Portfolio:
             fees += order.fee
         return fees
 
+    @property
+    def pnl_after_fees(self):
+        return self.pnl - self.fees_paid
+
     def __str__(self):
         # Only compute fees paid once
-        fees_paid = self.fees_paid
         positions_str = "\n".join(
             ["  " + str(position) for position in self._positions.values()]
         )
         orders_str = "\n".join(["  " + str(order) for order in self.orders])
         return (
             f"PnL (no fees): {self.pnl}\n"
-            + f"Fees paid: {fees_paid}\n"
-            + f"PnL (with fees): {self.pnl - fees_paid}\n"
+            + f"Fees paid: {self.fees_paid}\n"
+            + f"PnL (with fees): {self.pnl_after_fees}\n"
             + f"Cash left: {self._cash_balance}\n"
-            + f"Current positions:\n{positions_str}\n"
+            + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
             + f"Orders:\n{orders_str}"
         )
 
