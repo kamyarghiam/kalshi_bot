@@ -380,3 +380,40 @@ def test_sell_order():
         quantity=Quantity(500),
         trade=Trade.SELL,
     )
+
+
+def test_invalid_orderbooks():
+    with pytest.raises(ValueError) as err:
+        # The sides sum to above 100 in a sell view
+        Orderbook(
+            market_ticker=MarketTicker("hi"),
+            yes=OrderbookSide(levels={Price(90): Quantity(10)}),
+            no=OrderbookSide(levels={Price(90): Quantity(10)}),
+        )
+    assert err.match("Not a valid orderbook")
+
+    with pytest.raises(ValueError) as err:
+        # The sides sum to below 100 in a buy view
+        Orderbook(
+            market_ticker=MarketTicker("hi"),
+            yes=OrderbookSide(levels={Price(90): Quantity(10)}),
+            no=OrderbookSide(levels={Price(5): Quantity(10)}),
+            view=OrderbookView.BUY,
+        )
+    assert err.match("Not a valid orderbook")
+
+    o = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(90): Quantity(10)}),
+        view=OrderbookView.BUY,
+    )
+    with pytest.raises(ValueError) as err:
+        o.apply_delta(
+            OrderbookDeltaRM(
+                market_ticker=MarketTicker("hi"),
+                price=Price(5),
+                delta=QuantityDelta(10),
+                side=Side.NO,
+            )
+        )
+    assert err.match("Not a valid orderbook after delta")

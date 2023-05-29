@@ -428,7 +428,7 @@ def test_find_sell_opportunites():
     # Wrong ticker
     orderbook = Orderbook(
         market_ticker=MarketTicker("ticker not found"),
-        yes=OrderbookSide(levels={Price(50): Quantity(100)}),
+        yes=OrderbookSide(levels={Price(24): Quantity(100)}),
         no=OrderbookSide(levels={Price(75): Quantity(150)}),
     )
 
@@ -446,7 +446,7 @@ def test_find_sell_opportunites():
 
     len(portfolio._positions) == 2
     opportunity = portfolio.find_sell_opportunities(orderbook)
-    assert opportunity == (50 - 10) * 10
+    assert opportunity == (24 - 10) * 10
     len(portfolio._positions) == 1
 
     assert portfolio.get_positions_value() == 50 * 6

@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Dict, Tuple
 
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price, get_opposite_side_price
+from src.helpers.types.money import Cents, Price, get_opposite_side_price
 from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 
 if typing.TYPE_CHECKING:
@@ -96,6 +96,26 @@ class Orderbook:
     # Initially all orderbooks are in the maker (aka sell view) view from the websocket
     view: OrderbookView = field(default_factory=lambda: OrderbookView.SELL)
 
+    def __post_init__(self):
+        if not self._is_valid_orderbook():
+            raise ValueError("Not a valid orderbook")
+
+    def _is_valid_orderbook(self):
+        """Checks to make sure the orderbook prices don't overlap"""
+        if self.yes.is_empty() or self.no.is_empty():
+            # Vacously true
+            return True
+
+        if self.view == OrderbookView.SELL:
+            yes_price, _ = self.yes.get_largest_price_level()
+            no_price, _ = self.no.get_largest_price_level()
+            return yes_price + no_price < Cents(100)
+        else:
+            assert self.view == OrderbookView.BUY
+            yes_price, _ = self.yes.get_smallest_price_level()
+            no_price, _ = self.no.get_smallest_price_level()
+            return yes_price + no_price > Cents(100)
+
     def apply_delta(self, delta: "OrderbookDeltaRM") -> "Orderbook":
         """Non-destructively applies an orderbook delta to an orderbook snapshot"""
         if delta.market_ticker != self.market_ticker:
@@ -109,6 +129,8 @@ class Orderbook:
         else:
             assert delta.side == Side.YES
             new_orderbook.yes.apply_delta(delta.price, delta.delta)
+        if not new_orderbook._is_valid_orderbook():
+            raise ValueError("Not a valid orderbook after delta")
         return new_orderbook
 
     @classmethod

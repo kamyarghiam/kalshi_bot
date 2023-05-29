@@ -10,7 +10,6 @@ from src.helpers.utils import compute_pnl
 
 
 def test_possible_profit(tmp_path: Path):
-    # TODO: FIX THIS TEST, NOT WORKING
     # Create historical orderbook dataset
     snapshot1 = OrderbookSnapshotRM(
         market_ticker=MarketTicker("ticker"),
@@ -20,7 +19,7 @@ def test_possible_profit(tmp_path: Path):
     # No price goes from 10¢ to 40¢
     snapshot2 = OrderbookSnapshotRM(
         market_ticker=MarketTicker("ticker"),
-        yes=[[90, 10]],  # type:ignore[list-item]
+        yes=[],  # type:ignore[list-item]
         no=[[1, 20], [40, 30]],  # type:ignore[list-item]
     )
     # No price goes from 40¢ to 50¢
@@ -30,7 +29,7 @@ def test_possible_profit(tmp_path: Path):
         delta=QuantityDelta(20),
         side=Side.NO,
     )
-    # Yes price goes from 20¢ to 40¢ at quantity 10
+    # Yes price goes from to 40¢ at quantity (no effect)
     delta2 = OrderbookDeltaRM(
         market_ticker=MarketTicker("ticker"),
         price=Price(40),
