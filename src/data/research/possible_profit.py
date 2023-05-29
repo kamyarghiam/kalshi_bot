@@ -48,9 +48,9 @@ class PossibleProfit:
 
     def add_msg(self, msg: Orderbook):
         for side in Side:
+            metadata = self._profit_metadata[(msg.market_ticker, side)]
             buy_order = msg.buy_order(side)
             if buy_order is not None:
-                metadata = self._profit_metadata[(msg.market_ticker, side)]
                 if buy_order.price < metadata.min_price:
                     # Set min price
                     metadata.min_price = buy_order.price
