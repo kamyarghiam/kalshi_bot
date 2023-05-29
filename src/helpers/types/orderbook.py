@@ -122,6 +122,8 @@ class Orderbook:
             raise ValueError(
                 f"Market tickers don't match. Orderbook: {self}. Delta: {delta}"
             )
+        if self.view != OrderbookView.BID:
+            raise ValueError("Can only apply delta on bid view")
         # TODO: this copy probably takes a while
         new_orderbook = copy.deepcopy(self)
         if delta.side == Side.NO:

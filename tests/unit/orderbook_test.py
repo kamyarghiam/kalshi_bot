@@ -197,6 +197,21 @@ def test_is_empty():
     assert book.no.is_empty()
 
 
+def test_apply_delta_on_bid_view():
+    book = Orderbook(market_ticker=MarketTicker("hi"), view=OrderbookView.ASK)
+    delta = OrderbookDeltaRM(
+        market_ticker=MarketTicker("hi"),
+        price=Price(11),
+        delta=QuantityDelta(50),
+        side=Side.NO,
+    )
+    # Can't apply delta to a bid view book
+    with pytest.raises(ValueError) as err:
+        book.apply_delta(delta)
+
+    assert err.match("Can only apply delta on bid view")
+
+
 def test_get_largest_price_level():
     book = OrderbookSide()
 
@@ -405,13 +420,13 @@ def test_invalid_orderbooks():
     o = Orderbook(
         market_ticker=MarketTicker("hi"),
         yes=OrderbookSide(levels={Price(90): Quantity(10)}),
-        view=OrderbookView.ASK,
+        view=OrderbookView.BID,
     )
     with pytest.raises(ValueError) as err:
         o.apply_delta(
             OrderbookDeltaRM(
                 market_ticker=MarketTicker("hi"),
-                price=Price(5),
+                price=Price(10),
                 delta=QuantityDelta(10),
                 side=Side.NO,
             )

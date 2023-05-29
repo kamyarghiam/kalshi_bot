@@ -47,6 +47,7 @@ def test_historical_orderbook_reader(tmp_path: Path):
             pickle.dump(msg, data_file)
 
     reader = OrderbookReader.historical(Path(pickle_file))
+    reader.add_printer(1)
     orderbook1 = Orderbook.from_snapshot(snapshot1)
     orderbook2 = Orderbook.from_snapshot(snapshot2)
     reader.previous_snapshot(MarketTicker("ticker1")) == orderbook1
