@@ -1,5 +1,6 @@
 import itertools
-from typing import Dict, Generic, Iterable, Iterator, TypeVar
+from dataclasses import dataclass
+from typing import Generic, Iterable, Iterator, List, TypeVar
 
 from rich.console import Console
 from rich.table import Table
@@ -38,38 +39,49 @@ class PendingMessages(Generic[T]):
         return self
 
 
+P = TypeVar("P")
+
+
+@dataclass
+class Printable(Generic[P]):
+    """A class that stores a value that can be updated for the purposes of printing"""
+
+    name: str
+    value: P
+
+
 class Printer:
     """Abstract printer that allows us to print things to the console
+    When you create a new object, it returns a printable. This printable
+    can be updated to change the value in the table.
 
-    # TODO: maybe generate a printer object that be updated outside the printer
-    # TODO: checkout rich.live. Allows for auto-refresh
-    # TODO: should this run in another loop so that you can just hit run once and
-    # refresh interval?
+    TODO: checkout rich.live. Allows for auto-refresh
+    TODO: should this run in another loop so that you can just hit run once and
+    #refresh interval?
     """
 
     def __init__(self):
         self._console = Console()
-        self._values: Dict[str, str | None] = {}
+        self._printables: List[Printable] = []
 
     def run(self):
         self._console.clear()
         self._console.print(self._generate_table())
 
-    def add(self, row_name: str):
-        """Add a new row to the table"""
-        self._values[row_name] = None
+    def add(self, name: str, value: P) -> Printable:
+        """Add a new row to the table. Update the printable to
+        update the value in the table"""
+        printable: Printable[P] = Printable(name, value)
+        self._printables.append(printable)
+        return printable
 
     def _generate_table(self) -> Table:
         """Make a new table."""
         table = Table()
-        for row, value in self._values.items():
-            if value is not None:
-                table.add_row(row, value)
+        for printable in self._printables:
+            table.add_row(printable.name, str(printable.value))
 
         return table
-
-    def update(self, row_name: str, value: str):
-        self._values[row_name] = value
 
 
 def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):

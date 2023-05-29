@@ -6,6 +6,7 @@ from src.exchange.interface import OrderbookSubscription
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.websockets.response import OrderbookSnapshotRM
+from src.helpers.utils import Printable, Printer
 from tests.conftest import ExchangeInterface
 from tests.fake_exchange import OrderbookDeltaRM
 
@@ -19,10 +20,27 @@ class OrderbookReader(Generator[Orderbook, None, None]):
     """
 
     def __init__(
-        self, reader: Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None]
+        self,
+        reader: Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None],
     ):
         self._reader = reader
         self._snapshots: Dict[MarketTicker, Orderbook] = {}
+
+        # If <= 0, print is off
+        self._print_frequency: int = 0
+        self._printer: Printer = Printer()
+        self._num_snapshots: Printable = self._printer.add("Num snapshots", 0)
+        self._num_deltas: Printable = self._printer.add("Num deltas", 0)
+
+    def is_printer_on(self) -> bool:
+        return self._print_frequency > 0
+
+    def add_printer(self, print_frequency: int = 10000) -> Printer:
+        """Add a printer to the orderbook reader so we can print every so often
+
+        :param print_frequency int: after how many messags should we print"""
+        self._print_frequency = print_frequency
+        return self._printer
 
     def previous_snapshot(self, ticker: MarketTicker) -> Orderbook | None:
         """Returns the last snapshot of a ticker if it exists"""
@@ -35,12 +53,21 @@ class OrderbookReader(Generator[Orderbook, None, None]):
         msg = next(self._reader)
 
         if isinstance(msg, OrderbookSnapshotRM):
+            self._num_snapshots.value += 1
             self._snapshots[msg.market_ticker] = Orderbook.from_snapshot(msg)
         else:
             assert isinstance(msg, OrderbookDeltaRM)
+            self._num_deltas.value += 1
             self._snapshots[msg.market_ticker] = self._snapshots[
                 msg.market_ticker
             ].apply_delta(msg)
+
+        if self.is_printer_on():
+            if (
+                self._num_deltas.value + self._num_snapshots.value
+            ) % self._print_frequency == 0:
+                self._printer.run()
+
         return self._snapshots[msg.market_ticker]
 
     def send(self):

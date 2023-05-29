@@ -3,7 +3,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import DefaultDict, Dict, Tuple
+from typing import DefaultDict, Tuple
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.orderbook import EmptyOrderbookSideError, Orderbook
@@ -18,10 +18,14 @@ class PossibleProfit:
     """Finds max possible profit throughout the day using peaks and valleys
 
     Stores minimum price during day on yes and no side and largest positive price
-    differential on both sides. Does not include fees"""
+    differential on both sides. Does not include fees.
+
+    TODO: Limitations: this algorithm originally assumes high liquidity. But since
+    Kalshi is low liquidity, it may be beneficial to compute profit on
+    individual peaks and valleys
+    """
 
     def __init__(self):
-        self._previous_snapshot: Dict[MarketTicker, Orderbook] = {}
         self._profit_metadata: DefaultDict[
             Tuple[MarketTicker, Side], SideProfitMetadata
         ] = defaultdict(SideProfitMetadata)
@@ -33,17 +37,16 @@ class PossibleProfit:
             key=lambda pm: max(pm[1].max_profit, pm[1].max_profit),
         )
         for (market_ticker, side), profit_metadata in profit_metadatas:
-            total_profit += profit_metadata.max_profit + profit_metadata.max_profit
-            print(
-                f"{market_ticker}. Side: {side}. "
-                + f"Profit: ${profit_metadata.max_profit/100}."
-            )
+            if profit_metadata.max_profit > 0:
+                total_profit += profit_metadata.max_profit + profit_metadata.max_profit
+                print(
+                    f"{market_ticker} {side}. "
+                    + f"Profit: ${profit_metadata.max_profit/100}."
+                )
 
         return total_profit
 
     def add_msg(self, msg: Orderbook):
-        self._previous_snapshot[msg.market_ticker] = msg
-
         for side in Side:
             try:
                 buy_order = msg.buy_order(side)
@@ -75,6 +78,7 @@ class SideProfitMetadata:
 
 
 def get_possible_profit(reader: OrderbookReader):
+    reader.add_printer()
     possible_profit = PossibleProfit()
     for msg in reader:
         possible_profit.add_msg(msg)

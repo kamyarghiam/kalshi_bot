@@ -90,14 +90,19 @@ def test_printer_class():
     printer = Printer()
     row_name = "ROW"
     with patch.object(printer, "_console") as console:
-        printer.add(row_name)
-        assert printer._values == {row_name: None}
+        printable = printer.add(row_name, 0)
+        assert len(printer._printables) == 1
+        assert printer._printables[0].name == "ROW"
+        assert printer._printables[0].value == 0
         printer.run()
         console.clear.assert_called_once()
         console.print.assert_called_once()
 
-        printer.update(row_name, "SOMETHING")
-        assert printer._values == {row_name: "SOMETHING"}
+        printable.value = 1
+        assert len(printer._printables) == 1
+        assert printer._printables[0].name == "ROW"
+        assert printer._printables[0].value == 1
+
         printer.run()
 
 
