@@ -78,7 +78,6 @@ def get_possible_profit(reader: OrderbookReader):
     reader.add_printer()
     possible_profit = PossibleProfit()
     for msg in reader:
-        print(msg)
         possible_profit.add_msg(msg)
     total_profit = possible_profit.compute_total_profit()
     print(f"Total possible profit: ${total_profit/100}")
