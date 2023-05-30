@@ -4,10 +4,17 @@ from typing import List
 from pydantic import BaseModel, Extra
 
 from src.helpers.types.api import Cursor, ExternalApi
+from src.helpers.types.money import Price
 
 
 class MarketTicker(str):
     """Tickers on the exchange"""
+
+
+class MarketResult(str, Enum):
+    YES = "yes"
+    NO = "no"
+    NOT_DETERMINED = ""
 
 
 class MarketStatus(str, Enum):
@@ -16,6 +23,7 @@ class MarketStatus(str, Enum):
     SETTLED = "settled"
     ACTIVE = "active"
     DETERMINED = "determined"
+    FINALIZED = "finalized"
 
 
 class Market(BaseModel):
@@ -25,6 +33,8 @@ class Market(BaseModel):
 
     status: MarketStatus
     ticker: MarketTicker
+    result: MarketResult
+    last_price: Price
 
     class Config:
         extra = Extra.allow

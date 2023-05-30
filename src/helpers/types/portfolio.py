@@ -4,10 +4,11 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from src.helpers.types.markets import MarketTicker
+from src.helpers.types.markets import MarketResult, MarketTicker
 from src.helpers.types.money import Balance, Cents, Price
 from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
+from tests.conftest import ExchangeInterface
 
 
 class Position:
@@ -153,6 +154,37 @@ class Portfolio:
     @property
     def pnl_after_fees(self):
         return self.pnl - self.fees_paid
+
+    def get_unrealized_pnl(self, e: ExchangeInterface):
+        """Gets you the unrealized pnl without fees"""
+        unrealized_pnl: Cents = Cents(0)
+        for position in self._positions.values():
+            market = e.get_market(position.ticker)
+            if market.result == MarketResult.NOT_DETERMINED:
+                # If has not been determined yet, we will use the last price
+                revenue = market.last_price * position.total_quantity
+                cost, _ = position.sell(
+                    Order(
+                        price=market.last_price,
+                        quantity=position.total_quantity,
+                        trade=Trade.SELL,
+                        side=position.side,
+                    ),
+                    for_info=True,
+                )
+                unrealized_pnl += revenue - cost
+            else:
+                # If the result equals what we expected, we get money
+                if (position.side == Side.NO and market.result == MarketResult.NO) or (
+                    position.side == Side.YES and market.result == MarketResult.YES
+                ):
+                    # We get a dollar per contract (quantity)
+                    unrealized_pnl += (
+                        Cents(position.total_quantity * 100) - position.get_value()
+                    )
+                else:
+                    # Otherwise, we lose money
+                    unrealized_pnl -= position.get_value()
 
     def __str__(self):
         # Only compute fees paid once

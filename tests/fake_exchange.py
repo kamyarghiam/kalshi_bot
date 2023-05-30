@@ -31,6 +31,7 @@ from src.helpers.types.markets import (
     GetMarketResponse,
     GetMarketsResponse,
     Market,
+    MarketResult,
     MarketStatus,
     MarketTicker,
 )
@@ -58,7 +59,6 @@ from src.helpers.types.websockets.response import (
     SubscriptionUpdatedWR,
     UnsubscribedWR,
 )
-from tests.utils import random_data_from_basemodel
 
 
 @dataclass
@@ -113,8 +113,12 @@ def kalshi_test_exchange_factory():
 
     @router.get(MARKETS_URL + "/{ticker}")
     def get_market(ticker: MarketTicker):
-        market = random_data_from_basemodel(Market)
-        market.ticker = ticker
+        market = Market(
+            status=MarketStatus.OPEN,
+            ticker=ticker,
+            result=MarketResult.NOT_DETERMINED,
+            last_price=Price(10),
+        )
         return GetMarketResponse(
             market=market,
         )
@@ -122,14 +126,18 @@ def kalshi_test_exchange_factory():
     @router.get(MARKETS_URL)
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):
         """Returns all markets on the exchange"""
-        markets: List[Market] = [random_data_from_basemodel(Market) for _ in range(100)]
-        if status is not None:
-            if status == MarketStatus.OPEN:
+        markets: List[Market] = [
+            Market(
                 # For some reason, they set the open markets to active
-                status = MarketStatus.ACTIVE
-            # We just want to set the markets to the right status
-            for market in markets:
-                market.status = status
+                status=MarketStatus.ACTIVE
+                if status == MarketStatus.OPEN or status is None
+                else status,
+                ticker=MarketTicker("some_ticker"),
+                result=MarketResult.NOT_DETERMINED,
+                last_price=Price(10),
+            )
+            for _ in range(100)
+        ]
         # We hardcode that there are 3 pages
         if cursor is None:
             return GetMarketsResponse(
