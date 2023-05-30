@@ -5,8 +5,10 @@ from fastapi.testclient import TestClient
 
 from src.exchange.connection import Connection, Websocket
 from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
+from src.helpers.types.common import URL
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
+    GetMarketResponse,
     GetMarketsRequest,
     GetMarketsResponse,
     Market,
@@ -82,6 +84,13 @@ class ExchangeInterface:
             markets.extend(response.markets)
 
         return markets
+
+    def get_market(self, ticker: MarketTicker) -> Market:
+        return GetMarketResponse.parse_obj(
+            self._connection.get(
+                url=MARKETS_URL.add(URL(f"/{ticker}")),
+            )
+        ).market
 
     ######## Helpers ############
 

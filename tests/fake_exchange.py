@@ -28,6 +28,7 @@ from src.helpers.types.auth import (
 from src.helpers.types.common import URL
 from src.helpers.types.exchange import ExchangeStatusResponse
 from src.helpers.types.markets import (
+    GetMarketResponse,
     GetMarketsResponse,
     Market,
     MarketStatus,
@@ -109,6 +110,14 @@ def kalshi_test_exchange_factory():
     def exchange_status():
         """Returns a dummy exchange status"""
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
+
+    @router.get(MARKETS_URL + "/{ticker}")
+    def get_market(ticker: MarketTicker):
+        market = random_data_from_basemodel(Market)
+        market.ticker = ticker
+        return GetMarketResponse(
+            market=market,
+        )
 
     @router.get(MARKETS_URL)
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):

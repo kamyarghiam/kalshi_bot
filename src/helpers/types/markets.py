@@ -15,6 +15,7 @@ class MarketStatus(str, Enum):
     CLOSED = "closed"
     SETTLED = "settled"
     ACTIVE = "active"
+    DETERMINED = "determined"
 
 
 class Market(BaseModel):
@@ -43,3 +44,7 @@ class GetMarketsResponse(ExternalApi):
 
     def has_empty_cursor(self) -> bool:
         return len(self.cursor) == 0
+
+
+class GetMarketResponse(ExternalApi):
+    market: Market

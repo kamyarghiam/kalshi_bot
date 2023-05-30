@@ -83,7 +83,9 @@ class Experiment1:
 async def progress_reader(num_readers: int):
     global num_msgs_read
 
-    total_msgs = 590_000
+    # TODO: update this -- function of how many messages there in dataset
+    # total_msgs = 590_000
+    total_msgs = 10
 
     with Progress() as progress:
         task = progress.add_task(

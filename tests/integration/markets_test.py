@@ -1,5 +1,5 @@
 from src.exchange.interface import ExchangeInterface
-from src.helpers.types.markets import Market, MarketStatus
+from src.helpers.types.markets import Market, MarketStatus, MarketTicker
 
 
 def test_get_active_markets(exchange_interface: ExchangeInterface):
@@ -9,3 +9,10 @@ def test_get_active_markets(exchange_interface: ExchangeInterface):
     for market in open_markets:
         assert isinstance(market, Market)
         assert market.status == MarketStatus.ACTIVE
+
+
+def test_get_market(exchange_interface: ExchangeInterface):
+    # This is a market that exist in the demo env
+    ticker = "HIGHMIA-23MAY30-B87.5"
+    market = exchange_interface.get_market(MarketTicker(ticker))
+    assert market.ticker == ticker
