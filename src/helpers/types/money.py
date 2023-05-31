@@ -26,6 +26,11 @@ class Cents(float):
         return "$%0.2f" % (self / 100)
 
 
+class Dollars(Cents):
+    def __new__(cls, num: int | float):
+        return super(Dollars, cls).__new__(cls, num * 100)
+
+
 def get_opposite_side_price(price: Price) -> Price:
     """Get the price of the opposite side of the orderbook"""
     return Price(100 - price)

@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 
 from src.helpers.types.markets import MarketResult, MarketTicker
-from src.helpers.types.money import Balance, Cents, Price
+from src.helpers.types.money import Balance, Cents, Dollars, Price
 from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 from tests.conftest import ExchangeInterface
@@ -180,7 +180,7 @@ class Portfolio:
                 ):
                     # We get a dollar per contract (quantity)
                     unrealized_pnl += (
-                        Cents(position.total_quantity * 100) - position.get_value()
+                        Dollars(position.total_quantity * 100) - position.get_value()
                     )
                 else:
                     # Otherwise, we lose money

@@ -4,7 +4,7 @@ import pytest
 from mock import patch
 
 from src.helpers.types.common import URL, NonNullStr
-from src.helpers.types.money import Balance, Cents, Price
+from src.helpers.types.money import Balance, Cents, Dollars, Price
 from src.helpers.types.orders import Quantity, compute_fee
 from src.helpers.utils import PendingMessages, Printer, compute_pnl
 
@@ -123,3 +123,17 @@ def test_compute_pnl():
             sell_price,
             quantity,
         )
+
+
+def test_dollars():
+    d = Dollars(100)
+    assert d == Cents(10_000)
+
+    d = Dollars(0)
+    assert d == Cents(0)
+
+    d = Dollars(-100)
+    assert d == Cents(-10_000)
+
+    d = Dollars(10)
+    assert d == Cents(1_000)

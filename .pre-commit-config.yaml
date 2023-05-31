@@ -3,7 +3,6 @@
 default_language_version:
   python: python3.11.2
 
-fail_fast: true
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: "v0.0.267"

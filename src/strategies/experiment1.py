@@ -6,7 +6,7 @@ from rich.progress import Progress
 from src.data.reading.orderbook import OrderbookReader
 from src.helpers.constants import PATH_TO_ORDERBOOK_DATA
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Balance, Price
+from src.helpers.types.money import Balance, Dollars, Price
 from src.helpers.types.orders import Order, Side
 from src.helpers.utils import compute_pnl
 from tests.unit.common_test import Cents
@@ -22,7 +22,7 @@ class Experiment1:
 
     def __init__(self, price_differential: Cents):
         self._reader = OrderbookReader.historical(PATH_TO_ORDERBOOK_DATA / "05-17-2023")
-        self._portfolio = Portfolio(Balance(Cents(10_000)))  # $100
+        self._portfolio = Portfolio(Balance(Dollars(100)))
         # Maps the market ticker and side to the initial price
         # or the last price seen before purchase
         self._last_prices: Dict[Tuple[MarketTicker, Side], Price] = {}
