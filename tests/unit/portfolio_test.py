@@ -1,9 +1,11 @@
 import copy
 
 import pytest
+from mock import MagicMock
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Balance, Cents
+from src.exchange.interface import ExchangeInterface
+from src.helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
+from src.helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
 from src.helpers.types.portfolio import Portfolio, PortfolioError, Position
@@ -636,3 +638,63 @@ Orders:
   Ticker2: Bought NO | 200 @ 6¢
   Ticker2: Sold NO | 150 @ 5¢"""
     )
+
+
+def test_get_unrealized_pnl():
+    p = Portfolio(Balance(Dollars(10000)))
+    p.buy(
+        Order(
+            price=Price(10),
+            quantity=Quantity(100),
+            trade=Trade.BUY,
+            ticker=MarketTicker("determined_profit"),
+            side=Side.NO,
+        )
+    )
+    p.buy(
+        Order(
+            price=Price(5),
+            quantity=Quantity(1000),
+            trade=Trade.BUY,
+            ticker=MarketTicker("determined_loss"),
+            side=Side.NO,
+        )
+    )
+    p.buy(
+        Order(
+            price=Price(10),
+            quantity=Quantity(1000),
+            trade=Trade.BUY,
+            ticker=MarketTicker("not_determined"),
+            side=Side.NO,
+        )
+    )
+
+    market1 = Market(
+        status=MarketStatus.SETTLED,
+        ticker=MarketTicker("determined_profit"),
+        result=MarketResult.NO,
+        last_price=Price(95),
+    )
+
+    market2 = Market(
+        status=MarketStatus.SETTLED,
+        ticker=MarketTicker("determined_loss"),
+        result=MarketResult.YES,
+        last_price=Price(95),
+    )
+    market3 = Market(
+        status=MarketStatus.OPEN,
+        ticker=MarketTicker("not_determined"),
+        result=MarketResult.NOT_DETERMINED,
+        last_price=Price(95),
+    )
+
+    mock_exchange = MagicMock(spec=ExchangeInterface)
+    mock_exchange.get_market.side_effect = [market1, market2, market3]
+
+    profit1 = get_opposite_side_price(Price(10)) * Quantity(100)
+    profit2 = -1 * Price(5) * Quantity(1000)
+    profit3 = (Price(95) - Price(10)) * Quantity(1000)
+
+    assert p.get_unrealized_pnl(mock_exchange) == profit1 + profit2 + profit3

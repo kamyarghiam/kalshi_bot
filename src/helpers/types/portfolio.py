@@ -165,6 +165,7 @@ class Portfolio:
                 revenue = market.last_price * position.total_quantity
                 cost, _ = position.sell(
                     Order(
+                        ticker=market.ticker,
                         price=market.last_price,
                         quantity=position.total_quantity,
                         trade=Trade.SELL,
@@ -180,11 +181,12 @@ class Portfolio:
                 ):
                     # We get a dollar per contract (quantity)
                     unrealized_pnl += (
-                        Dollars(position.total_quantity * 100) - position.get_value()
+                        Dollars(position.total_quantity) - position.get_value()
                     )
                 else:
                     # Otherwise, we lose money
                     unrealized_pnl -= position.get_value()
+        return unrealized_pnl
 
     def __str__(self):
         # Only compute fees paid once
