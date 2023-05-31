@@ -109,12 +109,16 @@ class Orderbook:
         if self.view == OrderbookView.BID:
             yes_price, _ = self.yes.get_largest_price_level()
             no_price, _ = self.no.get_largest_price_level()
-            return yes_price + no_price < Cents(100)
+            # We do <= instead of < becasue there have been instances on the orderbook
+            # where we saw that the orders summed to 100, even though this shouldn't
+            # be possible
+            return yes_price + no_price <= Cents(100)
         else:
             assert self.view == OrderbookView.ASK
             yes_price, _ = self.yes.get_smallest_price_level()
             no_price, _ = self.no.get_smallest_price_level()
-            return yes_price + no_price > Cents(100)
+            # Ditton equality, see comment above
+            return yes_price + no_price >= Cents(100)
 
     def apply_delta(self, delta: "OrderbookDeltaRM") -> "Orderbook":
         """Non-destructively applies an orderbook delta to an orderbook snapshot"""
@@ -132,7 +136,11 @@ class Orderbook:
             assert delta.side == Side.YES
             new_orderbook.yes.apply_delta(delta.price, delta.delta)
         if not new_orderbook._is_valid_orderbook():
-            raise ValueError("Not a valid orderbook after delta")
+            raise ValueError(
+                "Not a valid orderbook after delta. "
+                + f"Old orderbook: {self}. Delta: {delta}."
+                + f"Neworderbook: {new_orderbook}"
+            )
         return new_orderbook
 
     @classmethod

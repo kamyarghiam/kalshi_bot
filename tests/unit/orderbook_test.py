@@ -422,11 +422,24 @@ def test_invalid_orderbooks():
         yes=OrderbookSide(levels={Price(90): Quantity(10)}),
         view=OrderbookView.BID,
     )
+    # The sum of the sides can equal 100. I believe this is a bug
+    # on Kalshi because this shouldn't be possible but this is
+    # what we observe in the data
+    o.apply_delta(
+        OrderbookDeltaRM(
+            market_ticker=MarketTicker("hi"),
+            price=Price(10),
+            delta=QuantityDelta(10),
+            side=Side.NO,
+        )
+    )
+
+    # Anything over 100 will raise an error
     with pytest.raises(ValueError) as err:
         o.apply_delta(
             OrderbookDeltaRM(
                 market_ticker=MarketTicker("hi"),
-                price=Price(10),
+                price=Price(11),
                 delta=QuantityDelta(10),
                 side=Side.NO,
             )
