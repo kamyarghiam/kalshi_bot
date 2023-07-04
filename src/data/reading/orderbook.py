@@ -17,6 +17,11 @@ class OrderbookReader(Generator[Orderbook, None, None]):
     You can use it like:
 
     for msg in <OrderbookReader>...
+
+    You could also use the class methods like:
+
+    OrderbookReader.historical(data_path)
+    OrderbookReader.live(exchange_interface)
     """
 
     def __init__(
