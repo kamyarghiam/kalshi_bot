@@ -63,6 +63,7 @@ class OrderbookSnapshotRM(ResponseMessage):
     yes: List[Tuple[Price, Quantity]] = []
     no: List[Tuple[Price, Quantity]] = []
     # The timestamp of receiving the message from the exchange
+    # Note: this was adding on 07-15-2023. Prior data may not have this
     ts: datetime = Field(default_factory=datetime.now)
 
     @validator("yes", "no", pre=True)
@@ -80,6 +81,7 @@ class OrderbookDeltaRM(ResponseMessage):
     delta: QuantityDelta
     side: Side
     # The timestamp of receiving the message from the exchange
+    # Note: this was adding on 07-15-2023. Prior data may not have this
     ts: datetime = Field(default_factory=datetime.now)
 
 
