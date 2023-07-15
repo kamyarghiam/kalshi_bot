@@ -1,6 +1,7 @@
 import copy
 import typing
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Dict, Tuple
 
@@ -95,6 +96,8 @@ class Orderbook:
     no: OrderbookSide = field(default_factory=OrderbookSide)
     # Initially all orderbooks are in the maker (aka sell view) view from the websocket
     view: OrderbookView = field(default_factory=lambda: OrderbookView.BID)
+    # The timestamp of when the message was received from the exchange
+    ts: datetime = field(default_factory=datetime.now, compare=False)
 
     def __post_init__(self):
         if not self._is_valid_orderbook():
@@ -141,6 +144,7 @@ class Orderbook:
                 + f"Old orderbook: {self}. Delta: {delta}."
                 + f"Neworderbook: {new_orderbook}"
             )
+        new_orderbook.ts = delta.ts
         return new_orderbook
 
     @classmethod
@@ -151,7 +155,12 @@ class Orderbook:
             yes.add_level(level[0], level[1])
         for level in orderbook_snapshot.no:
             no.add_level(level[0], level[1])
-        return cls(market_ticker=orderbook_snapshot.market_ticker, yes=yes, no=no)
+        return cls(
+            market_ticker=orderbook_snapshot.market_ticker,
+            ts=orderbook_snapshot.ts,
+            yes=yes,
+            no=no,
+        )
 
     def get_view(self, view: OrderbookView) -> "Orderbook":
         """Returns a different view of the orderbook"""

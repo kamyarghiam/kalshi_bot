@@ -58,18 +58,21 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
             price=Price(10),
             side=Side.NO,
             delta=QuantityDelta(5),
+            ts=second_message.msg.ts,
         )
         assert second_message.msg == expected_delta
 
         third_message = next(gen)
         assert third_message.type == Type.ORDERBOOK_DELTA
         assert isinstance(third_message, OrderbookDeltaWR)
+        expected_delta.ts = third_message.msg.ts
         assert third_message.msg == expected_delta
 
         # this message is going to re-subscribe to the topic. Goes back to beginning
         fourth_message = next(gen)
         assert fourth_message.type == Type.ORDERBOOK_SNAPSHOT
         assert isinstance(fourth_message, OrderbookSnapshotWR)
+        expected_delta.ts = fourth_message.msg.ts
         assert Orderbook.from_snapshot(fourth_message.msg) == expected_snapshot
 
         fifth_message = next(gen)
@@ -78,6 +81,7 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
             price=Price(10),
             side=Side.NO,
             delta=QuantityDelta(5),
+            ts=fifth_message.msg.ts,
         )
 
 
