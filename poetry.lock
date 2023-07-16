@@ -138,6 +138,61 @@ files = [
 ]
 
 [[package]]
+name = "ciso8601"
+version = "2.3.0"
+description = "Fast ISO8601 date time parser for Python written in C"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ciso8601-2.3.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:8f884d6a0b7384f8b1c57f740196988dd1229242c1be7c30a75424725590e0b3"},
+    {file = "ciso8601-2.3.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:58517dfe06c30ad65fb1b4e9de66ccb72752d79bc71d7b7d26cbc0d008b7265a"},
+    {file = "ciso8601-2.3.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:c66032757d314ad232904f91a54df4907bd9af41b0d0b4acc19bfde1ab52983b"},
+    {file = "ciso8601-2.3.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b6cae7a74d9485a2f191adc5aad2563756af89cc1f3190e7d89f401b2349eb2b"},
+    {file = "ciso8601-2.3.0-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:47cc66899e5facdccc28f183b978ace9edbebdea6545c013ec1d369fdea3de61"},
+    {file = "ciso8601-2.3.0-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:2b4596c9d92719af4f06082c59182ce9de3a73e2bda67304498d9ac78264dd5c"},
+    {file = "ciso8601-2.3.0-cp310-cp310-win_amd64.whl", hash = "sha256:a002a8dc91e63730f7ca8eae0cb1e2832ee057fedf65e5b9bf416aefb1dd8cab"},
+    {file = "ciso8601-2.3.0-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:87a6f58bdda833cb8d78c6482a179fff663903a8f562755e119bf815b1014f2e"},
+    {file = "ciso8601-2.3.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:7667faf021314315a3c498e4c7c8cf57a7014af0960ddd5b671bcf03b2d0132b"},
+    {file = "ciso8601-2.3.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:fa90488666ee44796932850fc419cd55863b320f77b1474991e60f321b5ac7d2"},
+    {file = "ciso8601-2.3.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1aba1f59b6d27ec694128f9ba85e22c1f17e67ffc5b1b0a991628bb402e25e81"},
+    {file = "ciso8601-2.3.0-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:896dd46c7f2129140fc36dbe9ccf78cec02143b941b5a608e652cd40e39f6064"},
+    {file = "ciso8601-2.3.0-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:2cf6dfa22f21f838b730f977bc7ad057c37646f683bf42a727b4e763f44d47dc"},
+    {file = "ciso8601-2.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:a8c4aa6880fd698075d5478615d4668e70af6424d90b1686c560c1ec3459926a"},
+    {file = "ciso8601-2.3.0-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:b12d314415ba1e4e4bfcfa3db782335949ca1866a2b6fe22c47099fed9c82826"},
+    {file = "ciso8601-2.3.0-cp36-cp36m-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7d115fc2501a316256dd0b961b0b384a12998c626ab1e91cd06164f7792e3908"},
+    {file = "ciso8601-2.3.0-cp36-cp36m-musllinux_1_1_i686.whl", hash = "sha256:5817bd895c0d083c161ea38459de8e2b90d798de09769aaba003fe53c1418aba"},
+    {file = "ciso8601-2.3.0-cp36-cp36m-musllinux_1_1_x86_64.whl", hash = "sha256:7d68741fe53cd0134e8e94109ede36d7aeaa65a36682680d53b69f790291d80f"},
+    {file = "ciso8601-2.3.0-cp36-cp36m-win_amd64.whl", hash = "sha256:74c4b0fe3fd0ce1a0da941f3f50af1a81970d7e4536cbae43f27e041b4ae4d3e"},
+    {file = "ciso8601-2.3.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:0136d49f2265bf3d06ffb7bc649a64ed316e921ba6cd05e0fecc477c80fe5097"},
+    {file = "ciso8601-2.3.0-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2188dd4784d87e4008cc765c80e26a503450c57a98655321de777679c556b133"},
+    {file = "ciso8601-2.3.0-cp37-cp37m-musllinux_1_1_i686.whl", hash = "sha256:4e0fa37c6d58be990c10d537ed286a35c018b5f038039ad796cf2352bc26799e"},
+    {file = "ciso8601-2.3.0-cp37-cp37m-musllinux_1_1_x86_64.whl", hash = "sha256:fa1085b47c15df627d6bea783a8f7c89a59268af85e204992a013df174b339aa"},
+    {file = "ciso8601-2.3.0-cp37-cp37m-win_amd64.whl", hash = "sha256:352809f24dc0fa7e05b85046f8bd34165a20fa5ebb5b43e053668fa69d57e657"},
+    {file = "ciso8601-2.3.0-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:7e8e78f8c7d35e6b43ad7316f652e2d53bf4b8798725d481abff14657852a88c"},
+    {file = "ciso8601-2.3.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:4cc04399f79a62338d4f4c19560d2b30f2d257021df1b0e55bae9209d8844c0c"},
+    {file = "ciso8601-2.3.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:e4affe0e72debf18c98d2f9e41c24a8ec8421ea65fafba96919f20a8d0f9bf87"},
+    {file = "ciso8601-2.3.0-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:47d7d0f84fb0276c031bf606da484e9dc52ebdf121695732609dc49b30e8cf7c"},
+    {file = "ciso8601-2.3.0-cp38-cp38-musllinux_1_1_i686.whl", hash = "sha256:8b1a217967083ac295d9239f5ba5235c66697fdadc2d5399c7bac53353218201"},
+    {file = "ciso8601-2.3.0-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:2785f374388e48c21420e820295d36a8d0734542e4e7bd3899467dc4d56016da"},
+    {file = "ciso8601-2.3.0-cp38-cp38-win_amd64.whl", hash = "sha256:59e6ac990dc31b14a39344a6a0f651658829bc59666cfff13c8deca37e360d86"},
+    {file = "ciso8601-2.3.0-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:3b135cda50be4ed52e44e815794cb19b268baf75d6c2a2a34eb6c2851bbe9423"},
+    {file = "ciso8601-2.3.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:b247b4a854119d438d28e0efd0258a5bb710be59ffeba3d2bea5bdab82f90ef3"},
+    {file = "ciso8601-2.3.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:243ffcbee824ed74b21bd1cede72050d36095df5fad8f1704730669d2b0db5be"},
+    {file = "ciso8601-2.3.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d39aa3d7148fcd9db1007c258e47c9e0174f383d82f5504b80db834c6215b7e4"},
+    {file = "ciso8601-2.3.0-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:e838b694b009e2d9b3b680008fa4c56e52f83935a31ea86fe4203dfff0086f88"},
+    {file = "ciso8601-2.3.0-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:aa58f55ed5c8b1e9962b56b2ecbfcca32f056edf8ecdce73b6623c55a2fd11e8"},
+    {file = "ciso8601-2.3.0-cp39-cp39-win_amd64.whl", hash = "sha256:161dc428d1735ed6dee6ce599c4275ef3fe280fe37308e3cc2efd4301781a7ff"},
+    {file = "ciso8601-2.3.0-pp37-pypy37_pp73-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:374275a329138b9b70c857c9ea460f65dc7f01ed2513f991e57090f39bf01de5"},
+    {file = "ciso8601-2.3.0-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:58910c03b5464d6b766ac5d894c6089ee8279432b85181283571b0e2bf502df4"},
+    {file = "ciso8601-2.3.0-pp38-pypy38_pp73-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b9f7608a276fa46d28255906c341752a87fe5353d8060932e0ec71745148a4d8"},
+    {file = "ciso8601-2.3.0-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:e20d14155f7b069f2aa2387a3f31de98f93bb94da63ad1b5aae78445b33f0529"},
+    {file = "ciso8601-2.3.0-pp39-pypy39_pp73-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a3f781561401c8666accae823ed8f2a5d1fa50b3e65eb65c21a2bd0374e14f19"},
+    {file = "ciso8601-2.3.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:a0f4a649e9693e5a46843b0ebd288de1e45b8852a2cff684e3a6b6f3fd56ec4e"},
+    {file = "ciso8601-2.3.0.tar.gz", hash = "sha256:19e3fbd786d8bec3358eac94d8774d365b694b604fd1789244b87083f66c8900"},
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -463,6 +518,32 @@ files = [
     {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
     {file = "idna-3.4.tar.gz", hash = "sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4"},
 ]
+
+[[package]]
+name = "influxdb-client"
+version = "1.36.1"
+description = "InfluxDB 2.0 Python client library"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "influxdb_client-1.36.1-py3-none-any.whl", hash = "sha256:a5a8d840139431356235f6c786cd49740ed545b6e99be62ae3fb6ba5df1d982b"},
+    {file = "influxdb_client-1.36.1.tar.gz", hash = "sha256:59654af4f7133f0ecf916411935b50f42e5c4bc125d218e193848f3615b57bfc"},
+]
+
+[package.dependencies]
+certifi = ">=14.05.14"
+ciso8601 = {version = ">=2.1.1", optional = true, markers = "extra == \"ciso\""}
+python-dateutil = ">=2.5.3"
+reactivex = ">=4.0.4"
+setuptools = ">=21.0.0"
+urllib3 = ">=1.26.0"
+
+[package.extras]
+async = ["aiocsv (>=1.2.2)", "aiohttp (>=3.8.1)"]
+ciso = ["ciso8601 (>=2.1.1)"]
+extra = ["numpy", "pandas (>=0.25.3)"]
+test = ["aioresponses (>=0.7.3)", "coverage (>=4.0.3)", "flake8 (>=5.0.3)", "httpretty (==1.0.5)", "jinja2 (==3.1.2)", "nose (>=1.3.7)", "pluggy (>=0.3.1)", "psutil (>=5.6.3)", "py (>=1.4.31)", "pytest (>=5.0.0)", "pytest-cov (>=3.0.0)", "pytest-timeout (>=2.1.0)", "randomize (>=0.13)", "sphinx (==1.8.5)", "sphinx-rtd-theme"]
 
 [[package]]
 name = "iniconfig"
@@ -1079,6 +1160,21 @@ files = [
 ]
 
 [[package]]
+name = "reactivex"
+version = "4.0.4"
+description = "ReactiveX (Rx) for Python"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "reactivex-4.0.4-py3-none-any.whl", hash = "sha256:0004796c420bd9e68aad8e65627d85a8e13f293de76656165dffbcb3a0e3fb6a"},
+    {file = "reactivex-4.0.4.tar.gz", hash = "sha256:e912e6591022ab9176df8348a653fe8c8fa7a301f26f9931c9d8c78a650e04e8"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.1.1,<5.0.0"
+
+[[package]]
 name = "requests"
 version = "2.28.2"
 description = "Python HTTP for Humans."
@@ -1218,6 +1314,23 @@ numpy = ">=1.18.5,<1.26.0"
 dev = ["flake8", "mypy", "pycodestyle", "typing_extensions"]
 doc = ["matplotlib (>2)", "numpydoc", "pydata-sphinx-theme (==0.9.0)", "sphinx (!=4.1.0)", "sphinx-panels (>=0.5.2)", "sphinx-tabs"]
 test = ["asv", "gmpy2", "mpmath", "pytest", "pytest-cov", "pytest-xdist", "scikit-umfpack", "threadpoolctl"]
+
+[[package]]
+name = "setuptools"
+version = "68.0.0"
+description = "Easily download, build, install, upgrade, and uninstall Python packages"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "setuptools-68.0.0-py3-none-any.whl", hash = "sha256:11e52c67415a381d10d6b462ced9cfb97066179f0e871399e006c4ab101fc85f"},
+    {file = "setuptools-68.0.0.tar.gz", hash = "sha256:baf1fdb41c6da4cd2eae722e135500da913332ab3f2f5c7d33af9b492acb5235"},
+]
+
+[package.extras]
+docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-favicon", "sphinx-hoverxref (<2)", "sphinx-inline-tabs", "sphinx-lint", "sphinx-notfound-page (==0.8.3)", "sphinx-reredirects", "sphinxcontrib-towncrier"]
+testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8-2020", "ini2toml[lite] (>=0.9)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pip (>=19.1)", "pip-run (>=8.8)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-mypy (>=0.9.1)", "pytest-perf", "pytest-ruff", "pytest-timeout", "pytest-xdist", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel"]
+testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pytest", "pytest-enabler", "pytest-xdist", "tomli", "virtualenv (>=13.0.0)", "wheel"]
 
 [[package]]
 name = "six"
@@ -1439,4 +1552,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "9541a94b436847604a069ed944cd6b05bb9e6f6bbc3e793c9aff2b8b7e87ce9d"
+content-hash = "cc84b914b245954e2ff9b4c70c6f201d4e2f1e8c68158e284df03ee93a58042a"

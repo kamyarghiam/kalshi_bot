@@ -47,6 +47,8 @@ direction of the project.
 }
 ```
 
+- Install InfluxDB. On mac, run `brew update && brew install influxdb` for mac
+
 ### CREDENTIALS
 
 Credentials will be necessary for running tests and connecting to the Kalshi demo exchange.
