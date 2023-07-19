@@ -48,7 +48,7 @@ direction of the project.
 ```
 
 - Install InfluxDB. On mac, run `brew update && brew install influxdb` for mac
-- Move the influxdb engine to the store file. For me, it looked like `cp -r /Users/kamyarghiam/.influxdbv2/engine src/data/store/influxdb/engine`
+- Move the influxdb engine to the store folder. This keeps the data localized in one place. For me, it looked like `cp -r /Users/kamyarghiam/.influxdbv2/engine src/data/store/influxdb/engine`
 
 ### CREDENTIALS
 
