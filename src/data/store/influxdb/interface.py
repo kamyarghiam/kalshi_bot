@@ -9,7 +9,9 @@ class InfluxDBAdapter:
     def __enter__(self):
         # See: https://stackoverflow.com/questions/4789837/how-to-terminate-a-python-subprocess-launched-with-shell-true
         self._influx_process = subprocess.Popen(
-            "exec influxd", stdout=subprocess.PIPE, shell=True
+            "exec influxd --engine-path src/data/store/influxdb/engine",
+            stdout=subprocess.PIPE,
+            shell=True,
         )
         # Wait until influx DB is up
         while not self._client.ping():
