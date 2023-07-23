@@ -2,7 +2,7 @@ import time
 
 from influxdb_client.client.flux_table import FluxRecord
 
-from src.data.store.influxdb.interface import InfluxDBAdapter
+from src.data.influxdb_interface import InfluxDBAdapter
 
 
 def test_basic_influxdb_write_get():

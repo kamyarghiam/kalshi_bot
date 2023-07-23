@@ -12,7 +12,7 @@ from tests.fake_exchange import OrderbookDeltaRM
 
 
 class OrderbookReader(Generator[Orderbook, None, None]):
-    """Reads orderbook data either from a websocket or historical data
+    """Reads orderbook data sequentially either from a websocket or historical data
 
     You can use it like:
 
@@ -95,6 +95,7 @@ class OrderbookReader(Generator[Orderbook, None, None]):
 def historical_data_reader(
     path: Path,
 ) -> Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None]:
+    # TODO: change this to read from influx db
     with open(str(path), "rb") as f:
         msg_num = 0
         while True:

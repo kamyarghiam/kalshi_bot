@@ -26,6 +26,7 @@ def collect_orderbook_data(
 ):
     """Dumps data as pickle to file. To read data, call pickle.load
     on the file several times"""
+    # TODO: CHANGE THIS TO WRITE TO INFLUX DB
     data_path = get_data_path() if data_path is None else data_path
 
     if not data_path.exists():
