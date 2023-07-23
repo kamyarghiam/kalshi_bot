@@ -9,7 +9,6 @@ def test_basic_influxdb_write_get():
     with InfluxDBAdapter() as influx:
         measurement = f"test_measurement_{time.time()}"
         influx.write(
-            InfluxDBAdapter.test_bucket_name,
             measurement,
             fields={"test": "test"},
             tags={"tag": "tag"},

@@ -13,7 +13,6 @@ from src.helpers.types.auth import Auth
 class InfluxDBAdapter:
     # Data in this bucket is deleted after 1 hour
     test_bucket_name = "testing"
-    demo_bucket_name = "demo"
     prod_bucket_name = "prod"
     db_address = "http://localhost:8086"
     org = "kamyar"
@@ -45,6 +44,11 @@ class InfluxDBAdapter:
         self._write_api: WriteApi | None = None
         # Use self.query_api to initialize
         self._query_api: QueryApi | None = None
+        self._bucket = (
+            InfluxDBAdapter.test_bucket_name
+            if is_test_run
+            else InfluxDBAdapter.prod_bucket_name
+        )
 
         # Bring up influxdb
         self._client = InfluxDBClient(
@@ -71,7 +75,6 @@ class InfluxDBAdapter:
 
     def write(
         self,
-        bucket: str,
         measurement: str,
         fields: Dict[str, str],
         tags: Dict[str, str] = {},
@@ -90,7 +93,7 @@ class InfluxDBAdapter:
         for field_key, field_value in fields.items():
             point = point.field(field_key, field_value)
 
-        self.write_api.write(bucket=bucket, record=point)
+        self.write_api.write(bucket=self._bucket, record=point)
 
     def query(self, query: str) -> TableList:
         return self.query_api.query(query)
