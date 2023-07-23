@@ -3,7 +3,7 @@ import typing
 from datetime import datetime
 from typing import List, Sequence, Tuple, TypeVar
 
-from pydantic import BaseModel, Extra, Field, validator
+from pydantic import BaseModel, Extra, validator
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
@@ -62,8 +62,7 @@ class OrderbookSnapshotRM(ResponseMessage):
     market_ticker: MarketTicker
     yes: List[Tuple[Price, Quantity]] = []
     no: List[Tuple[Price, Quantity]] = []
-    # The timestamp of receiving the message from the exchange
-    ts: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = datetime.now()
 
     @validator("yes", "no", pre=True)
     def validate_iterable(cls, input_levels: List[Sequence[int]]):
@@ -79,8 +78,6 @@ class OrderbookDeltaRM(ResponseMessage):
     price: Price
     delta: QuantityDelta
     side: Side
-    # The timestamp of receiving the message from the exchange
-    ts: datetime = Field(default_factory=datetime.now)
 
 
 ### Different websocket responses ####
@@ -106,6 +103,7 @@ class OrderbookDeltaWR(WebsocketResponse):
     sid: SubscriptionId
     seq: SeqId
     msg: OrderbookDeltaRM
+    created_at: datetime = datetime.now()
 
 
 class UnsubscribedWR(WebsocketResponse):
