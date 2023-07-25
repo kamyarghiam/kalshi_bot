@@ -16,6 +16,7 @@ class InfluxDBAdapter:
     prod_bucket_name = "prod"
     db_address = "http://localhost:8086"
     org = "kamyar"
+    orderbook_updates_measurement = "orderbook_udpates"
 
     def __enter__(self):
         # See: https://stackoverflow.com/questions/4789837/how-to-terminate-a-python-subprocess-launched-with-shell-true
@@ -26,7 +27,7 @@ class InfluxDBAdapter:
         )
         # Wait until influx DB is up
         while not self._client.ping():
-            sleep(0.1)
+            sleep(0.1)  # pragma: no cover
         return self
 
     def __exit__(
@@ -88,7 +89,7 @@ class InfluxDBAdapter:
         """
         point = Point(measurement)
         for tag_key, tag_value in tags.items():
-            point = point.field(tag_key, tag_value)
+            point = point.tag(tag_key, tag_value)
 
         for field_key, field_value in fields.items():
             point = point.field(field_key, field_value)

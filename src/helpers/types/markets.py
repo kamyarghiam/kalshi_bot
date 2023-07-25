@@ -7,8 +7,30 @@ from src.helpers.types.api import Cursor, ExternalApi
 from src.helpers.types.money import Price
 
 
+class SeriesTicker(str):
+    """Series tickers on the exchange.
+
+    Example: CPICORE"""
+
+
+class EventTicker(str):
+    """Event tickers on the exchange.
+
+    Example: CPICORE-23JUL"""
+
+
 class MarketTicker(str):
-    """Tickers on the exchange"""
+    """Full market tickers on the exchange.
+
+    Example: CPICORE-23JUL-TN0.1"""
+
+
+def to_event_ticker(market_ticker: MarketTicker) -> EventTicker:
+    return EventTicker(market_ticker.rsplit("-", 1)[0])
+
+
+def to_series_ticker(market_ticker: MarketTicker) -> SeriesTicker:
+    return SeriesTicker(market_ticker.split("-")[0])
 
 
 class MarketResult(str, Enum):
