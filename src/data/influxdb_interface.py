@@ -1,11 +1,13 @@
 import subprocess
+import typing
 from time import sleep
 from types import TracebackType
-from typing import Dict
+from typing import Any, Dict
 
 from influxdb_client import InfluxDBClient, Point, QueryApi, WriteApi
 from influxdb_client.client.flux_table import TableList
 from influxdb_client.client.write_api import SYNCHRONOUS
+from pydantic import BaseModel
 
 from src.helpers.types.auth import Auth
 
@@ -98,3 +100,13 @@ class InfluxDBAdapter:
 
     def query(self, query: str) -> TableList:
         return self.query_api.query(query)
+
+    @staticmethod
+    def encode_object(o: BaseModel) -> str:
+        """Encodes basemodel object so it can be stored in influx"""
+        return o.json()
+
+    @staticmethod
+    def decode_object(s: str, object_class: typing.Type[BaseModel]) -> Any:
+        """Decodes basemodel object that was encoded with the encode_object function"""
+        return object_class.parse_raw(s)

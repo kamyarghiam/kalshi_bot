@@ -1,5 +1,3 @@
-import pickle
-
 from rich.console import Console
 from rich.table import Table
 
@@ -33,13 +31,15 @@ def collect_orderbook_data(
                 printer.num_deltas += 1
             printer.run()
             market_ticker = data.msg.market_ticker
+            data_type = "snapshot" if isinstance(data, OrderbookSnapshotWR) else "delta"
             influx.write(
                 InfluxDBAdapter.orderbook_updates_measurement,
                 tags={
                     "series_ticker": to_series_ticker(market_ticker),
                 },
                 fields={
-                    "data": str(pickle.dumps(data.msg)),
+                    "data": InfluxDBAdapter.encode_object(data.msg),
+                    "data_type": data_type,
                 },
             )
 
