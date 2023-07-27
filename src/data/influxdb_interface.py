@@ -14,6 +14,14 @@ from src.helpers.types.auth import Auth
 
 
 class InfluxDBAdapter:
+    """Entrypoint into the influxdb
+
+    You must use this in a context manager to successfully access the db
+
+    with InfluxDBAdapter() as influx_client:
+        ...
+    """
+
     # Data in this bucket is deleted after 1 hour
     test_bucket_name = "testing"
     prod_bucket_name = "prod"

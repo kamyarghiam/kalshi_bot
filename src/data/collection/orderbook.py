@@ -22,30 +22,33 @@ def collect_orderbook_data(
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, market_tickers)
         gen = sub.continuous_receive()
-        while True:
-            data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
-            if isinstance(data, OrderbookSnapshotWR):
-                printer.num_snapshots += 1
-            else:
-                assert isinstance(data, OrderbookDeltaWR)
-                printer.num_deltas += 1
-            printer.run()
-            market_ticker = data.msg.market_ticker
-            data_type = "snapshot" if isinstance(data, OrderbookSnapshotWR) else "delta"
-            influx.write(
-                InfluxDBAdapter.orderbook_updates_measurement,
-                tags={
-                    "series_ticker": to_series_ticker(market_ticker),
-                },
-                fields={
-                    "data": InfluxDBAdapter.encode_object(data.msg),
-                    "data_type": data_type,
-                },
-            )
+        with InfluxDBAdapter(is_test_run) as influx:
+            while True:
+                data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
+                if isinstance(data, OrderbookSnapshotWR):
+                    printer.num_snapshots += 1
+                else:
+                    assert isinstance(data, OrderbookDeltaWR)
+                    printer.num_deltas += 1
+                printer.run()
+                market_ticker = data.msg.market_ticker
+                data_type = (
+                    "snapshot" if isinstance(data, OrderbookSnapshotWR) else "delta"
+                )
+                influx.write(
+                    InfluxDBAdapter.orderbook_updates_measurement,
+                    tags={
+                        "series_ticker": to_series_ticker(market_ticker),
+                    },
+                    fields={
+                        "data": InfluxDBAdapter.encode_object(data.msg),
+                        "data_type": data_type,
+                    },
+                )
 
-            if is_test_run and printer.num_deltas + printer.num_snapshots == 3:
-                # For testing, we don't want to run it too many times
-                break
+                if is_test_run and printer.num_deltas + printer.num_snapshots == 3:
+                    # For testing, we don't want to run it too many times
+                    break
 
 
 class OrderbookCollectionPrinter:
