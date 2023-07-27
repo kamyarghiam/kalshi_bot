@@ -64,6 +64,7 @@ Next, you will need to export these three variables in your local environment (e
 - API_USERNAME
 - API_PASSWORD
 - INFLUXDB_API_TOKEN
+- TRADING_ENV
 
 In order for tests to pass, you need these env vars. These vars are used for functional
 tests and some regular testing. You can automatically add these env vars
@@ -77,6 +78,7 @@ export API_VERSION='v2'
 export API_USERNAME='your-email@email.com'
 export API_PASSWORD='some-password'
 export INFLUXDB_API_TOKEN = 'influxdb_token'
+export TRADING_ENV = 'demo' or 'prod'
 ```
 
 And then adding the following to your bash / zsh profile: `source path/to/your/script.sh`.

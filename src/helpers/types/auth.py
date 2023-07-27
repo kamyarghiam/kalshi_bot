@@ -10,8 +10,10 @@ from src.helpers.constants import (
     INFLUXDB_API_TOKEN,
     KALSHI_PROD_BASE_URL,
     PASSWORD_ENV_VAR,
+    TRADING_ENV_ENV_VAR,
     URL_ENV_VAR,
     USERNAME_ENV_VAR,
+    TradingEnv,
 )
 from src.helpers.types.api import ExternalApi
 from src.helpers.types.common import URL, NonNullStr
@@ -81,6 +83,7 @@ class Auth:
         self._base_url: URL = URL(os.environ.get(URL_ENV_VAR))
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
         self._influxdb_api_token: str | None = os.environ.get(INFLUXDB_API_TOKEN)
+        self.env: TradingEnv = TradingEnv(os.environ.get(TRADING_ENV_ENV_VAR))
 
         if is_test_run and KALSHI_PROD_BASE_URL in self._base_url:
             raise ValueError("You're running against prod. Are you sure?")

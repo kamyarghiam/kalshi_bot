@@ -9,6 +9,7 @@ from influxdb_client.client.flux_table import TableList
 from influxdb_client.client.write_api import SYNCHRONOUS
 from pydantic import BaseModel
 
+from src.helpers.constants import TradingEnv
 from src.helpers.types.auth import Auth
 
 
@@ -49,7 +50,7 @@ class InfluxDBAdapter:
         self._query_api: QueryApi | None = None
         self._bucket = (
             InfluxDBAdapter.test_bucket_name
-            if is_test_run
+            if is_test_run or self._auth.env == TradingEnv.DEMO
             else InfluxDBAdapter.prod_bucket_name
         )
 

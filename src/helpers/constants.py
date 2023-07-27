@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 
 from src.helpers.types.common import URL
@@ -16,6 +17,7 @@ PASSWORD_ENV_VAR = "API_PASSWORD"
 URL_ENV_VAR = "API_URL"
 API_VERSION_ENV_VAR = "API_VERSION"
 INFLUXDB_API_TOKEN = "INFLUXDB_API_TOKEN"
+TRADING_ENV_ENV_VAR = "TRADING_ENV"
 ENV_VARS = [
     USERNAME_ENV_VAR,
     PASSWORD_ENV_VAR,
@@ -23,3 +25,8 @@ ENV_VARS = [
     API_VERSION_ENV_VAR,
 ]
 PATH_TO_ORDERBOOK_DATA = Path("src/data/store/orderbook_data")
+
+
+class TradingEnv(str, Enum):
+    DEMO = "demo"
+    PROD = "prod"

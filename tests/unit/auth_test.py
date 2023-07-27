@@ -20,6 +20,7 @@ from src.helpers.types.common import URL
         "API_PASSWORD": "PASS",
         "API_URL": "URL",
         "API_VERSION": "VERSION",
+        "TRADING_ENV": "prod",
     },
 )
 def test_succesful_auth():
@@ -38,6 +39,7 @@ def test_missing_creds():
             "API_PASSWORD": "PASS",
             "API_URL": "URL",
             "API_VERSION": "VERSION",
+            "TRADING_ENV": "demo",
         },
     ):
         with pytest.raises(ValueError):
@@ -50,6 +52,7 @@ def test_missing_creds():
             "API_USERNAME": "NAME",
             "API_URL": "URL",
             "API_VERSION": "VERSION",
+            "TRADING_ENV": "prod",
         },
     ):
         with pytest.raises(ValueError):
@@ -62,12 +65,26 @@ def test_missing_creds():
             "API_USERNAME": "NAME",
             "API_PASSWORD": "PASS",
             "API_VERSION": "VERSION",
+            "TRADING_ENV": "demo",
         },
     ):
         with pytest.raises(ValueError):
             Auth()
 
     # Missing api version
+    with patch(
+        "os.environ",
+        {
+            "API_USERNAME": "NAME",
+            "API_PASSWORD": "PASS",
+            "API_URL": "URL",
+            "TRADING_ENV": "demo",
+        },
+    ):
+        with pytest.raises(ValueError):
+            Auth()
+
+    # Missing trading env
     with patch(
         "os.environ",
         {
@@ -87,6 +104,7 @@ def test_missing_creds():
         "API_PASSWORD": "PASS",
         "API_URL": "URL",
         "API_VERSION": "VERSION",
+        "TRADING_ENV": "demo",
     },
 )
 def test_valid_auth():
@@ -123,6 +141,7 @@ def test_valid_auth():
         "API_PASSWORD": "PASS",
         "API_URL": "https://trading-api.kalshi.com/trade-api/v2/events",
         "API_VERSION": "VERSION",
+        "TRADING_ENV": "demo",
     },
 )
 def test_using_prod():
@@ -153,6 +172,7 @@ def test_null_api_version():
         "API_PASSWORD": "PASS",
         "API_URL": "URL",
         "API_VERSION": "VERSION",
+        "TRADING_ENV": "demo",
     },
 )
 def test_influxdb_api_creds_missing():
@@ -171,6 +191,7 @@ def test_influxdb_api_creds_missing():
         "API_URL": "URL",
         "API_VERSION": "VERSION",
         "INFLUXDB_API_TOKEN": "SOME_TOKEN",
+        "TRADING_ENV": "demo",
     },
 )
 def test_valid_influxdb_api_creds():
