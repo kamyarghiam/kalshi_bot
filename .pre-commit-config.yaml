@@ -54,4 +54,7 @@ repos:
         language: script
         pass_filenames: false
         always_run: true
-        args: ["-n", "auto"]
+        # Currently, we can't run it with -n auto because there
+        # is a problem with the influxdb spinning up and getting
+        # shut down by another process?
+        # args: ["-n", "auto"]

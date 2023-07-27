@@ -20,6 +20,7 @@ from src.helpers.types.common import URL
         "API_PASSWORD": "PASS",
         "API_URL": "URL",
         "API_VERSION": "VERSION",
+        "INFLUXDB_API_TOKEN": "SOME_TOKEN",
         "TRADING_ENV": "prod",
     },
 )

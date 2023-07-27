@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from src.data.influxdb_interface import InfluxDBAdapter
 from src.exchange.interface import ExchangeInterface
 from tests.fake_exchange import kalshi_test_exchange_factory
 
@@ -36,3 +37,9 @@ def exchange_interface(fastapi_test_client: TestClient | None):
     real exchange through the ehxcnage interface"""
     with ExchangeInterface(fastapi_test_client) as exchange_interface:
         yield exchange_interface
+
+
+@pytest.fixture(scope="session")
+def influx_client():
+    with InfluxDBAdapter() as influx_client:
+        yield influx_client

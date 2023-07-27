@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import typing
 from time import sleep
 from types import TracebackType
@@ -61,6 +62,13 @@ class InfluxDBAdapter:
             if is_test_run or self._auth.env == TradingEnv.DEMO
             else InfluxDBAdapter.prod_bucket_name
         )
+
+        if self._bucket == InfluxDBAdapter.prod_bucket_name:
+            confirmation = input(
+                "You will be writing to the prod influx bucket. Are you sure? (y/N): "
+            )
+            if confirmation != "y":
+                sys.exit(0)
 
         # Bring up influxdb
         self._client = InfluxDBClient(
