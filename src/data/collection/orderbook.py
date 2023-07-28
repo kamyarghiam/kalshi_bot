@@ -1,7 +1,7 @@
 from rich.console import Console
 from rich.table import Table
 
-from src.data.influxdb_interface import InfluxDBAdapter
+from src.data.influxdb_interface import InfluxDatabase, InfluxDBAdapter
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import to_series_ticker
 from src.helpers.types.websockets.response import OrderbookSnapshotWR
@@ -65,9 +65,12 @@ class OrderbookCollectionPrinter:
         self._console.print(table)
 
 
-def collect_prod_orderbook_data():
-    with InfluxDBAdapter(is_test_run=False) as influx_client:  # pragma: no cover
-        collect_orderbook_data(  # pragma: no cover
-            ExchangeInterface(is_test_run=False),  # pragma: no cover
-            influx_client,  # pragma: no cover
-        )  # pragma: no cover
+def collect_prod_orderbook_data():  # pragma: no cover
+    db = InfluxDatabase()
+    db.start()
+    with InfluxDBAdapter(is_test_run=False) as influx_client:
+        collect_orderbook_data(
+            ExchangeInterface(is_test_run=False),
+            influx_client,
+        )
+    db.stop()

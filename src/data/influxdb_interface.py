@@ -15,13 +15,7 @@ from src.helpers.types.auth import Auth
 
 
 class InfluxDBAdapter:
-    """Entrypoint into the influxdb
-
-    You must use this in a context manager to successfully access the db
-
-    with InfluxDBAdapter() as influx_client:
-        ...
-    """
+    """Entrypoint into the influxdb"""
 
     # Data in this bucket is deleted after 1 hour
     test_bucket_name = "testing"
@@ -31,15 +25,11 @@ class InfluxDBAdapter:
     orderbook_updates_measurement = "orderbook_udpates"
 
     def __enter__(self):
-        # See: https://stackoverflow.com/questions/4789837/how-to-terminate-a-python-subprocess-launched-with-shell-true
-        self._influx_process = subprocess.Popen(
-            "exec influxd --engine-path src/data/store/influxdb/engine",
-            stdout=subprocess.PIPE,
-            shell=True,
+        self._client = InfluxDBClient(
+            url=InfluxDBAdapter.db_address,
+            org=InfluxDBAdapter.org,
+            token=self.token,
         )
-        # Wait until influx DB is up
-        while not self._client.ping():
-            sleep(0.1)  # pragma: no cover
         return self
 
     def __exit__(
@@ -49,7 +39,6 @@ class InfluxDBAdapter:
         exc_tb: TracebackType | None,
     ):
         self._client.close()
-        self._influx_process.kill()
 
     def __init__(self, is_test_run: bool = True):
         self._auth = Auth(is_test_run)
@@ -69,13 +58,6 @@ class InfluxDBAdapter:
             )
             if confirmation != "y":
                 sys.exit(0)
-
-        # Bring up influxdb
-        self._client = InfluxDBClient(
-            url=InfluxDBAdapter.db_address,
-            org=InfluxDBAdapter.org,
-            token=self.token,
-        )
 
     @property
     def write_api(self):
@@ -127,3 +109,34 @@ class InfluxDBAdapter:
     def decode_object(s: str, object_class: typing.Type[BaseModel]) -> Any:
         """Decodes basemodel object that was encoded with the encode_object function"""
         return object_class.parse_raw(s)
+
+
+class InfluxDatabase:
+    """A class to spin up/down the influx db locally"""
+
+    def start(self):
+        """Starts the influxdb database"""
+        # https://stackoverflow.com/questions/4789837/how-to-terminate-a-python-subprocess-launched-with-shell-true
+        self._influx_process = subprocess.Popen(
+            "exec influxd --engine-path src/data/store/influxdb/engine",
+            stdout=subprocess.PIPE,
+            shell=True,
+        )
+        # Wait until influx DB is up
+        while not self._client.ping():
+            sleep(0.1)  # pragma: no cover
+
+    def stop(self):
+        """Stops the influxdb database"""
+        self._client.close()
+        self._influx_process.terminate()
+
+    def __init__(self, is_test_run: bool = True):
+        self._auth = Auth(is_test_run)
+
+        # Bring up influxdb
+        self._client = InfluxDBClient(
+            url=InfluxDBAdapter.db_address,
+            org=InfluxDBAdapter.org,
+            token=self._auth.influxdb_api_token,
+        )
