@@ -22,7 +22,7 @@ class InfluxDBAdapter:
     prod_bucket_name = "prod"
     db_address = "http://localhost:8086"
     org = "kamyar"
-    orderbook_updates_measurement = "orderbook_udpates"
+    orderbook_updates_measurement = "orderbook_updates"
 
     def __enter__(self):
         self._client = InfluxDBClient(
@@ -95,7 +95,7 @@ class InfluxDBAdapter:
         for field_key, field_value in fields.items():
             point = point.field(field_key, field_value)
 
-        self.write_api.write(bucket=self._bucket, record=point)
+        return self.write_api.write(bucket=self._bucket, record=point)
 
     def query(self, query: str) -> TableList:
         return self.query_api.query(query)
