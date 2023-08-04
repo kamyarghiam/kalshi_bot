@@ -1,0 +1,3 @@
+One possible idea is to explore how fast the market reacts to new information across different markets.
+For example, if there is a huge price movement in the daily SPY market, how fast does that propagate
+to the yearly or weekly market. There may be some arbitrage opportunites here.
