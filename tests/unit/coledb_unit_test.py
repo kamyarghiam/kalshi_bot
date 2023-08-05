@@ -5,7 +5,7 @@ from mock import patch
 
 from src.data.coledb.coledb import (
     ColeDBInterface,
-    ColeDBMetadataFile,
+    ColeDBMetadata,
     ticker_to_metadata_path,
     ticker_to_path,
 )
@@ -14,14 +14,14 @@ from src.helpers.types.markets import MarketTicker
 
 def test_read_write_metadata(tmp_path: Path):
     path = tmp_path / "metadata"
-    metadata = ColeDBMetadataFile(path)
+    metadata = ColeDBMetadata(path)
     now = datetime.now()
     metadata.chunk_first_time_stamps.append(now)
     metadata.num_msgs_in_last_file = 1000
     metadata.last_chunk_num = 5
 
     metadata.save()
-    assert ColeDBMetadataFile.load(path) == ColeDBMetadataFile(path, [now], 5, 1000)
+    assert ColeDBMetadata.load(path) == ColeDBMetadata(path, [now], 5, 1000)
 
 
 def test_ticker_to_path():

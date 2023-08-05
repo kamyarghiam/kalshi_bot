@@ -15,15 +15,17 @@ Market Ticker folders
 |   |   |
 ...
 
-Within the market ticker folders, we store data in chunks. Namely, we will
-store 5000 messages (snapshots and deltas) within each chunk. There is also a
+Within the market ticker folders, we store data in files called chunks
+that contain a fixed numer of messages (defined as MSGS_PER_CHUNK). There is also a
 metadata file that contains information about the start time of each chunk, the
-number of the last chunk, and the number of objects in the last chunk.
+number of the last chunk, and the number of objects in the last chunk (ColeDBMetadata).
 
 Each chunk file needs to start with a snapshot. The idea is that if someone queries
 for a particular timestamp range, we can find the chunk in which the time stamp starts
 using the metadata file, we can open the file start from the snapshot, apply the
-deltas, and find the starting point.
+deltas, and find the starting point. In order to create a new chunk, we get the
+snapshot of the new chunk by reading the previous chunk from the start and
+applying all of the deltas.
 
 This DB interface supports the following operations:
 1. Query by start timestamp by market
@@ -48,20 +50,23 @@ from pathlib import Path
 from typing import Dict, List
 
 from src.helpers.types.markets import MarketTicker
+from src.helpers.types.orderbook import Orderbook
+from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 COLEDB_STORAGE_PATH = Path("storage")
+MSGS_PER_CHUNK = 5000
 
 
 @dataclass
-class ColeDBMetadataFile:
+class ColeDBMetadata:
     """This class defines the metadata file that exists in all the
     market data folders. This file is used to discover the location
     of deltas and snapshots
 
     path: path to the metadata file
     chunk_first_time_stamps: the starting timestamp of each chunk
-    last_chunk_num: the number of the last chunk
-    num_msgs_in_last_file: number of messages in the last chunk
+    last_chunk_num: the number of the chunk at the end
+    num_msgs_in_last_file: number of messages in the chunk at the end
     """
 
     path: Path
@@ -76,29 +81,68 @@ class ColeDBMetadataFile:
     def load(cls, path: Path):
         return pickle.loads(path.read_bytes())
 
+    @property
+    def path_to_market_data(self) -> Path:
+        """Returns path to the market data"""
+        return self.path.parent
+
+    @property
+    def path_to_last_chunk(self) -> Path:
+        """Return path to the last chunk"""
+        return self.path_to_market_data / str(self.last_chunk_num)
+
 
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
     def __init__(self):
         # Metadata files that we opened up already
-        self._open_metadata_files: Dict[MarketTicker, ColeDBMetadataFile] = {}
+        self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
 
-    def get_metadata(self, ticker: MarketTicker) -> ColeDBMetadataFile:
+    def get_metadata(self, ticker: MarketTicker) -> ColeDBMetadata:
+        """Gets the metadata file for the market if it exists. Otherwise, creates it"""
         if ticker in self._open_metadata_files:
             metadata = self._open_metadata_files[ticker]
         else:
-            # Check if metadata file exists
             path = ticker_to_metadata_path(ticker)
             if not path.exists():
-                metadata = ColeDBMetadataFile(
+                metadata = ColeDBMetadata(
                     path=path,
                 )
                 metadata.save()
             else:
-                metadata = ColeDBMetadataFile.load(path)
+                metadata = ColeDBMetadata.load(path)
             self._open_metadata_files[ticker] = metadata
         return metadata
+
+    def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
+        metadata = self.get_metadata(data.market_ticker)
+        is_new_dataset = metadata.last_chunk_num == 0
+        if is_new_dataset:
+            # TODO: assert data is OrderbookSnapshotRM using valueerror
+            assert isinstance(data, OrderbookSnapshotRM)
+            self._create_new_chunk(Orderbook.from_snapshot(data), metadata)
+            return
+        needs_new_chunk = metadata.num_msgs_in_last_file == MSGS_PER_CHUNK
+        if needs_new_chunk:
+            last_chunk_snapshot = self._read_chunk_apply_deltas(
+                metadata.path_to_last_chunk
+            )
+            self._create_new_chunk(last_chunk_snapshot, metadata)
+        # TODO: finish
+        ...
+
+    def _create_new_chunk(self, snapshot: Orderbook, metadata: ColeDBMetadata):
+        # TODO: finish
+        metadata.last_chunk_num += 1
+        metadata.num_msgs_in_last_file = 0
+        return
+
+    def _read_chunk_apply_deltas(self, path: Path) -> Orderbook:
+        """Reads a chunk and applies the deltas from the beginning"""
+        # TODO: finish
+        ...
+        return
 
 
 def ticker_to_path(ticker: MarketTicker) -> Path:
