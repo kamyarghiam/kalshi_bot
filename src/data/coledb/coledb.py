@@ -36,15 +36,76 @@ This DB interface supports the following operations:
 TODO: maybe we should also have a metadata file on the market (not chunk) level
 to define some of the market information (like expiration, settlement, settlement
 direction, etc.)
+
+TODO: maybe we should parallelize the writes if it's too slow?
 """
 
 
-from dataclasses import dataclass
+import pickle
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List
+
+from src.helpers.types.markets import MarketTicker
+
+COLEDB_STORAGE_PATH = Path("storage")
 
 
 @dataclass
-class ColeDBMeadataFile:
+class ColeDBMetadataFile:
     """This class defines the metadata file that exists in all the
     market data folders. This file is used to discover the location
     of deltas and snapshots
+
+    path: path to the metadata file
+    chunk_first_time_stamps: the starting timestamp of each chunk
+    last_chunk_num: the number of the last chunk
+    num_msgs_in_last_file: number of messages in the last chunk
     """
+
+    path: Path
+    chunk_first_time_stamps: List[datetime] = field(default_factory=list)
+    last_chunk_num: int = field(default=0)
+    num_msgs_in_last_file: int = field(default=0)
+
+    def save(self):
+        self.path.write_bytes(pickle.dumps(self))
+
+    @classmethod
+    def load(cls, path: Path):
+        return pickle.loads(path.read_bytes())
+
+
+class ColeDBInterface:
+    """Public interface for ColeDB"""
+
+    def __init__(self):
+        # Metadata files that we opened up already
+        self._open_metadata_files: Dict[MarketTicker, ColeDBMetadataFile] = {}
+
+    def get_metadata(self, ticker: MarketTicker) -> ColeDBMetadataFile:
+        if ticker in self._open_metadata_files:
+            metadata = self._open_metadata_files[ticker]
+        else:
+            # Check if metadata file exists
+            path = ticker_to_metadata_path(ticker)
+            if not path.exists():
+                metadata = ColeDBMetadataFile(
+                    path=path,
+                )
+                metadata.save()
+            else:
+                metadata = ColeDBMetadataFile.load(path)
+            self._open_metadata_files[ticker] = metadata
+        return metadata
+
+
+def ticker_to_path(ticker: MarketTicker) -> Path:
+    """Given a market ticker returns a path to where all its data should live"""
+    return COLEDB_STORAGE_PATH / ticker.replace("-", "/")
+
+
+def ticker_to_metadata_path(ticker: MarketTicker) -> Path:
+    """Given a market ticker returns a path to the metdata file"""
+    return ticker_to_path(ticker) / "metadata"
