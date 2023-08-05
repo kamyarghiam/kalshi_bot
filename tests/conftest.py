@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from filelock import FileLock
 
-from src.data.influxdb_interface import InfluxDatabase, InfluxDBAdapter
+from src.data.influxdb.influxdb_interface import InfluxDatabase, InfluxDBAdapter
 from src.exchange.interface import ExchangeInterface
 from tests.fake_exchange import kalshi_test_exchange_factory
 

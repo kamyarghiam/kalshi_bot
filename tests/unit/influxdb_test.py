@@ -6,7 +6,7 @@ from mock import patch
 from pydantic import BaseModel
 from pytest import MonkeyPatch
 
-from src.data.influxdb_interface import InfluxDBAdapter
+from src.data.influxdb.influxdb_interface import InfluxDBAdapter
 
 
 def test_basic_influxdb_write_get(influx_client: InfluxDBAdapter):

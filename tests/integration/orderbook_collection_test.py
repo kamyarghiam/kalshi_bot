@@ -1,5 +1,5 @@
 from src.data.collection.orderbook import collect_orderbook_data
-from src.data.influxdb_interface import InfluxDBAdapter
+from src.data.influxdb.influxdb_interface import InfluxDBAdapter
 from src.exchange.interface import ExchangeInterface
 
 

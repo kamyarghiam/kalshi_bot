@@ -1,7 +1,7 @@
 from rich.console import Console
 from rich.table import Table
 
-from src.data.influxdb_interface import InfluxDatabase, InfluxDBAdapter
+from src.data.influxdb.influxdb_interface import InfluxDatabase, InfluxDBAdapter
 from src.exchange.interface import ExchangeInterface, OrderbookSubscription
 from src.helpers.types.markets import to_series_ticker
 from src.helpers.types.websockets.response import OrderbookSnapshotWR

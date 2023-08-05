@@ -1,5 +1,4 @@
 from enum import Enum
-from pathlib import Path
 
 from src.helpers.types.common import URL
 
@@ -24,7 +23,6 @@ ENV_VARS = [
     URL_ENV_VAR,
     API_VERSION_ENV_VAR,
 ]
-PATH_TO_ORDERBOOK_DATA = Path("src/data/store/orderbook_data")
 
 
 class TradingEnv(str, Enum):

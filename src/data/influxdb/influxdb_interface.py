@@ -118,7 +118,7 @@ class InfluxDatabase:
         """Starts the influxdb database"""
         # https://stackoverflow.com/questions/4789837/how-to-terminate-a-python-subprocess-launched-with-shell-true
         self._influx_process = subprocess.Popen(
-            "exec influxd --engine-path src/data/store/influxdb/engine",
+            "exec influxd --engine-path src/data/influxdb/engine",
             stdout=subprocess.PIPE,
             shell=True,
         )
