@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+import pytest
 from mock import patch
 
 from src.data.coledb.coledb import (
@@ -10,6 +11,9 @@ from src.data.coledb.coledb import (
     ticker_to_path,
 )
 from src.helpers.types.markets import MarketTicker
+from src.helpers.types.money import Price
+from src.helpers.types.orders import QuantityDelta, Side
+from tests.fake_exchange import OrderbookDeltaRM
 
 
 def test_read_write_metadata(tmp_path: Path):
@@ -62,3 +66,22 @@ def test_get_metadata_file(tmp_path: Path):
         cole._open_metadata_files = {}
         metadata_from_loading = cole.get_metadata(ticker)
         assert metadata_from_loading == metadata_from_dict
+
+
+def test_encode_decode_message():
+    ticker = MarketTicker("SIDE-EVENT-MARKET")
+    delta = QuantityDelta(12345)
+    side = Side.YES
+    price = Price(31)
+
+    msg = OrderbookDeltaRM(market_ticker=ticker, price=price, delta=delta, side=side)
+    b = ColeDBInterface._encode_to_bits(msg)
+    assert ColeDBInterface._decode_to_response_message(b, ticker) == msg
+
+    # Test too high quantity case
+    bad_quantity = QuantityDelta(1 << ColeDBInterface._max_delta_bit_length)
+    with pytest.raises(ValueError):
+        msg.delta = bad_quantity
+        ColeDBInterface._encode_to_bits(msg)
+
+    # TODO: add more testing here

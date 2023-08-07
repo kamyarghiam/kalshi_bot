@@ -50,7 +50,9 @@ from pathlib import Path
 from typing import Dict, List
 
 from src.helpers.types.markets import MarketTicker
+from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook
+from src.helpers.types.orders import QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 COLEDB_STORAGE_PATH = Path("storage")
@@ -95,6 +97,8 @@ class ColeDBMetadata:
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
+    _max_delta_bit_length: int = 31
+
     def __init__(self):
         # Metadata files that we opened up already
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
@@ -119,8 +123,10 @@ class ColeDBInterface:
         metadata = self.get_metadata(data.market_ticker)
         is_new_dataset = metadata.last_chunk_num == 0
         if is_new_dataset:
-            # TODO: assert data is OrderbookSnapshotRM using valueerror
-            assert isinstance(data, OrderbookSnapshotRM)
+            if not isinstance(data, OrderbookSnapshotRM):
+                raise TypeError(
+                    f"New dataset writes must start with a snapshot! Data: {data}"
+                )
             self._create_new_chunk(Orderbook.from_snapshot(data), metadata)
             return
         needs_new_chunk = metadata.num_msgs_in_last_file == MSGS_PER_CHUNK
@@ -129,8 +135,84 @@ class ColeDBInterface:
                 metadata.path_to_last_chunk
             )
             self._create_new_chunk(last_chunk_snapshot, metadata)
+
         # TODO: finish
         ...
+
+    @staticmethod
+    def _encode_to_bits(data: OrderbookDeltaRM | OrderbookSnapshotRM) -> bytes:
+        """Encodes an exchange message to bytes"""
+        if isinstance(data, OrderbookDeltaRM):
+            # Side (yes/no):             1 bit
+            # Price (1-99)               7 bits
+            # Quantity delta (>= 0):    31 bits
+            # Delta / Snapshot:          1 bit
+            total_bytes = 5
+
+            b = 0
+
+            # Side
+            if data.side == Side.YES:
+                b |= 1
+
+            # Price
+            b <<= 7
+            b |= int(data.price)
+
+            # Quantity delta
+            b <<= ColeDBInterface._max_delta_bit_length
+            if data.delta.bit_length() > ColeDBInterface._max_delta_bit_length:
+                # If you see this error, it means we need to change
+                # up our bit encoding scheme to fit larger values into the database.
+                raise ValueError(
+                    "Received a orderbook delta with bit length greater than "
+                    + f"{ColeDBInterface._max_delta_bit_length}. Data: {data}"
+                )
+            b |= data.delta
+
+            # Delta / Snapshot
+            b <<= 1
+            b |= 1
+
+            return b.to_bytes(total_bytes)
+        else:
+            # TODO: finish
+            ...
+
+    @staticmethod
+    def _decode_to_response_message(
+        bytes_: bytes,
+        ticker: MarketTicker,
+    ) -> OrderbookDeltaRM | OrderbookSnapshotRM:
+        """Decodes bytes into an exchange message"""
+        b = int.from_bytes(bytes_)
+        # Type
+        t = b & 1
+        b >>= 1
+        if t == 1:
+            # OrderbookDeltaRM
+
+            # Delta
+            delta = b & ((1 << ColeDBInterface._max_delta_bit_length) - 1)
+            b >>= ColeDBInterface._max_delta_bit_length
+
+            # Price
+            price = b & ((1 << 7) - 1)
+            b >>= 7
+
+            # Side
+            s = b & 1
+            side = Side.YES if s == 1 else Side.NO
+
+            return OrderbookDeltaRM(
+                market_ticker=ticker,
+                price=Price(price),
+                delta=QuantityDelta(delta),
+                side=side,
+            )
+        else:
+            # TODO: finish
+            return
 
     def _create_new_chunk(self, snapshot: Orderbook, metadata: ColeDBMetadata):
         # TODO: finish
