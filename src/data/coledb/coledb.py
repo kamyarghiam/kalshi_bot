@@ -147,6 +147,13 @@ class ColeDBInterface:
             # Price (1-99)               7 bits
             # Quantity delta (>= 0):    31 bits
             # Delta / Snapshot:          1 bit
+
+            # TODO: add timestamp. For the timestamp, I would steal
+            # some bits from the quantity delta and add an extra byte.
+            # This can represent the offset from the "metadata timestamp"
+            # (add a timestamp to the metadata file that represents the
+            # starting timestamp of the chunk). If your offset can't fit
+            # in the number of bits you have, just create a new chunk?
             total_bytes = 5
 
             b = 0

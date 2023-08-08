@@ -84,4 +84,19 @@ def test_encode_decode_message():
         msg.delta = bad_quantity
         ColeDBInterface._encode_to_bits(msg)
 
-    # TODO: add more testing here
+    # Some edge cases
+    ticker = MarketTicker("SOME-REALLYLONGMARKETTICKER-WITHMANYCHARACTERS")
+    delta = QuantityDelta(1 << (ColeDBInterface._max_delta_bit_length) - 1)
+    side = Side.NO
+    price = Price(99)
+    msg = OrderbookDeltaRM(market_ticker=ticker, price=price, delta=delta, side=side)
+    b = ColeDBInterface._encode_to_bits(msg)
+    assert ColeDBInterface._decode_to_response_message(b, ticker) == msg
+
+    ticker = MarketTicker("SOME-MARKET1234-TICKER01")
+    delta = QuantityDelta(1)
+    side = Side.NO
+    price = Price(1)
+    msg = OrderbookDeltaRM(market_ticker=ticker, price=price, delta=delta, side=side)
+    b = ColeDBInterface._encode_to_bits(msg)
+    assert ColeDBInterface._decode_to_response_message(b, ticker) == msg
