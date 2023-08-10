@@ -97,8 +97,8 @@ class ColeDBMetadata:
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
-    _max_delta_bit_length: int = 25
-    _timestamp_bit_length: int = 22
+    _max_delta_bit_length: int = 27
+    _timestamp_bit_length: int = 20
 
     def __init__(self):
         # Metadata files that we opened up already
@@ -147,11 +147,11 @@ class ColeDBInterface:
     ) -> bytes:
         """Encodes an exchange message to bytes"""
         if isinstance(data, OrderbookDeltaRM):
-            # Side (yes/no):             1 bit
-            # Price (1-99)               7 bits
-            # Quantity delta (>= 0):    25 bits
-            # Timestamp                 22 bits
-            # Delta / Snapshot:          1 bit
+            # Side (yes/no):                                  1 bit
+            # Price (1-99)                                    7 bits
+            # Quantity delta (can be negative)               27 bits
+            # Time delta (relative to chunk_start_timestamp) 20 bits
+            # Delta / Snapshot:                               1 bit
 
             total_bytes = 7
 
@@ -193,6 +193,13 @@ class ColeDBInterface:
 
             return b.to_bytes(total_bytes)
         else:
+            assert isinstance(data, OrderbookSnapshotRM)
+            # Delta / Snapshot:                    1 bit
+            # Time delta (relative to Jan 1 2023) 31 bits
+            # Per each price level:
+            # Side(s) (yes/no/both/neither)        2 bits
+            # Quantity (>= 0):           25 bits each side
+
             # TODO: finish
             ...
 
