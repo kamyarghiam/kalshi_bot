@@ -7,6 +7,7 @@ from mock import patch
 from src.data.coledb.coledb import (
     ColeDBInterface,
     ColeDBMetadata,
+    TimestampTooLargeError,
     ticker_to_metadata_path,
     ticker_to_path,
 )
@@ -73,30 +74,56 @@ def test_encode_decode_message():
     delta = QuantityDelta(12345)
     side = Side.YES
     price = Price(31)
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
+    ts = datetime(2023, 8, 9, 20, 31, 56, 800000)
 
-    msg = OrderbookDeltaRM(market_ticker=ticker, price=price, delta=delta, side=side)
-    b = ColeDBInterface._encode_to_bits(msg)
-    assert ColeDBInterface._decode_to_response_message(b, ticker) == msg
+    msg = OrderbookDeltaRM(
+        market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
+    )
+    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    assert (
+        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+    )
 
     # Test too high quantity case
     bad_quantity = QuantityDelta(1 << ColeDBInterface._max_delta_bit_length)
     with pytest.raises(ValueError):
         msg.delta = bad_quantity
-        ColeDBInterface._encode_to_bits(msg)
+        ColeDBInterface._encode_to_bits(msg, chunk_start_time)
 
-    # Some edge cases
+    # Edge cases
     ticker = MarketTicker("SOME-REALLYLONGMARKETTICKER-WITHMANYCHARACTERS")
     delta = QuantityDelta(1 << (ColeDBInterface._max_delta_bit_length) - 1)
     side = Side.NO
     price = Price(99)
-    msg = OrderbookDeltaRM(market_ticker=ticker, price=price, delta=delta, side=side)
-    b = ColeDBInterface._encode_to_bits(msg)
-    assert ColeDBInterface._decode_to_response_message(b, ticker) == msg
+    ts = datetime(2023, 8, 9, 20, 31, 56, 860000)
+    msg = OrderbookDeltaRM(
+        market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
+    )
 
+    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    # It will round up the ts to the nearest decimal
+    msg.ts = ts = datetime(2023, 8, 9, 20, 31, 56, 900000)
+    assert (
+        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+    )
+
+    # Another random case
     ticker = MarketTicker("SOME-MARKET1234-TICKER01")
     delta = QuantityDelta(1)
     side = Side.NO
     price = Price(1)
-    msg = OrderbookDeltaRM(market_ticker=ticker, price=price, delta=delta, side=side)
-    b = ColeDBInterface._encode_to_bits(msg)
-    assert ColeDBInterface._decode_to_response_message(b, ticker) == msg
+    ts = datetime(2023, 8, 9, 20, 31, 56, 800000)
+    msg = OrderbookDeltaRM(
+        market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
+    )
+    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    assert (
+        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+    )
+
+    # Time too high
+    bad_time_diff = 1 << ColeDBInterface._timestamp_bit_length
+    with pytest.raises(TimestampTooLargeError):
+        msg.ts = datetime.fromtimestamp(bad_time_diff)
+        ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))

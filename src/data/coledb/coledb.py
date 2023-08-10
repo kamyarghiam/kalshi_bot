@@ -97,7 +97,8 @@ class ColeDBMetadata:
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
-    _max_delta_bit_length: int = 31
+    _max_delta_bit_length: int = 25
+    _timestamp_bit_length: int = 22
 
     def __init__(self):
         # Metadata files that we opened up already
@@ -136,25 +137,23 @@ class ColeDBInterface:
             )
             self._create_new_chunk(last_chunk_snapshot, metadata)
 
-        # TODO: finish
+        # TODO: finish. NOTE: remember that if the timestamp is too large,
+        # you need to create a new chunk for the message
         ...
 
     @staticmethod
-    def _encode_to_bits(data: OrderbookDeltaRM | OrderbookSnapshotRM) -> bytes:
+    def _encode_to_bits(
+        data: OrderbookDeltaRM | OrderbookSnapshotRM, chunk_start_timestamp: datetime
+    ) -> bytes:
         """Encodes an exchange message to bytes"""
         if isinstance(data, OrderbookDeltaRM):
             # Side (yes/no):             1 bit
             # Price (1-99)               7 bits
-            # Quantity delta (>= 0):    31 bits
+            # Quantity delta (>= 0):    25 bits
+            # Timestamp                 22 bits
             # Delta / Snapshot:          1 bit
 
-            # TODO: add timestamp. For the timestamp, I would steal
-            # some bits from the quantity delta and add an extra byte.
-            # This can represent the offset from the "metadata timestamp"
-            # (add a timestamp to the metadata file that represents the
-            # starting timestamp of the chunk). If your offset can't fit
-            # in the number of bits you have, just create a new chunk?
-            total_bytes = 5
+            total_bytes = 7
 
             b = 0
 
@@ -177,6 +176,17 @@ class ColeDBInterface:
                 )
             b |= data.delta
 
+            # Timestamp. Take 1 decimal place after seconds
+            b <<= ColeDBInterface._timestamp_bit_length
+            timestamp = data.ts.timestamp()
+            timestamp_delta: int = round(
+                (timestamp - chunk_start_timestamp.timestamp()) * 10
+            )
+            if timestamp_delta.bit_length() > ColeDBInterface._timestamp_bit_length:
+                # This means we need to move the message to a new chunk
+                raise TimestampTooLargeError("Create a new chunk")
+            b |= timestamp_delta
+
             # Delta / Snapshot
             b <<= 1
             b |= 1
@@ -190,6 +200,7 @@ class ColeDBInterface:
     def _decode_to_response_message(
         bytes_: bytes,
         ticker: MarketTicker,
+        chunk_start_timestamp: datetime,
     ) -> OrderbookDeltaRM | OrderbookSnapshotRM:
         """Decodes bytes into an exchange message"""
         b = int.from_bytes(bytes_)
@@ -198,6 +209,15 @@ class ColeDBInterface:
         b >>= 1
         if t == 1:
             # OrderbookDeltaRM
+
+            # Time stamp. We divide by 10 to get the sub-second precision
+            timestamp_delta = (
+                b & ((1 << ColeDBInterface._timestamp_bit_length) - 1)
+            ) / 10
+            ts = datetime.fromtimestamp(
+                chunk_start_timestamp.timestamp() + timestamp_delta
+            )
+            b >>= ColeDBInterface._timestamp_bit_length
 
             # Delta
             delta = b & ((1 << ColeDBInterface._max_delta_bit_length) - 1)
@@ -216,6 +236,7 @@ class ColeDBInterface:
                 price=Price(price),
                 delta=QuantityDelta(delta),
                 side=side,
+                ts=ts,
             )
         else:
             # TODO: finish
@@ -242,3 +263,7 @@ def ticker_to_path(ticker: MarketTicker) -> Path:
 def ticker_to_metadata_path(ticker: MarketTicker) -> Path:
     """Given a market ticker returns a path to the metdata file"""
     return ticker_to_path(ticker) / "metadata"
+
+
+class TimestampTooLargeError(Exception):
+    """Our timestamp is too distant from the chunk start timestamp"""
