@@ -40,6 +40,7 @@ to define some of the market information (like expiration, settlement, settlemen
 direction, etc.)
 
 TODO: maybe we should parallelize the writes if it's too slow?
+TODO: ***experiment to see if 5000 is the best size for the chunks
 """
 
 
@@ -97,8 +98,9 @@ class ColeDBMetadata:
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
-    _max_delta_bit_length: int = 27
-    _timestamp_bit_length: int = 20
+    # Inside the delta message, there are a few bits that are free
+    # after the internal metadata
+    _num_bits_free_after_delta_metadata: int = 3
 
     def __init__(self):
         # Metadata files that we opened up already
@@ -147,13 +149,15 @@ class ColeDBInterface:
     ) -> bytes:
         """Encodes an exchange message to bytes"""
         if isinstance(data, OrderbookDeltaRM):
-            # Side (yes/no):                                  1 bit
-            # Price (1-99)                                    7 bits
-            # Quantity delta (can be negative)               27 bits
-            # Time delta (relative to chunk_start_timestamp) 20 bits
-            # Delta / Snapshot:                               1 bit
+            # Side (yes/no):                                    1 bit
+            # Price (1-99)                                      7 bits
+            # Quantity delta (can be negative)               8-32 bits
+            # Time delta (relative to chunk_start_timestamp) 8-32 bits
+            # Quantity bytes length                             2 bits
+            # Timestamp bytes length                            2 bits
+            # Delta / Snapshot                                  1 bit
 
-            total_bytes = 7
+            total_bytes = 2
 
             b = 0
 
@@ -166,26 +170,39 @@ class ColeDBInterface:
             b |= int(data.price)
 
             # Quantity delta
-            b <<= ColeDBInterface._max_delta_bit_length
-            if data.delta.bit_length() > ColeDBInterface._max_delta_bit_length:
-                # If you see this error, it means we need to change
-                # up our bit encoding scheme to fit larger values into the database.
-                raise ValueError(
-                    "Received a orderbook delta with bit length greater than "
-                    + f"{ColeDBInterface._max_delta_bit_length}. Data: {data}"
-                )
+            quantity_delta_extra_bit_length = (
+                data.delta.bit_length()
+                - ColeDBInterface._num_bits_free_after_delta_metadata
+            )
+            b <<= quantity_delta_extra_bit_length
             b |= data.delta
 
-            # Timestamp. Take 1 decimal place after seconds
-            b <<= ColeDBInterface._timestamp_bit_length
+            # Timestamp
             timestamp = data.ts.timestamp()
             timestamp_delta: int = round(
-                (timestamp - chunk_start_timestamp.timestamp()) * 10
+                # Take 1 decimal place after seconds
+                (timestamp - chunk_start_timestamp.timestamp())
+                * 10
             )
-            if timestamp_delta.bit_length() > ColeDBInterface._timestamp_bit_length:
-                # This means we need to move the message to a new chunk
-                raise TimestampTooLargeError("Create a new chunk")
+            timestamp_bits_length = timestamp_delta.bit_length()
+            b <<= timestamp_bits_length
             b |= timestamp_delta
+
+            # Quantity delta bytes length
+            quantiy_delta_bytes_length = ((quantity_delta_extra_bit_length) // 8) + 1
+            total_bytes += quantiy_delta_bytes_length
+            if quantiy_delta_bytes_length.bit_length() > 2:
+                raise ValueError("Quantiy delta needs more than 4 bytes")
+            b <<= 2
+            b |= quantiy_delta_bytes_length
+
+            # Timestamp bytes length
+            timestamp_bytes_length = (timestamp_bits_length // 8) + 1
+            total_bytes += timestamp_bytes_length
+            if timestamp_bytes_length.bit_length() > 2:
+                raise ValueError("Timestamp needs more than 4 bytes")
+            b <<= 2
+            b |= timestamp_bytes_length
 
             # Delta / Snapshot
             b <<= 1
@@ -217,18 +234,28 @@ class ColeDBInterface:
         if t == 1:
             # OrderbookDeltaRM
 
+            # Timestamp bytes length
+            timestamp_bits_length = b & ((1 << 2) - 1) * 8
+            b >>= 2
+
+            # Quantity delta extra bytes length
+            quantity_bits_length = (
+                b
+                & ((1 << 2) - 1) * 8
+                + ColeDBInterface._num_bits_free_after_delta_metadata
+            )
+            b >> 2
+
             # Time stamp. We divide by 10 to get the sub-second precision
-            timestamp_delta = (
-                b & ((1 << ColeDBInterface._timestamp_bit_length) - 1)
-            ) / 10
+            timestamp_delta = (b & ((1 << timestamp_bits_length) - 1)) / 10
             ts = datetime.fromtimestamp(
                 chunk_start_timestamp.timestamp() + timestamp_delta
             )
-            b >>= ColeDBInterface._timestamp_bit_length
+            b >>= timestamp_bits_length
 
-            # Delta
-            delta = b & ((1 << ColeDBInterface._max_delta_bit_length) - 1)
-            b >>= ColeDBInterface._max_delta_bit_length
+            # Quantity delta
+            delta = b & ((1 << quantity_bits_length) - 1)
+            b >>= quantity_bits_length
 
             # Price
             price = b & ((1 << 7) - 1)
