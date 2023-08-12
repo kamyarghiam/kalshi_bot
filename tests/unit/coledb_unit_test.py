@@ -68,7 +68,7 @@ def test_get_metadata_file(tmp_path: Path):
         assert metadata_from_loading == metadata_from_dict
 
 
-def test_encode_decode_message():
+def test_encode_decode_orderbook_delta():
     ticker = MarketTicker("SIDE-EVENT-MARKET")
     delta = QuantityDelta(12345)
     side = Side.YES
