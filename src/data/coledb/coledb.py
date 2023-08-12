@@ -147,16 +147,8 @@ class ColeDBInterface:
 
         if isinstance(data, OrderbookDeltaRM):
             return ColeDBInterface._encode_orderbook_delta(data, chunk_start_timestamp)
-        else:
-            assert isinstance(data, OrderbookSnapshotRM)
-            # Delta / Snapshot:                    1 bit
-            # Time delta (relative to Jan 1 2023) 31 bits
-            # Per each price level:
-            # Side(s) (yes/no/both/neither)        2 bits
-            # Quantity (>= 0):           25 bits each side
-
-            # TODO: finish
-            ...
+        assert isinstance(data, OrderbookSnapshotRM)
+        return ColeDBInterface._encode_orderbook_snapshot(data, chunk_start_timestamp)
 
     @staticmethod
     def _encode_orderbook_delta(
@@ -240,6 +232,35 @@ class ColeDBInterface:
         b |= 1
 
         return b.to_bytes((total_bits // 8) + min(total_bits % 8, 1))
+
+    @staticmethod
+    def _encode_orderbook_snapshot(
+        data: OrderbookSnapshotRM, chunk_start_timestamp: datetime
+    ) -> bytes:
+        """Encodes an orderbook snapshot message to bytes
+
+        The quantity delta and the time delta are in 4 bit intervals.
+        Their lengths are codified in the quantity half bytes and
+        timestamp half bytes sections. Since these length fields are
+        3 bits at most (1-8), then we can only do up to 8 4-bit intervals,
+        so the max size for the quantity delta and the time delta is 32 bits.
+
+        The time delta is relative to the chunk_start_timestamp and the
+        quantity delta is the raw value from the exchange (it already is a
+        delta from the exchange).
+
+        At each level, we have 2 bits in the front that represent either
+
+        00 -> neither Yes or No
+        10 -> Yes price only
+        01 -> No price only
+        11 -> Both yes and no price
+
+        Then, 3 bits for each side to represnt the length of their
+        quantities in half byte intervals. Then the quantites. Yes
+        always comes before no
+        """
+        # TODO: finish
 
     @staticmethod
     def _decode_orderbook_delta(
