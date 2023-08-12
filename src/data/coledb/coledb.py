@@ -327,7 +327,3 @@ def ticker_to_path(ticker: MarketTicker) -> Path:
 def ticker_to_metadata_path(ticker: MarketTicker) -> Path:
     """Given a market ticker returns a path to the metdata file"""
     return ticker_to_path(ticker) / "metadata"
-
-
-class TimestampTooLargeError(Exception):
-    """Our timestamp is too distant from the chunk start timestamp"""
