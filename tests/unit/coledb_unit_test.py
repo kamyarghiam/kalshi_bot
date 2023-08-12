@@ -1,5 +1,8 @@
 from datetime import datetime
 from pathlib import Path
+import pdb
+import random
+from re import L
 
 import pytest
 from mock import patch
@@ -85,7 +88,7 @@ def test_encode_decode_orderbook_delta():
     )
 
     # Test too high quantity case
-    bad_quantity = QuantityDelta(1 << 34)
+    bad_quantity = QuantityDelta(1 << 31)
     with pytest.raises(ValueError) as e:
         msg.delta = bad_quantity
         ColeDBInterface._encode_to_bits(msg, chunk_start_time)
@@ -104,8 +107,7 @@ def test_encode_decode_orderbook_delta():
 
     # Edge cases
     ticker = MarketTicker("SOME-REALLYLONGMARKETTICKER-WITHMANYCHARACTERS")
-    # 34 bits, but you get a free 3 bits after the metadata
-    delta = QuantityDelta((1 << 34) - 1)
+    delta = QuantityDelta((1 << 31) - 1)
     side = Side.NO
     price = Price(99)
     ts = datetime(2023, 8, 9, 20, 31, 56, 860000)
@@ -148,3 +150,22 @@ def test_encode_decode_orderbook_delta():
     assert (
         ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
     )
+
+    # Commented out is some full blown testing that you can use
+    # to do some exhaustive checking
+    # for i in range(1, 1000000):
+    #     if i % 10000 == 0:
+    #         print(i)
+    #     delta = QuantityDelta(random.randint(1, (((1 << 31) - 1))))
+    #     price = Price(random.randint(1, 99))
+    #     ts = datetime.fromtimestamp(random.randint(1, (((1 << 31) - 1) // 10)))
+    #     msg = OrderbookDeltaRM(
+    #         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
+    #     )
+    #     b = ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
+    #     assert (
+    #         ColeDBInterface._decode_to_response_message(
+    #             b, ticker, datetime.fromtimestamp(0)
+    #         )
+    #         == msg
+    #     )

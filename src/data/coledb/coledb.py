@@ -98,10 +98,6 @@ class ColeDBMetadata:
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
-    # Inside the delta message, there are a few bits that are free
-    # after the internal metadata
-    _num_bits_free_after_delta_metadata: int = 3
-
     def __init__(self):
         # Metadata files that we opened up already
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
@@ -166,40 +162,45 @@ class ColeDBInterface:
     def _encode_orderbook_delta(
         data: OrderbookDeltaRM, chunk_start_timestamp: datetime
     ) -> bytes:
-        """Encodes an orderbook delta message to bytes"""
+        """Encodes an orderbook delta message to bytes
+
+        The quantity delta and the time delta are in 4 bit intervals.
+        Their lengths are codified in the quantity half bytes and
+        timestamp half bytes sections. Since these length fields are
+        3 bits at most (1-8), then we can only do up to 8 4-bit intervals,
+        so the max size for the quantity delta and the time delta is 32 bits.
+
+        The time delta is relative to the chunk_start_timestamp and the
+        quantity delta is the raw value from the exchange (it already is a
+        delta from the exchange).
+        """
         # Side (yes/no):                                    1 bit
         # Price (1-99)                                      7 bits
-        # Quantity delta (can be negative)               8-32 bits
-        # Time delta (relative to chunk_start_timestamp) 8-32 bits
-        # Quantity bytes length                             2 bits
-        # Timestamp bytes length                            2 bits
+        # Quantity delta (can be negative)               4-32 bits
+        # Time delta (relative to chunk_start_timestamp) 4-32 bits
+        # Quantity half bytes length                        3 bits
+        # Timestamp half bytes length                       3 bits
         # Delta / Snapshot                                  1 bit
 
-        total_bytes = 2
+        total_bits = 0
 
         b = 0
 
         # Side
         if data.side == Side.YES:
             b |= 1
+        total_bits += 1
 
         # Price
+        total_bits += 7
         b <<= 7
         b |= int(data.price)
 
         # Quantity delta
-        quantity_delta_extra_bit_length = max(
-            (
-                data.delta.bit_length()
-                - ColeDBInterface._num_bits_free_after_delta_metadata
-            ),
-            0,
-        )
-        quantity_delta_bytes_length = ((quantity_delta_extra_bit_length) // 8) + 1
-        total_bytes += quantity_delta_bytes_length
-        b <<= (
-            quantity_delta_bytes_length * 8
-        ) + ColeDBInterface._num_bits_free_after_delta_metadata
+        quantity_delta_bit_length = data.delta.bit_length()
+        quantity_delta_half_bytes_length = ((quantity_delta_bit_length) // 4) + 1
+        total_bits += quantity_delta_half_bytes_length * 4
+        b <<= quantity_delta_half_bytes_length * 4
         b |= data.delta
 
         # Timestamp
@@ -210,32 +211,35 @@ class ColeDBInterface:
             * 10
         )
         timestamp_bits_length = timestamp_delta.bit_length()
-        timestamp_bytes_length = (timestamp_bits_length // 8) + 1
-        total_bytes += timestamp_bytes_length
-        b <<= timestamp_bytes_length * 8
+        timestamp_half_bytes_length = (timestamp_bits_length // 4) + 1
+        total_bits += timestamp_half_bytes_length * 4
+        b <<= timestamp_half_bytes_length * 4
         b |= timestamp_delta
 
         # Quantity delta bytes length
         # We encode one less than the max bytes length: so we can fit it in 2 bits
-        quantity_delta_bytes_length -= 1
-        if quantity_delta_bytes_length.bit_length() > 2:
+        quantity_delta_half_bytes_length -= 1
+        if quantity_delta_half_bytes_length.bit_length() > 3:
             raise ValueError("Quantity delta is more than 4 bytes")
-        b <<= 2
-        b |= quantity_delta_bytes_length
+        total_bits += 3
+        b <<= 3
+        b |= quantity_delta_half_bytes_length
 
         # Timestamp bytes length
         # We encode one less than the max bytes length: so we can fit it in 2 bits
-        timestamp_bytes_length -= 1
-        if timestamp_bytes_length.bit_length() > 2:
+        timestamp_half_bytes_length -= 1
+        if timestamp_half_bytes_length.bit_length() > 3:
             raise ValueError("Timestamp is more than 4 bytes")
-        b <<= 2
-        b |= timestamp_bytes_length
+        total_bits += 3
+        b <<= 3
+        b |= timestamp_half_bytes_length
 
         # Delta / Snapshot
+        total_bits += 1
         b <<= 1
         b |= 1
 
-        return b.to_bytes(total_bytes)
+        return b.to_bytes((total_bits // 8) + min(total_bits % 8, 1))
 
     @staticmethod
     def _decode_orderbook_delta(
@@ -251,15 +255,13 @@ class ColeDBInterface:
         """
         # Timestamp bytes length
         # We add one because we substracted 1 in encode to fit in 2 bits
-        timestamp_bits_length = ((b & ((1 << 2) - 1)) + 1) * 8
-        b >>= 2
+        timestamp_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
+        b >>= 3
 
         # Quantity delta extra bytes length
         # We add one because we substracted 1 in encode to fit in 2 bits
-        quantity_bits_length = (
-            ((b & ((1 << 2) - 1)) + 1) * 8
-        ) + ColeDBInterface._num_bits_free_after_delta_metadata
-        b >>= 2
+        quantity_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
+        b >>= 3
 
         # Time stamp. We divide by 10 to get the sub-second precision
         timestamp_delta = (b & ((1 << timestamp_bits_length) - 1)) / 10
