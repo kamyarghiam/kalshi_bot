@@ -190,7 +190,9 @@ class ColeDBInterface:
 
         # Quantity delta
         quantity_delta_bit_length = data.delta.bit_length()
-        quantity_delta_half_bytes_length = ((quantity_delta_bit_length) // 4) + 1
+        quantity_delta_half_bytes_length = get_num_byte_sections_per_bits(
+            quantity_delta_bit_length, 4
+        )
         total_bits += quantity_delta_half_bytes_length * 4
         b <<= quantity_delta_half_bytes_length * 4
         b |= data.delta
@@ -203,7 +205,9 @@ class ColeDBInterface:
             * 10
         )
         timestamp_bits_length = timestamp_delta.bit_length()
-        timestamp_half_bytes_length = (timestamp_bits_length // 4) + 1
+        timestamp_half_bytes_length = get_num_byte_sections_per_bits(
+            timestamp_bits_length, 4
+        )
         total_bits += timestamp_half_bytes_length * 4
         b <<= timestamp_half_bytes_length * 4
         b |= timestamp_delta
@@ -217,7 +221,7 @@ class ColeDBInterface:
         b <<= 3
         b |= quantity_delta_half_bytes_length
 
-        # Timestamp bytes length
+        # Timestamp bytes lengthxw
         # We encode one less than the max bytes length: so we can fit it in 2 bits
         timestamp_half_bytes_length -= 1
         if timestamp_half_bytes_length.bit_length() > 3:
@@ -231,7 +235,7 @@ class ColeDBInterface:
         b <<= 1
         b |= 1
 
-        return b.to_bytes((total_bits // 8) + min(total_bits % 8, 1))
+        return b.to_bytes(get_num_byte_sections_per_bits(total_bits, 8))
 
     @staticmethod
     def _encode_orderbook_snapshot(
@@ -254,13 +258,12 @@ class ColeDBInterface:
         00 -> neither Yes or No
         10 -> Yes price only
         01 -> No price only
-        11 -> Both yes and no price
+        11 -> Both yes and no prices
 
         Then, 3 bits for each side to represnt the length of their
         quantities in half byte intervals. Then the quantites. Yes
         always comes before no
         """
-        # TODO: finish
 
     @staticmethod
     def _decode_orderbook_delta(
@@ -350,3 +353,20 @@ def ticker_to_path(ticker: MarketTicker) -> Path:
 def ticker_to_metadata_path(ticker: MarketTicker) -> Path:
     """Given a market ticker returns a path to the metdata file"""
     return ticker_to_path(ticker) / "metadata"
+
+
+def get_num_byte_sections_per_bits(num_bits: int, byte_section_size: int) -> int:
+    """Return min num of byte sections needed to fit num_bits in byte_section_size bits
+
+    A byte section represents any number of bits. So you can have a byte section with
+    4 bits or 8 bits, for example.
+
+    For example, with byte_section_size = 4, you get:
+
+    num_bits   num_byte_sections
+    0          0
+    3          1
+    4          1
+    5          2
+    """
+    return (num_bits // byte_section_size) + min(num_bits % byte_section_size, 1)

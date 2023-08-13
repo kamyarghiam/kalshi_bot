@@ -7,6 +7,7 @@ from mock import patch
 from src.data.coledb.coledb import (
     ColeDBInterface,
     ColeDBMetadata,
+    get_num_byte_sections_per_bits,
     ticker_to_metadata_path,
     ticker_to_path,
 )
@@ -85,7 +86,7 @@ def test_encode_decode_orderbook_delta():
     )
 
     # Test too high quantity case
-    bad_quantity = QuantityDelta(1 << 31)
+    bad_quantity = QuantityDelta(1 << 32)
     with pytest.raises(ValueError) as e:
         msg.delta = bad_quantity
         ColeDBInterface._encode_to_bits(msg, chunk_start_time)
@@ -94,17 +95,17 @@ def test_encode_decode_orderbook_delta():
     msg.delta = delta
 
     # Time too high
-    bad_time_diff = (1 << 31) / 10
+    bad_time_diff = (1 << 32) / 10
     with pytest.raises(ValueError) as e:
         msg.ts = datetime.fromtimestamp(bad_time_diff)
         ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
     assert e.match("Timestamp is more than 4 bytes")
-    # Bring back good time
+    # Bring back good timexw
     msg.ts = ts
 
     # Edge cases
     ticker = MarketTicker("SOME-REALLYLONGMARKETTICKER-WITHMANYCHARACTERS")
-    delta = QuantityDelta((1 << 31) - 1)
+    delta = QuantityDelta((1 << 32) - 1)
     side = Side.NO
     price = Price(99)
     ts = datetime(2023, 8, 9, 20, 31, 56, 860000)
@@ -125,7 +126,7 @@ def test_encode_decode_orderbook_delta():
     side = Side.YES
     price = Price(31)
     chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
-    ts = datetime.fromtimestamp((chunk_start_time.timestamp() + (((1 << 31) - 1) / 10)))
+    ts = datetime.fromtimestamp((chunk_start_time.timestamp() + (((1 << 32) - 1) / 10)))
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
@@ -150,19 +151,34 @@ def test_encode_decode_orderbook_delta():
 
     # Commented out is some full blown testing that you can use
     # to do some exhaustive checking
+    # import random
+
+    # lens = 0
     # for i in range(1, 1000000):
-    #     if i % 10000 == 0:
-    #         print(i)
-    #     delta = QuantityDelta(random.randint(1, (((1 << 31) - 1))))
+    #     delta = QuantityDelta(random.randint(1, (((1 << 32) - 1))))
     #     price = Price(random.randint(1, 99))
-    #     ts = datetime.fromtimestamp(random.randint(1, (((1 << 31) - 1) // 10)))
+    #     ts = datetime.fromtimestamp(random.randint(1, (((1 << 32) - 1) // 10)))
     #     msg = OrderbookDeltaRM(
     #         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     #     )
+
     #     b = ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
+    #     lens += len(b)
+    #     if i % 10000 == 0:
+    #         print(i)
+    #         print("Avg len: ", lens / i)
     #     assert (
     #         ColeDBInterface._decode_to_response_message(
     #             b, ticker, datetime.fromtimestamp(0)
     #         )
     #         == msg
     #     )
+
+
+def test_get_num_byte_sections_per_bits():
+    assert get_num_byte_sections_per_bits(0, 4) == 0
+    assert get_num_byte_sections_per_bits(1, 4) == 1
+    assert get_num_byte_sections_per_bits(2, 4) == 1
+    assert get_num_byte_sections_per_bits(3, 4) == 1
+    assert get_num_byte_sections_per_bits(4, 4) == 1
+    assert get_num_byte_sections_per_bits(5, 4) == 2
