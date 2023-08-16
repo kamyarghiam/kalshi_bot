@@ -1,7 +1,7 @@
 import pickle
 import typing
 from datetime import datetime
-from typing import List, Sequence, Tuple, TypeVar
+from typing import List, Optional, Sequence, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, Field, validator
 
@@ -60,6 +60,7 @@ class ErrorRM(ResponseMessage):
 
 class OrderbookSnapshotRM(ResponseMessage):
     market_ticker: MarketTicker
+    # You can assume these are sorted by price increasing
     yes: List[Tuple[Price, Quantity]] = []
     no: List[Tuple[Price, Quantity]] = []
     # The timestamp of receiving the message from the exchange
@@ -67,11 +68,27 @@ class OrderbookSnapshotRM(ResponseMessage):
 
     @validator("yes", "no", pre=True)
     def validate_iterable(cls, input_levels: List[Sequence[int]]):
+        """Converts levels into Price and Quantity and makes sure it's sorted"""
         output_levels: List[Tuple[Price, Quantity]] = []
+        last_price: Optional[Price] = None
+        need_to_sort = False
         for level in input_levels:
             assert len(level) == 2
-            output_levels.append((Price(level[0]), Quantity(level[1])))
+            price, quantity = Price(level[0]), Quantity(level[1])
+            output_levels.append((price, quantity))
+            if last_price is None or price > last_price:
+                last_price = price
+            else:
+                need_to_sort = True
+        if need_to_sort:
+            output_levels.sort()
         return output_levels
+
+    def get_side(self, side: Side) -> List[Tuple[Price, Quantity]]:
+        if side == Side.YES:
+            return self.yes
+        assert side == Side.NO
+        return self.no
 
 
 class OrderbookDeltaRM(ResponseMessage):

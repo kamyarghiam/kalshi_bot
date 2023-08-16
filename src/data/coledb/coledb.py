@@ -48,12 +48,12 @@ import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set, Tuple
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook
-from src.helpers.types.orders import QuantityDelta, Side
+from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 COLEDB_STORAGE_PATH = Path("storage")
@@ -216,7 +216,13 @@ class ColeDBInterface:
         # We encode one less than the max bytes length: so we can fit it in 2 bits
         quantity_delta_half_bytes_length -= 1
         if quantity_delta_half_bytes_length.bit_length() > 3:
-            raise ValueError("Quantity delta is more than 4 bytes")
+            raise ValueError(
+                "Quantity delta more than 4 bytes. "
+                + f"Side: {data.side}. "
+                + f"Price: {data.price}. "
+                + f"Quantity delta: {data.delta}. "
+                + f"Market ticker: {data.market_ticker}."
+            )
         total_bits += 3
         b <<= 3
         b |= quantity_delta_half_bytes_length
@@ -225,7 +231,12 @@ class ColeDBInterface:
         # We encode one less than the max bytes length: so we can fit it in 2 bits
         timestamp_half_bytes_length -= 1
         if timestamp_half_bytes_length.bit_length() > 3:
-            raise ValueError("Timestamp is more than 4 bytes")
+            raise ValueError(
+                "Timestamp is more than 4 bytes in delta. "
+                + f"Side: {data.side}. "
+                + f"Timestamp: {data.ts}. "
+                + f"Market ticker: {data.market_ticker}."
+            )
         total_bits += 3
         b <<= 3
         b |= timestamp_half_bytes_length
@@ -260,10 +271,124 @@ class ColeDBInterface:
         01 -> No price only
         11 -> Both yes and no prices
 
-        Then, 3 bits for each side to represnt the length of their
-        quantities in half byte intervals. Then the quantites. Yes
-        always comes before no
+        Then, for each side: 3 bits to represnt the length of their
+        quantities in half byte intervals (4 bits). Then the quantity.
+
+        Reading from left to right, it should look like:
+
+        For each level:
+            no quantity half bytes length (3 bits) optional
+            no quantity (variable up to 4 bytes) optional
+            yes quantity half byte length (3 bits) optional
+            yes quantity (variable up to 4 bytes) optioanl
+
+        Timestamp (variable up to 4 bytes)
+        Timestamp half bytes length (3 bits)
+        Delta / Snapshot 1 bit
         """
+
+        total_bits = 0
+        b = 0
+
+        # We're going to loop backwards through the price level because we
+        # want to read in a fowards manner when decoding. Since sides are
+        # sorted, we can just start at the last index of the sides and work
+        # our way down
+        side_to_index: Dict[Side, int] = {
+            Side.NO: len(data.no) - 1,
+            Side.YES: len(data.yes) - 1,
+        }
+        side_to_orderbook: Dict[Side, List[Tuple[Price, Quantity]]] = {
+            Side.NO: data.no,
+            Side.YES: data.yes,
+        }
+
+        # Prices and quantities
+        for price in range(99, 0, -1):
+            # The encoding of this level
+            level_encoding = 0
+            # Length of the encoding
+            length = 2  # Already includes the side encoding below
+            sides_that_include_price: Set[Side] = set()
+
+            for side in Side:
+                side_orderbook = side_to_orderbook[side]
+                index = side_to_index[side]
+                # Pric
+                price_at_level, quantity_at_level = side_orderbook[index]
+                if index < 0 or price_at_level != price:
+                    # This means this price is not included on this side's level
+                    continue
+
+                side_to_index[side] -= 1
+                sides_that_include_price.add(side)
+
+                quantity = quantity_at_level
+                quantity_length = (int(quantity)).bit_length()
+                # Number of 4 bit intervals needed to store the quantity
+                quantity_length_half_bytes = get_num_byte_sections_per_bits(
+                    quantity_length, 4
+                )
+                if quantity_length_half_bytes.bit_length() > 3:
+                    raise ValueError(
+                        f"Quantity snapshot is more than 4 bytes. Side: {side}. "
+                        + f"Price: {price}. "
+                        + f"Quantity: {quantity}. "
+                        + f"Market ticker: {data.market_ticker}."
+                    )
+                # Quantity half byte length encoding
+                b << 3
+                b |= quantity_length_half_bytes
+                length += 3
+
+                # Quantity encoding
+                b << quantity_length_half_bytes * 4
+                b |= quantity
+                length += quantity_length_half_bytes * 4
+
+            # Side encoding
+            # Encoding that the quantity is Yes, No, neither, or both
+            if Side.NO in sides_that_include_price:
+                level_encoding |= 1
+            level_encoding <<= 1
+            if Side.YES in sides_that_include_price:
+                level_encoding |= 1
+            level_encoding <<= 1
+
+            total_bits += length
+
+        # Timestamp (TODO: refactor to merge logic with other encode func)
+        timestamp = data.ts.timestamp()
+        timestamp_delta: int = round(
+            # Take 1 decimal place after seconds
+            (timestamp - chunk_start_timestamp.timestamp())
+            * 10
+        )
+        timestamp_bits_length = timestamp_delta.bit_length()
+        timestamp_half_bytes_length = get_num_byte_sections_per_bits(
+            timestamp_bits_length, 4
+        )
+        total_bits += timestamp_half_bytes_length * 4
+        b <<= timestamp_half_bytes_length * 4
+        b |= timestamp_delta
+
+        # Timestamp bytes length
+        # We encode one less than the max bytes length: so we can fit it in 2 bits
+        timestamp_half_bytes_length -= 1
+        if timestamp_half_bytes_length.bit_length() > 3:
+            raise ValueError(
+                "Timestamp is more than 4 bytes in snapshot."
+                + f"Timestamp: {data.ts}. "
+                + f"Market ticker: {data.market_ticker}."
+            )
+        total_bits += 3
+        b <<= 3
+        b |= timestamp_half_bytes_length
+
+        # Delta / Snapshot
+        total_bits += 1
+        b <<= 1
+        b |= 1
 
     @staticmethod
     def _decode_orderbook_delta(

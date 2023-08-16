@@ -26,6 +26,17 @@ def test_from_snapshot():
     assert orderbook.no == OrderbookSide(levels={Price(20): Quantity(200)})
 
 
+def test_get_side():
+    orderbook_snapshot = OrderbookSnapshotRM(
+        market_ticker=MarketTicker("hi"),
+        yes=[[10, 100]],  # type:ignore[list-item]
+        no=[[20, 200]],  # type:ignore[list-item]
+    )
+
+    assert orderbook_snapshot.get_side(Side.YES) == [(Price(10), Quantity(100))]
+    assert orderbook_snapshot.get_side(Side.NO) == [(Price(20), Quantity(200))]
+
+
 def test_add_remove_level():
     book = OrderbookSide()
     book.add_level(Price(10), Quantity(100))
@@ -445,3 +456,13 @@ def test_invalid_orderbooks():
             )
         )
     assert err.match("Not a valid orderbook after delta")
+
+
+def test_validate_levels_sorted():
+    orderbook_snapshot = OrderbookSnapshotRM(
+        market_ticker=MarketTicker("hi"),
+        yes=[(Price(i), Quantity(100)) for i in range(1, 100)],
+        no=[(Price(i), Quantity(200)) for i in range(99, 0, -1)],
+    )
+    assert orderbook_snapshot.yes == [(Price(i), Quantity(100)) for i in range(1, 100)]
+    assert orderbook_snapshot.no == [(Price(i), Quantity(200)) for i in range(1, 100)]

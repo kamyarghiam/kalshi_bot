@@ -70,7 +70,7 @@ def test_get_metadata_file(tmp_path: Path):
 
 
 def test_encode_decode_orderbook_delta():
-    ticker = MarketTicker("SIDE-EVENT-MARKET")
+    ticker = MarketTicker("SERIES-EVENT-MARKET")
     delta = QuantityDelta(12345)
     side = Side.YES
     price = Price(31)
@@ -90,7 +90,13 @@ def test_encode_decode_orderbook_delta():
     with pytest.raises(ValueError) as e:
         msg.delta = bad_quantity
         ColeDBInterface._encode_to_bits(msg, chunk_start_time)
-    assert e.match("Quantity delta is more than 4 bytes")
+    assert e.match(
+        "Quantity delta more than 4 bytes. "
+        + "Side: Side.YES. "
+        + "Price: 31¢. "
+        + "Quantity delta: 4294967296. "
+        + "Market ticker: SERIES-EVENT-MARKET."
+    )
     # Bring back good quantity
     msg.delta = delta
 
@@ -99,7 +105,12 @@ def test_encode_decode_orderbook_delta():
     with pytest.raises(ValueError) as e:
         msg.ts = datetime.fromtimestamp(bad_time_diff)
         ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
-    assert e.match("Timestamp is more than 4 bytes")
+    assert e.match(
+        "Timestamp is more than 4 bytes in delta. "
+        + "Side: Side.YES. "
+        + f"Timestamp: {datetime.fromtimestamp(bad_time_diff)}. "
+        + "Market ticker: SERIES-EVENT-MARKET."
+    )
     # Bring back good timexw
     msg.ts = ts
 

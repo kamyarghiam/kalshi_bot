@@ -98,8 +98,8 @@ def test_orderbook_snapshot_validation():
 
     assert orderbook_snapshot.market_ticker == "hi"
     assert orderbook_snapshot.yes == [
-        (Price(40), Quantity(100)),
         (Price(20), Quantity(200)),
+        (Price(40), Quantity(100)),
     ]
     assert orderbook_snapshot.no == [
         (Price(50), Quantity(200)),
