@@ -252,6 +252,7 @@ class ColeDBInterface:
     def _encode_orderbook_snapshot(
         data: OrderbookSnapshotRM, chunk_start_timestamp: datetime
     ) -> bytes:
+        # TODO: test me!
         """Encodes an orderbook snapshot message to bytes
 
         The quantity delta and the time delta are in 4 bit intervals.
@@ -314,7 +315,7 @@ class ColeDBInterface:
             for side in Side:
                 side_orderbook = side_to_orderbook[side]
                 index = side_to_index[side]
-                # Pric
+                # Price
                 price_at_level, quantity_at_level = side_orderbook[index]
                 if index < 0 or price_at_level != price:
                     # This means this price is not included on this side's level
@@ -336,15 +337,15 @@ class ColeDBInterface:
                         + f"Quantity: {quantity}. "
                         + f"Market ticker: {data.market_ticker}."
                     )
-                # Quantity half byte length encoding
-                b << 3
-                b |= quantity_length_half_bytes
-                length += 3
-
                 # Quantity encoding
                 b << quantity_length_half_bytes * 4
                 b |= quantity
                 length += quantity_length_half_bytes * 4
+
+                # Quantity half byte length encoding
+                b << 3
+                b |= quantity_length_half_bytes
+                length += 3
 
             # Side encoding
             # Encoding that the quantity is Yes, No, neither, or both
@@ -436,6 +437,56 @@ class ColeDBInterface:
             side=side,
             ts=ts,
         )
+
+    @staticmethod
+    def _decode_orderbook_snapshot(
+        b: int,
+        ticker: MarketTicker,
+        chunk_start_timestamp: datetime,
+    ) -> OrderbookSnapshotRM:
+        """Takes in the bytes as an int (with the first bit skipped) and decodes msg
+
+        The encoded message should be ocnverted to an int. And since the first
+        bit of the mesage determines whether it is an orderbook delta or snapshot,
+        it should be ommitted before it is passed into this function.
+        """
+        # TODO: combine this logic with other decode function
+
+        # Timestamp bytes length
+        # We add one because we substracted 1 in encode to fit in 2 bits
+        timestamp_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
+        b >>= 3
+
+        # Time stamp. We divide by 10 to get the sub-second precision
+        timestamp_delta = (b & ((1 << timestamp_bits_length) - 1)) / 10
+        ts = datetime.fromtimestamp(chunk_start_timestamp.timestamp() + timestamp_delta)
+        b >>= timestamp_bits_length
+
+        snapshot_rm = OrderbookSnapshotRM(market_ticker=ticker, ts=ts, yes=[], no=[])
+
+        for price in range(1, 100):
+            # Tells us if it's a yes/no/both/neither
+            # The number 3 takes 2 bits: ((1 << 2) - 1
+            side_encoding = b & 3
+            b <<= 2
+
+            if side_encoding & 1:
+                # Yes side
+                yes_quantity_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
+                b >>= 3
+                yes_quantity = b & ((1 << yes_quantity_bits_length) - 1)
+                b <<= yes_quantity_bits_length
+                snapshot_rm.yes.append((Price(price), Quantity(yes_quantity)))
+
+            if side_encoding & 2:
+                # No side
+                no_quantity_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
+                b >>= 3
+                no_quantity = b & ((1 << no_quantity_bits_length) - 1)
+                b <<= no_quantity_bits_length
+                snapshot_rm.no.append((Price(price), Quantity(no_quantity)))
+
+        return snapshot_rm
 
     @staticmethod
     def _decode_to_response_message(
