@@ -391,6 +391,8 @@ class ColeDBInterface:
         b <<= 1
         b |= 1
 
+        return b.to_bytes(get_num_byte_sections_per_bits(total_bits, 8))
+
     @staticmethod
     def _decode_orderbook_delta(
         b: int,
@@ -505,8 +507,9 @@ class ColeDBInterface:
                 b, ticker, chunk_start_timestamp
             )
         else:
-            # TODO: finish
-            return
+            return ColeDBInterface._decode_orderbook_snapshot(
+                b, ticker, chunk_start_timestamp
+            )
 
     def _create_new_chunk(self, snapshot: Orderbook, metadata: ColeDBMetadata):
         # TODO: finish

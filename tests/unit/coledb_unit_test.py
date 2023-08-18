@@ -14,6 +14,7 @@ from src.data.coledb.coledb import (
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
 from src.helpers.types.orders import QuantityDelta, Side
+from src.helpers.types.websockets.response import OrderbookSnapshotRM
 from tests.fake_exchange import OrderbookDeltaRM
 
 
@@ -193,3 +194,22 @@ def test_get_num_byte_sections_per_bits():
     assert get_num_byte_sections_per_bits(3, 4) == 1
     assert get_num_byte_sections_per_bits(4, 4) == 1
     assert get_num_byte_sections_per_bits(5, 4) == 2
+
+
+def test_encode_decode_orderbook_snapshot():
+    # Basic test
+    ticker = MarketTicker("some_ticker")
+    chunk_start_ts = datetime.fromtimestamp(0)
+    snapshot = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[2, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=datetime.fromtimestamp(10),
+    )
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        b, MarketTicker("some_ticker"), chunk_start_ts
+    )
+    assert snapshot == msg
+
+    # TODO: test boundaries, edge cases, etc. Especially with prices
