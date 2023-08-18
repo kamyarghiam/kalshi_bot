@@ -386,10 +386,9 @@ class ColeDBInterface:
         b <<= 3
         b |= timestamp_half_bytes_length
 
-        # Delta / Snapshot
+        # Delta / Snapshot (marked as 0)
         total_bits += 1
         b <<= 1
-        b |= 1
 
         return b.to_bytes(get_num_byte_sections_per_bits(total_bits, 8))
 
