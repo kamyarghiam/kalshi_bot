@@ -1,3 +1,4 @@
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from src.data.coledb.coledb import (
 )
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
-from src.helpers.types.orders import QuantityDelta, Side
+from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookSnapshotRM
 from tests.fake_exchange import OrderbookDeltaRM
 
@@ -107,9 +108,9 @@ def test_encode_decode_orderbook_delta():
         msg.ts = datetime.fromtimestamp(bad_time_diff)
         ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
     assert e.match(
-        "Timestamp is more than 4 bytes in delta. "
+        "Timestamp delta more than 4 bytes in orderbook delta. "
         + "Side: Side.YES. "
-        + f"Timestamp: {datetime.fromtimestamp(bad_time_diff)}. "
+        + f"Timestamp delta: {round(bad_time_diff * 10)}. "
         + "Market ticker: SERIES-EVENT-MARKET."
     )
     # Bring back good timexw
@@ -161,8 +162,7 @@ def test_encode_decode_orderbook_delta():
         ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
     )
 
-    # Commented out is some full blown testing that you can use
-    # to do some exhaustive checking
+    # Stress testing. Uncomment to use
     # import random
 
     # lens = 0
@@ -200,16 +200,127 @@ def test_encode_decode_orderbook_snapshot():
     # Basic test
     ticker = MarketTicker("some_ticker")
     chunk_start_ts = datetime.fromtimestamp(0)
+    ts = datetime.fromtimestamp(10)
     snapshot = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[[2, 100]],  # type:ignore[list-item]
         no=[[1, 20]],  # type:ignore[list-item]
-        ts=datetime.fromtimestamp(10),
+        ts=ts,
     )
     b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(
-        b, MarketTicker("some_ticker"), chunk_start_ts
-    )
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert snapshot == msg
 
-    # TODO: test boundaries, edge cases, etc. Especially with prices
+    # Test too high quantity case on yes side
+    bad_quantity = Quantity(1 << 32)
+    with pytest.raises(ValueError) as e:
+        snapshot.yes.append((Price(31), bad_quantity))
+        ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    assert e.match(
+        "Quantity snapshot is more than 4 bytes. "
+        + "Side: Side.YES. "
+        + "Price: 31¢. "
+        + "Quantity: 4294967296. "
+        + "Market ticker: some_ticker."
+    )
+    snapshot.yes.pop()
+
+    # Time too high
+    bad_time_diff = (1 << 32) / 10
+    with pytest.raises(ValueError) as e:
+        snapshot.ts = datetime.fromtimestamp(bad_time_diff)
+        ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    assert e.match(
+        "Timestamp delta is more than 4 bytes in snapshot. "
+        + f"Timestamp delta: {round(bad_time_diff * 10)}. "
+        + "Market ticker: some_ticker."
+    )
+
+    # Edge case, timestamp at edge
+    chunk_start_ts = datetime(2023, 8, 9, 20, 31, 55)
+    edge_ts = datetime.fromtimestamp(
+        (chunk_start_ts.timestamp() + (((1 << 32) - 1) / 10))
+    )
+    snapshot.ts = edge_ts
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    assert (
+        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+        == snapshot
+    )
+
+    # Quantities on edge and at same price
+    snapshot.yes.append((Price(31), Quantity(1)))
+    snapshot.no.append((Price(31), Quantity((1 << 32) - 1)))
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    assert msg == snapshot
+
+    # Fill every level
+    yes = []
+    no = []
+    for i in range(1, 100):
+        yes.append((Price(i), Quantity(random.randint(1, (1 << 32) - 1))))
+        no.append((Price(i), Quantity(random.randint(1, (1 << 32) - 1))))
+    snapshot.yes = yes
+    snapshot.no = no
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    assert msg == snapshot
+
+    # Empty levels
+    snapshot.yes = []
+    snapshot.no = []
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    assert msg == snapshot
+
+    # Yes empty
+    snapshot.yes = []
+    snapshot.no = [(Price(i), Quantity(random.randint(1, (1 << 32) - 1)))]
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    assert msg == snapshot
+
+    # No empty
+    snapshot.yes = [(Price(i), Quantity(random.randint(1, (1 << 32) - 1)))]
+    snapshot.no = []
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    assert msg == snapshot
+
+    # Small quantities
+    yes = [(Price(i), Quantity(i)) for i in range(1, 100)]
+    no = [(Price(i), Quantity(99 + i)) for i in range(1, 100)]
+    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    assert msg == snapshot
+
+    # Stress testing. Uncomment to use
+    # for i in range(1000000):
+    #     if i % 10000 == 0:
+    #         print(i)
+    #     no = []
+    #     yes = []
+    #     for price in range(1, 100):
+    #         should_add_no = bool(random.getrandbits(1))
+    #         if should_add_no:
+    #             no.append((Price(price), Quantity(random.randint(1, (1 << 32) - 1))))
+    #         should_add_yes = bool(random.getrandbits(1))
+    #         if should_add_yes:
+    #             yes.append((Price(price), Quantity(random.randint(1, (1 << 32) - 1))))
+
+    #     chunk_start_ts = datetime.fromtimestamp(random.randint(0, 100000))
+    #     ts = datetime.fromtimestamp(
+    #         chunk_start_ts.timestamp() + random.randint(0, int(((1 << 32) - 1) / 10))
+    #     )
+    #     market_ticker_length = random.randint(1, 100)
+    #     ticker = "".join(
+    #         random.choice(string.ascii_lowercase) for _ in range(market_ticker_length)
+    #     )
+    #     snapshot.market_ticker = ticker
+    #     snapshot.ts = ts
+    #     snapshot.yes = yes
+    #     snapshot.no = no
+    #     b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    #     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    #     assert msg == snapshot

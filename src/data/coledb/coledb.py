@@ -232,9 +232,9 @@ class ColeDBInterface:
         timestamp_half_bytes_length -= 1
         if timestamp_half_bytes_length.bit_length() > 3:
             raise ValueError(
-                "Timestamp is more than 4 bytes in delta. "
+                "Timestamp delta more than 4 bytes in orderbook delta. "
                 + f"Side: {data.side}. "
-                + f"Timestamp: {data.ts}. "
+                + f"Timestamp delta: {timestamp_delta}. "
                 + f"Market ticker: {data.market_ticker}."
             )
         total_bits += 3
@@ -252,7 +252,6 @@ class ColeDBInterface:
     def _encode_orderbook_snapshot(
         data: OrderbookSnapshotRM, chunk_start_timestamp: datetime
     ) -> bytes:
-        # TODO: test me!
         """Encodes an orderbook snapshot message to bytes
 
         The quantity delta and the time delta are in 4 bit intervals.
@@ -303,16 +302,20 @@ class ColeDBInterface:
             Side.NO: data.no,
             Side.YES: data.yes,
         }
+        non_empty_sides = []
+        if len(data.no) > 0:
+            non_empty_sides.append(Side.NO)
+        if len(data.yes) > 0:
+            non_empty_sides.append(Side.YES)
 
         # Prices and quantities
         for price in range(99, 0, -1):
-            # The encoding of this level
-            level_encoding = 0
             # Length of the encoding
-            length = 2  # Already includes the side encoding below
+            length = 0
             sides_that_include_price: Set[Side] = set()
 
-            for side in Side:
+            # Set explicit order for iterating through sides
+            for side in non_empty_sides:
                 side_orderbook = side_to_orderbook[side]
                 index = side_to_index[side]
                 # Price
@@ -330,31 +333,39 @@ class ColeDBInterface:
                 quantity_length_half_bytes = get_num_byte_sections_per_bits(
                     quantity_length, 4
                 )
+                quantity_num_bits = quantity_length_half_bytes * 4
+                # Subtract 1 when encoding to use 0 bit
+                quantity_length_half_bytes -= 1
                 if quantity_length_half_bytes.bit_length() > 3:
                     raise ValueError(
                         f"Quantity snapshot is more than 4 bytes. Side: {side}. "
-                        + f"Price: {price}. "
+                        + f"Price: {Price(price)}. "
                         + f"Quantity: {quantity}. "
                         + f"Market ticker: {data.market_ticker}."
                     )
                 # Quantity encoding
-                b << quantity_length_half_bytes * 4
+                b <<= quantity_num_bits
                 b |= quantity
-                length += quantity_length_half_bytes * 4
+                length += quantity_num_bits
 
                 # Quantity half byte length encoding
-                b << 3
+                b <<= 3
+
                 b |= quantity_length_half_bytes
                 length += 3
 
             # Side encoding
+            side_encoding = 0
             # Encoding that the quantity is Yes, No, neither, or both
             if Side.NO in sides_that_include_price:
-                level_encoding |= 1
-            level_encoding <<= 1
+                side_encoding |= 1
+            side_encoding <<= 1
             if Side.YES in sides_that_include_price:
-                level_encoding |= 1
-            level_encoding <<= 1
+                side_encoding |= 1
+
+            b <<= 2
+            b |= side_encoding
+            length += 2
 
             total_bits += length
 
@@ -378,8 +389,8 @@ class ColeDBInterface:
         timestamp_half_bytes_length -= 1
         if timestamp_half_bytes_length.bit_length() > 3:
             raise ValueError(
-                "Timestamp is more than 4 bytes in snapshot."
-                + f"Timestamp: {data.ts}. "
+                "Timestamp delta is more than 4 bytes in snapshot. "
+                + f"Timestamp delta: {timestamp_delta}. "
                 + f"Market ticker: {data.market_ticker}."
             )
         total_bits += 3
@@ -469,14 +480,14 @@ class ColeDBInterface:
             # Tells us if it's a yes/no/both/neither
             # The number 3 takes 2 bits: ((1 << 2) - 1
             side_encoding = b & 3
-            b <<= 2
+            b >>= 2
 
             if side_encoding & 1:
                 # Yes side
                 yes_quantity_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
                 b >>= 3
                 yes_quantity = b & ((1 << yes_quantity_bits_length) - 1)
-                b <<= yes_quantity_bits_length
+                b >>= yes_quantity_bits_length
                 snapshot_rm.yes.append((Price(price), Quantity(yes_quantity)))
 
             if side_encoding & 2:
@@ -484,7 +495,7 @@ class ColeDBInterface:
                 no_quantity_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
                 b >>= 3
                 no_quantity = b & ((1 << no_quantity_bits_length) - 1)
-                b <<= no_quantity_bits_length
+                b >>= no_quantity_bits_length
                 snapshot_rm.no.append((Price(price), Quantity(no_quantity)))
 
         return snapshot_rm
