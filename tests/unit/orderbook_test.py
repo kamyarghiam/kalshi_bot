@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 
 import pytest
 
@@ -466,3 +467,42 @@ def test_validate_levels_sorted():
     )
     assert orderbook_snapshot.yes == [(Price(i), Quantity(100)) for i in range(1, 100)]
     assert orderbook_snapshot.no == [(Price(i), Quantity(200)) for i in range(1, 100)]
+
+
+def test_from_orderbook():
+    ts = datetime.now()
+    book = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+        ts=ts,
+    )
+    assert OrderbookSnapshotRM.from_orderbook(book) == OrderbookSnapshotRM(
+        market_ticker=MarketTicker("hi"),
+        yes=[(Price(1), Quantity(200)), (Price(2), Quantity(100))],
+        no=[
+            (Price(93), Quantity(300)),
+            (Price(94), Quantity(400)),
+            (Price(95), Quantity(500)),
+        ],
+        ts=ts,
+    )
+
+    orderbook_snapshot = OrderbookSnapshotRM(
+        market_ticker=MarketTicker("hi"),
+        yes=[(Price(1), Quantity(200)), (Price(2), Quantity(100))],
+        no=[
+            (Price(93), Quantity(300)),
+            (Price(94), Quantity(400)),
+            (Price(95), Quantity(500)),
+        ],
+        ts=ts,
+    )
+    book = Orderbook.from_snapshot(orderbook_snapshot)
+    assert OrderbookSnapshotRM.from_orderbook(book) == orderbook_snapshot

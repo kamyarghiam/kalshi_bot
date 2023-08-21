@@ -120,7 +120,7 @@ class Orderbook:
             assert self.view == OrderbookView.ASK
             yes_price, _ = self.yes.get_smallest_price_level()
             no_price, _ = self.no.get_smallest_price_level()
-            # Ditton equality, see comment above
+            # Ditto on equality, see comment above
             return yes_price + no_price >= Cents(100)
 
     def apply_delta(self, delta: "OrderbookDeltaRM") -> "Orderbook":

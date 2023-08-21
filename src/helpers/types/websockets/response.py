@@ -1,15 +1,19 @@
 import pickle
 import typing
 from datetime import datetime
-from typing import List, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, Field, validator
 
 from src.helpers.types.markets import MarketTicker
+from src.helpers.types.orderbook import OrderbookView
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Type
 from src.helpers.types.websockets.request import Channel
 from tests.unit.prices_test import Price
+
+if TYPE_CHECKING:
+    from src.helpers.types.orderbook import Orderbook
 
 WR = TypeVar("WR", bound="WebsocketResponse")
 
@@ -89,6 +93,19 @@ class OrderbookSnapshotRM(ResponseMessage):
             return self.yes
         assert side == Side.NO
         return self.no
+
+    @classmethod
+    def from_orderbook(cls, o: "Orderbook"):
+        o = o.get_view(OrderbookView.BID)
+        yes = []
+        no = []
+        for price, quantity in o.yes.levels.items():
+            yes.append((Price(price), Quantity(quantity)))
+
+        for price, quantity in o.no.levels.items():
+            no.append((Price(price), Quantity(quantity)))
+
+        return cls(market_ticker=o.market_ticker, ts=o.ts, yes=yes, no=no)
 
 
 class OrderbookDeltaRM(ResponseMessage):

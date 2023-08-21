@@ -94,6 +94,11 @@ class ColeDBMetadata:
         """Return path to the last chunk"""
         return self.path_to_market_data / str(self.last_chunk_num)
 
+    @property
+    def latest_chunk_timestamp(self) -> datetime:
+        # Last chunk num is 1 indexed
+        return self.chunk_first_time_stamps[self.last_chunk_num - 1]
+
 
 class ColeDBInterface:
     """Public interface for ColeDB"""
@@ -126,18 +131,33 @@ class ColeDBInterface:
                 raise TypeError(
                     f"New dataset writes must start with a snapshot! Data: {data}"
                 )
-            self._create_new_chunk(Orderbook.from_snapshot(data), metadata)
+            self._create_new_chunk(data, metadata)
             return
         needs_new_chunk = metadata.num_msgs_in_last_file == MSGS_PER_CHUNK
         if needs_new_chunk:
             last_chunk_snapshot = self._read_chunk_apply_deltas(
                 metadata.path_to_last_chunk
             )
-            self._create_new_chunk(last_chunk_snapshot, metadata)
+            self._create_new_chunk(
+                OrderbookSnapshotRM.from_orderbook(last_chunk_snapshot), metadata
+            )
+        else:
+            ColeDBInterface._write_data_to_last_file(data, metadata)
 
-        # TODO: finish. NOTE: remember that if the timestamp is too large,
-        # you need to create a new chunk for the message
-        ...
+    @staticmethod
+    def _write_data_to_last_file(
+        data: OrderbookDeltaRM | OrderbookSnapshotRM,
+        metadata: ColeDBMetadata,
+    ):
+        """Writes data to the latest file in the database"""
+        metadata.path_to_last_chunk.write_bytes(
+            ColeDBInterface._encode_to_bits(
+                data,
+                metadata.latest_chunk_timestamp,
+            )
+        )
+        metadata.num_msgs_in_last_file += 1
+        metadata.save()
 
     @staticmethod
     def _encode_to_bits(
@@ -521,15 +541,20 @@ class ColeDBInterface:
                 b, ticker, chunk_start_timestamp
             )
 
-    def _create_new_chunk(self, snapshot: Orderbook, metadata: ColeDBMetadata):
-        # TODO: finish
+    def _create_new_chunk(
+        self, snapshot: OrderbookDeltaRM | OrderbookSnapshotRM, metadata: ColeDBMetadata
+    ):
         metadata.last_chunk_num += 1
         metadata.num_msgs_in_last_file = 0
-        return
+        metadata.chunk_first_time_stamps.append(datetime.now())
+        new_chunk_file = metadata.path_to_market_data / str(metadata.last_chunk_num)
+        new_chunk_file.touch()
+
+        ColeDBInterface._write_data_to_last_file(snapshot, metadata)
 
     def _read_chunk_apply_deltas(self, path: Path) -> Orderbook:
         """Reads a chunk and applies the deltas from the beginning"""
-        # TODO: finish
+        # TODO: finish.
         ...
         return
 
