@@ -178,7 +178,6 @@ def test_encode_decode_orderbook_delta():
     )
 
     # Stress testing. Uncomment to use
-    # import random
 
     # lens = 0
     # for i in range(1, 1000000):
@@ -223,7 +222,9 @@ def test_encode_decode_orderbook_snapshot():
         ts=ts,
     )
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert snapshot == msg
 
     # Test too high quantity case on yes side
@@ -259,7 +260,9 @@ def test_encode_decode_orderbook_snapshot():
     snapshot.ts = edge_ts
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     assert (
-        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+        ColeDBInterface._decode_to_response_message(
+            ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+        )
         == snapshot
     )
 
@@ -267,7 +270,9 @@ def test_encode_decode_orderbook_snapshot():
     snapshot.yes.append((Price(31), Quantity(1)))
     snapshot.no.append((Price(31), Quantity((1 << 32) - 1)))
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert msg == snapshot
 
     # Fill every level
@@ -279,39 +284,51 @@ def test_encode_decode_orderbook_snapshot():
     snapshot.yes = yes
     snapshot.no = no
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert msg == snapshot
 
     # Empty levels
     snapshot.yes = []
     snapshot.no = []
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert msg == snapshot
 
     # Yes empty
     snapshot.yes = []
     snapshot.no = [(Price(i), Quantity(random.randint(1, (1 << 32) - 1)))]
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert msg == snapshot
 
     # No empty
     snapshot.yes = [(Price(i), Quantity(random.randint(1, (1 << 32) - 1)))]
     snapshot.no = []
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert msg == snapshot
 
     # Small quantities
     yes = [(Price(i), Quantity(i)) for i in range(1, 100)]
     no = [(Price(i), Quantity(99 + i)) for i in range(1, 100)]
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    msg = ColeDBInterface._decode_to_response_message(
+        ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    )
     assert msg == snapshot
 
     # Stress testing. Uncomment to use
-    # for i in range(1000000):
+    # import string
+
+    # for i in range(100000):
     #     if i % 10000 == 0:
     #         print(i)
     #     no = []
@@ -337,7 +354,9 @@ def test_encode_decode_orderbook_snapshot():
     #     snapshot.yes = yes
     #     snapshot.no = no
     #     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
-    #     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
+    #     msg = ColeDBInterface._decode_to_response_message(
+    #         ColeBytes(io.BytesIO(b)), ticker, chunk_start_ts
+    #     )
     #     assert msg == snapshot
 
 
