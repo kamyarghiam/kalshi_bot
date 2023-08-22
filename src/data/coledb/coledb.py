@@ -188,8 +188,6 @@ class ColeDBInterface:
                 data.market_ticker,
                 metadata.latest_chunk_timestamp,
             )
-            if last_chunk_snapshot is None:
-                raise ValueError("Last chunk had nothing written to it")
             self._create_new_chunk(
                 OrderbookSnapshotRM.from_orderbook(last_chunk_snapshot), metadata
             )
@@ -627,26 +625,52 @@ class ColeDBInterface:
 
     @staticmethod
     def _read_chunk_apply_deltas(
-        path: Path, ticker: MarketTicker, chunk_start_ts: datetime
-    ) -> Optional[Orderbook]:
+        path: Path,
+        ticker: MarketTicker,
+        chunk_start_ts: datetime,
+    ) -> Orderbook:
         """Reads a chunk and applies the deltas from the beginning"""
+        for orderbook in ColeDBInterface._read_chunk_apply_deltas_generator(
+            path, ticker, chunk_start_ts
+        ):
+            continue
+        return orderbook
+
+    @staticmethod
+    def _read_chunk_apply_deltas_generator(
+        path: Path,
+        ticker: MarketTicker,
+        chunk_start_ts: datetime,
+        timestamp: Optional[datetime] = None,
+    ):
+        """Generator that returns messages starting after the timestamp passed in
+
+        If no timestamp is passed in, it starts from the beginning"""
         with open(str(path), "rb") as f:
             cole_bytes = ColeBytes(f)
-            orderbook: Optional[Orderbook] = None
+            # First message must be a snapshot. If you get an EOFError here,
+            # it means the chunk was empty.
+            msg = ColeDBInterface._decode_to_response_message(
+                cole_bytes, ticker, chunk_start_ts
+            )
+            assert isinstance(msg, OrderbookSnapshotRM)
+            orderbook = Orderbook.from_snapshot(msg)
             while True:
                 try:
                     msg = ColeDBInterface._decode_to_response_message(
                         cole_bytes, ticker, chunk_start_ts
                     )
                 except EOFError:
-                    return orderbook
+                    yield orderbook
+                    return
                 else:
                     if isinstance(msg, OrderbookSnapshotRM):
                         orderbook = Orderbook.from_snapshot(msg)
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
-                        assert orderbook is not None
                         orderbook = orderbook.apply_delta(msg)
+                    if timestamp is None or timestamp < orderbook.ts:
+                        yield orderbook
 
 
 def ticker_to_path(ticker: MarketTicker) -> Path:

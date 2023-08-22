@@ -546,3 +546,50 @@ def test_read_chunk_apply_deltas(tmp_path: Path):
         )
         assert actual_orderbook == expected_orderbook
     f.close()
+
+
+def test_read_chunk_apply_deltas_generator(tmp_path: Path):
+    ticker = MarketTicker("some_ticker")
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
+    snapshot = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[2, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=datetime(2023, 8, 9, 20, 31, 55, 800000),
+    )
+    delta1 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=datetime(2023, 8, 9, 20, 31, 56, 800000),
+    )
+    delta2 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=datetime(2023, 8, 9, 20, 31, 57, 800000),
+    )
+    snapshot_bytes = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_time)
+    delta_bytes1 = ColeDBInterface._encode_to_bytes(delta1, chunk_start_time)
+    delta_bytes2 = ColeDBInterface._encode_to_bytes(delta2, chunk_start_time)
+
+    test_file = tmp_path / "test_file"
+    test_file.touch()
+    with open(str(test_file), "ab") as f:
+        f.write(snapshot_bytes)
+        f.write(delta_bytes1)
+        f.write(delta_bytes2)
+    # Read from after the snapshot
+    actual_orderbook_gen = ColeDBInterface._read_chunk_apply_deltas_generator(
+        test_file,
+        ticker,
+        chunk_start_time,
+        timestamp=snapshot.ts,
+    )
+    expected_orderbook = Orderbook.from_snapshot(snapshot)
+    expected_orderbook = expected_orderbook.apply_delta(delta1)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    expected_orderbook = expected_orderbook.apply_delta(delta2)
+    assert next(actual_orderbook_gen) == expected_orderbook
