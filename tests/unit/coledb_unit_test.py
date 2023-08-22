@@ -1,3 +1,4 @@
+import io
 import random
 from datetime import datetime
 from io import BytesIO
@@ -84,16 +85,19 @@ def test_encode_decode_orderbook_delta():
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
-    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    b = ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
     assert (
-        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+        ColeDBInterface._decode_to_response_message(
+            ColeBytes(io.BytesIO(b)), ticker, chunk_start_time
+        )
+        == msg
     )
 
     # Test too high quantity case
     bad_quantity = QuantityDelta(1 << 32)
     with pytest.raises(ValueError) as e:
         msg.delta = bad_quantity
-        ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+        ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
     assert e.match(
         "Quantity delta more than 4 bytes. "
         + "Side: Side.YES. "
@@ -108,7 +112,7 @@ def test_encode_decode_orderbook_delta():
     bad_time_diff = (1 << 32) / 10
     with pytest.raises(ValueError) as e:
         msg.ts = datetime.fromtimestamp(bad_time_diff)
-        ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
+        ColeDBInterface._encode_to_bytes(msg, datetime.fromtimestamp(0))
     assert e.match(
         "Timestamp delta more than 4 bytes in orderbook delta. "
         + "Side: Side.YES. "
@@ -128,11 +132,14 @@ def test_encode_decode_orderbook_delta():
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
 
-    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    b = ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
     # It will round up the ts to the nearest decimal
     msg.ts = ts = datetime(2023, 8, 9, 20, 31, 56, 900000)
     assert (
-        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+        ColeDBInterface._decode_to_response_message(
+            ColeBytes(io.BytesIO(b)), ticker, chunk_start_time
+        )
+        == msg
     )
 
     # Edge case, timestamp at edge
@@ -145,9 +152,12 @@ def test_encode_decode_orderbook_delta():
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
-    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    b = ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
     assert (
-        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+        ColeDBInterface._decode_to_response_message(
+            ColeBytes(io.BytesIO(b)), ticker, chunk_start_time
+        )
+        == msg
     )
 
     # Another random case
@@ -159,9 +169,12 @@ def test_encode_decode_orderbook_delta():
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
-    b = ColeDBInterface._encode_to_bits(msg, chunk_start_time)
+    b = ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
     assert (
-        ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_time) == msg
+        ColeDBInterface._decode_to_response_message(
+            ColeBytes(io.BytesIO(b)), ticker, chunk_start_time
+        )
+        == msg
     )
 
     # Stress testing. Uncomment to use
@@ -176,14 +189,14 @@ def test_encode_decode_orderbook_delta():
     #         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     #     )
 
-    #     b = ColeDBInterface._encode_to_bits(msg, datetime.fromtimestamp(0))
+    #     b = ColeDBInterface._encode_to_bytes(msg, datetime.fromtimestamp(0))
     #     lens += len(b)
     #     if i % 10000 == 0:
     #         print(i)
     #         print("Avg len: ", lens / i)
     #     assert (
     #         ColeDBInterface._decode_to_response_message(
-    #             b, ticker, datetime.fromtimestamp(0)
+    #             ColeBytes(io.BytesIO(b)), ticker, datetime.fromtimestamp(0)
     #         )
     #         == msg
     #     )
@@ -209,7 +222,7 @@ def test_encode_decode_orderbook_snapshot():
         no=[[1, 20]],  # type:ignore[list-item]
         ts=ts,
     )
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert snapshot == msg
 
@@ -217,7 +230,7 @@ def test_encode_decode_orderbook_snapshot():
     bad_quantity = Quantity(1 << 32)
     with pytest.raises(ValueError) as e:
         snapshot.yes.append((Price(31), bad_quantity))
-        ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+        ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     assert e.match(
         "Quantity snapshot is more than 4 bytes. "
         + "Side: Side.YES. "
@@ -231,7 +244,7 @@ def test_encode_decode_orderbook_snapshot():
     bad_time_diff = (1 << 32) / 10
     with pytest.raises(ValueError) as e:
         snapshot.ts = datetime.fromtimestamp(bad_time_diff)
-        ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+        ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     assert e.match(
         "Timestamp delta is more than 4 bytes in snapshot. "
         + f"Timestamp delta: {round(bad_time_diff * 10)}. "
@@ -244,7 +257,7 @@ def test_encode_decode_orderbook_snapshot():
         (chunk_start_ts.timestamp() + (((1 << 32) - 1) / 10))
     )
     snapshot.ts = edge_ts
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     assert (
         ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
         == snapshot
@@ -253,7 +266,7 @@ def test_encode_decode_orderbook_snapshot():
     # Quantities on edge and at same price
     snapshot.yes.append((Price(31), Quantity(1)))
     snapshot.no.append((Price(31), Quantity((1 << 32) - 1)))
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert msg == snapshot
 
@@ -265,35 +278,35 @@ def test_encode_decode_orderbook_snapshot():
         no.append((Price(i), Quantity(random.randint(1, (1 << 32) - 1))))
     snapshot.yes = yes
     snapshot.no = no
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert msg == snapshot
 
     # Empty levels
     snapshot.yes = []
     snapshot.no = []
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert msg == snapshot
 
     # Yes empty
     snapshot.yes = []
     snapshot.no = [(Price(i), Quantity(random.randint(1, (1 << 32) - 1)))]
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert msg == snapshot
 
     # No empty
     snapshot.yes = [(Price(i), Quantity(random.randint(1, (1 << 32) - 1)))]
     snapshot.no = []
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert msg == snapshot
 
     # Small quantities
     yes = [(Price(i), Quantity(i)) for i in range(1, 100)]
     no = [(Price(i), Quantity(99 + i)) for i in range(1, 100)]
-    b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     assert msg == snapshot
 
@@ -323,7 +336,7 @@ def test_encode_decode_orderbook_snapshot():
     #     snapshot.ts = ts
     #     snapshot.yes = yes
     #     snapshot.no = no
-    #     b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
+    #     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     #     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     #     assert msg == snapshot
 
@@ -341,11 +354,16 @@ def test_cole_bytes_basic():
     while True:
         pull_length = random.randint(1, 20)
         try:
-            bits, num_bits_pulled = cole_bytes.read(pull_length)
+            bits = cole_bytes.read(pull_length)
         except EOFError:
+            remaining_bits = cole_bytes.last_bits_length
+            if cole_bytes.last_bits_length > 0:
+                bits = cole_bytes.read(remaining_bits)
+            contructed_num <<= remaining_bits
+            contructed_num |= bits
             break
         else:
-            contructed_num <<= num_bits_pulled
+            contructed_num <<= pull_length
             contructed_num |= bits
     assert contructed_num == bytes_num
 
@@ -362,10 +380,15 @@ def test_cole_bytes_with_file(tmp_path: Path):
         while True:
             pull_length = random.randint(1, 20)
             try:
-                bits, num_bits_pulled = cole_bytes.read(pull_length)
+                bits = cole_bytes.read(pull_length)
             except EOFError:
+                remaining_bits = cole_bytes.last_bits_length
+                if cole_bytes.last_bits_length > 0:
+                    bits = cole_bytes.read(remaining_bits)
+                contructed_num <<= remaining_bits
+                contructed_num |= bits
                 break
             else:
-                contructed_num <<= num_bits_pulled
+                contructed_num <<= pull_length
                 contructed_num |= bits
         assert contructed_num == bytes_num

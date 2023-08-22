@@ -111,36 +111,37 @@ class ColeBytes:
         self._bio = bytes_io
         # If we read too many bits, stores remaining bits here
         self._last_bits = 0
-        self._last_bits_length = 0
+        # We expose this so the client can access remaining bits after EOFError
+        self.last_bits_length = 0
         self._eof_reached = False
 
-    def read(self, size: int) -> Tuple[int, int]:
-        """Returns bits as an int. Also returns number of bits returned.
-        Return value: (bits, num_bits_pulled)
+    def read(self, size: int) -> int:
+        """Reads size bits (if they exist) and returns them
 
-        Note: may return less than "size" bits. This is why we also
-        retur nteh number of bits pulled"""
+        If we are trying to read more bits than exist, raises EOFError.
+        However, even if we raise EOFError, note that there may be bits
+        remaining in the file."""
         if size == 0:
             raise ValueError("Must read more than 0 bytes")
-        if size > self._last_bits_length:
+        if size > self.last_bits_length:
             pulled_bytes = self._bio.read(ColeBytes.chunk_size_bytes)
             num_bits_pulled = 8 * len(pulled_bytes)
-            self._last_bits_length += num_bits_pulled
+            self.last_bits_length += num_bits_pulled
             self._last_bits <<= num_bits_pulled
             self._last_bits |= int.from_bytes(pulled_bytes)
             if len(pulled_bytes) < ColeBytes.chunk_size_bytes:
                 self._eof_reached = True
 
-        if self._eof_reached and self._last_bits_length == 0:
+        if self._eof_reached and size > self.last_bits_length:
             raise EOFError()
-        size = min(size, self._last_bits_length)
+        size = min(size, self.last_bits_length)
         # Represents num bits after the bits we're looking for
-        len_after_size = self._last_bits_length - size
+        len_after_size = self.last_bits_length - size
         bits = (self._last_bits >> len_after_size) & ((1 << size) - 1)
-        self._last_bits_length -= size
+        self.last_bits_length -= size
         # Zero out the top
         self._last_bits &= (1 << len_after_size) - 1
-        return bits, size
+        return bits
 
 
 class ColeDBInterface:
@@ -194,7 +195,7 @@ class ColeDBInterface:
     ):
         """Writes data to the latest file in the database"""
         metadata.path_to_last_chunk.write_bytes(
-            ColeDBInterface._encode_to_bits(
+            ColeDBInterface._encode_to_bytes(
                 data,
                 metadata.latest_chunk_timestamp,
             )
@@ -203,7 +204,7 @@ class ColeDBInterface:
         metadata.save()
 
     @staticmethod
-    def _encode_to_bits(
+    def _encode_to_bytes(
         data: OrderbookDeltaRM | OrderbookSnapshotRM, chunk_start_timestamp: datetime
     ) -> bytes:
         """Encodes an exchange message to bytes"""
@@ -229,6 +230,8 @@ class ColeDBInterface:
         quantity delta is the raw value from the exchange (it already is a
         delta from the exchange).
         """
+        # TODO: use ColeBytes in encoding as well?
+
         # Side (yes/no):                                    1 bit
         # Price (1-99)                                      7 bits
         # Quantity delta (can be negative)               4-32 bits
@@ -236,31 +239,14 @@ class ColeDBInterface:
         # Quantity half bytes length                        3 bits
         # Timestamp half bytes length                       3 bits
         # Delta / Snapshot                                  1 bit
-
         total_bits = 0
-
         b = 0
 
-        # Side
-        if data.side == Side.YES:
-            b |= 1
+        # Delta / Snapshot
+        b |= 1
         total_bits += 1
 
-        # Price
-        total_bits += 7
-        b <<= 7
-        b |= int(data.price)
-
-        # Quantity delta
-        quantity_delta_bit_length = data.delta.bit_length()
-        quantity_delta_half_bytes_length = get_num_byte_sections_per_bits(
-            quantity_delta_bit_length, 4
-        )
-        total_bits += quantity_delta_half_bytes_length * 4
-        b <<= quantity_delta_half_bytes_length * 4
-        b |= data.delta
-
-        # Timestamp
+        # Timestamp bytes length
         timestamp = data.ts.timestamp()
         timestamp_delta: int = round(
             # Take 1 decimal place after seconds
@@ -271,14 +257,24 @@ class ColeDBInterface:
         timestamp_half_bytes_length = get_num_byte_sections_per_bits(
             timestamp_bits_length, 4
         )
-        total_bits += timestamp_half_bytes_length * 4
-        b <<= timestamp_half_bytes_length * 4
-        b |= timestamp_delta
+        if timestamp_bits_length > 32:
+            raise ValueError(
+                "Timestamp delta more than 4 bytes in orderbook delta. "
+                + f"Side: {data.side}. "
+                + f"Timestamp delta: {timestamp_delta}. "
+                + f"Market ticker: {data.market_ticker}."
+            )
+        b <<= 3
+        # We encode one less than the max bytes length bc there is no 0 len
+        b |= timestamp_half_bytes_length - 1
+        total_bits += 3
 
         # Quantity delta bytes length
-        # We encode one less than the max bytes length: so we can fit it in 2 bits
-        quantity_delta_half_bytes_length -= 1
-        if quantity_delta_half_bytes_length.bit_length() > 3:
+        quantity_delta_bit_length = data.delta.bit_length()
+        quantity_delta_half_bytes_length = get_num_byte_sections_per_bits(
+            quantity_delta_bit_length, 4
+        )
+        if quantity_delta_bit_length > 32:
             raise ValueError(
                 "Quantity delta more than 4 bytes. "
                 + f"Side: {data.side}. "
@@ -286,30 +282,38 @@ class ColeDBInterface:
                 + f"Quantity delta: {data.delta}. "
                 + f"Market ticker: {data.market_ticker}."
             )
-        total_bits += 3
         b <<= 3
-        b |= quantity_delta_half_bytes_length
-
-        # Timestamp bytes lengthxw
-        # We encode one less than the max bytes length: so we can fit it in 2 bits
-        timestamp_half_bytes_length -= 1
-        if timestamp_half_bytes_length.bit_length() > 3:
-            raise ValueError(
-                "Timestamp delta more than 4 bytes in orderbook delta. "
-                + f"Side: {data.side}. "
-                + f"Timestamp delta: {timestamp_delta}. "
-                + f"Market ticker: {data.market_ticker}."
-            )
+        # We encode one less than the max bytes length bc there is no 0 len
+        b |= quantity_delta_half_bytes_length - 1
         total_bits += 3
-        b <<= 3
-        b |= timestamp_half_bytes_length
 
-        # Delta / Snapshot
-        total_bits += 1
+        # Timestamp
+        b <<= timestamp_half_bytes_length * 4
+        b |= timestamp_delta
+        total_bits += timestamp_half_bytes_length * 4
+
+        # Quantity delta
+        b <<= quantity_delta_half_bytes_length * 4
+        b |= data.delta
+        total_bits += quantity_delta_half_bytes_length * 4
+
+        # Price
+        b <<= 7
+        b |= int(data.price)
+        total_bits += 7
+
+        # Side
         b <<= 1
-        b |= 1
+        if data.side == Side.YES:
+            b |= 1
+        total_bits += 1
 
-        return b.to_bytes(get_num_byte_sections_per_bits(total_bits, 8))
+        byte_length = get_num_byte_sections_per_bits(total_bits, 8)
+        padding = (byte_length * 8) - total_bits
+        # We pad with zeros to fit byte boundaries
+        b <<= padding
+
+        return b.to_bytes(byte_length)
 
     @staticmethod
     def _encode_orderbook_snapshot(
@@ -349,6 +353,7 @@ class ColeDBInterface:
         Timestamp half bytes length (3 bits)
         Delta / Snapshot 1 bit
         """
+        # TODO: use ColeBytes in encoding as well?
 
         total_bits = 0
         b = 0
@@ -468,42 +473,48 @@ class ColeDBInterface:
 
     @staticmethod
     def _decode_orderbook_delta(
-        b: int,
+        b: ColeBytes,
         ticker: MarketTicker,
         chunk_start_timestamp: datetime,
     ) -> OrderbookDeltaRM:
-        """Takes in the bytes as an int (with the first bit skipped) and decodes msg
+        """Takes in ColeBytes (with first bit skipped) and decodes msg
 
-        The encoded message should be ocnverted to an int. And since the first
-        bit of the mesage determines whether it is an orderbook delta or snapshot,
-        it should be ommitted before it is passed into this function.
+        The first bit of the mesage determines whether it is an orderbook
+        delta or snapshot, so it should be ommitted before it is passed
+        into this function.
         """
+        # Already added constant values:
+        # (timestamp_bits_length, quantity_bits_length, price, side)
+        num_bits_read = 3 + 3 + 7 + 1
+
         # Timestamp bytes length
         # We add one because we substracted 1 in encode to fit in 2 bits
-        timestamp_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
-        b >>= 3
+        timestamp_bits_length = (b.read(3) + 1) * 4
 
         # Quantity delta extra bytes length
         # We add one because we substracted 1 in encode to fit in 2 bits
-        quantity_bits_length = ((b & ((1 << 3) - 1)) + 1) * 4
-        b >>= 3
+        quantity_bits_length = (b.read(3) + 1) * 4
 
-        # Time stamp. We divide by 10 to get the sub-second precision
-        timestamp_delta = (b & ((1 << timestamp_bits_length) - 1)) / 10
+        # Timestamp. We divide by 10 to get the sub-second precision
+        timestamp_delta = (b.read(timestamp_bits_length)) / 10
         ts = datetime.fromtimestamp(chunk_start_timestamp.timestamp() + timestamp_delta)
-        b >>= timestamp_bits_length
+        num_bits_read += timestamp_bits_length
 
         # Quantity delta
-        delta = b & ((1 << quantity_bits_length) - 1)
-        b >>= quantity_bits_length
+        delta = b.read(quantity_bits_length)
+        num_bits_read += quantity_bits_length
 
         # Price
-        price = b & ((1 << 7) - 1)
-        b >>= 7
+        price = b.read(7)
 
         # Side
-        s = b & 1
+        s = b.read(1)
         side = Side.YES if s == 1 else Side.NO
+
+        # Read the padding to skip it
+        padding = get_num_byte_sections_per_bits(num_bits_read, 8) - num_bits_read
+        if padding > 0:
+            b.read(padding)
 
         return OrderbookDeltaRM(
             market_ticker=ticker,
@@ -565,15 +576,13 @@ class ColeDBInterface:
 
     @staticmethod
     def _decode_to_response_message(
-        bytes_: bytes,
+        b: ColeBytes,
         ticker: MarketTicker,
         chunk_start_timestamp: datetime,
     ) -> OrderbookDeltaRM | OrderbookSnapshotRM:
         """Decodes bytes into an exchange message"""
-        b = int.from_bytes(bytes_)
         # Type
-        t = b & 1
-        b >>= 1
+        t = b.read(1)
         if t == 1:
             # OrderbookDeltaRM
             return ColeDBInterface._decode_orderbook_delta(
