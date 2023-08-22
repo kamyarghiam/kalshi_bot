@@ -44,6 +44,7 @@ TODO: ***experiment to see if 5000 is the best size for the chunks
 """
 
 
+import io
 import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -98,6 +99,48 @@ class ColeDBMetadata:
     def latest_chunk_timestamp(self) -> datetime:
         # Last chunk num is 1 indexed
         return self.chunk_first_time_stamps[self.last_chunk_num - 1]
+
+
+class ColeBytes:
+    """Bytes object used to read the binary files from db"""
+
+    # Number of bytes to read per chunk
+    chunk_size_bytes = 4096  # 2^12
+
+    def __init__(self, bytes_io: io.BytesIO | io.BufferedReader):
+        self._bio = bytes_io
+        # If we read too many bits, stores remaining bits here
+        self._last_bits = 0
+        self._last_bits_length = 0
+        self._eof_reached = False
+
+    def read(self, size: int) -> Tuple[int, int]:
+        """Returns bits as an int. Also returns number of bits returned.
+        Return value: (bits, num_bits_pulled)
+
+        Note: may return less than "size" bits. This is why we also
+        retur nteh number of bits pulled"""
+        if size == 0:
+            raise ValueError("Must read more than 0 bytes")
+        if size > self._last_bits_length:
+            pulled_bytes = self._bio.read(ColeBytes.chunk_size_bytes)
+            num_bits_pulled = 8 * len(pulled_bytes)
+            self._last_bits_length += num_bits_pulled
+            self._last_bits <<= num_bits_pulled
+            self._last_bits |= int.from_bytes(pulled_bytes)
+            if len(pulled_bytes) < ColeBytes.chunk_size_bytes:
+                self._eof_reached = True
+
+        if self._eof_reached and self._last_bits_length == 0:
+            raise EOFError()
+        size = min(size, self._last_bits_length)
+        # Represents num bits after the bits we're looking for
+        len_after_size = self._last_bits_length - size
+        bits = (self._last_bits >> len_after_size) & ((1 << size) - 1)
+        self._last_bits_length -= size
+        # Zero out the top
+        self._last_bits &= (1 << len_after_size) - 1
+        return bits, size
 
 
 class ColeDBInterface:

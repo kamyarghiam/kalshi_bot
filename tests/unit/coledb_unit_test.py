@@ -1,11 +1,13 @@
 import random
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from mock import patch
 
 from src.data.coledb.coledb import (
+    ColeBytes,
     ColeDBInterface,
     ColeDBMetadata,
     get_num_byte_sections_per_bits,
@@ -324,3 +326,46 @@ def test_encode_decode_orderbook_snapshot():
     #     b = ColeDBInterface._encode_to_bits(snapshot, chunk_start_ts)
     #     msg = ColeDBInterface._decode_to_response_message(b, ticker, chunk_start_ts)
     #     assert msg == snapshot
+
+
+def test_cole_bytes_basic():
+    bytes_num: int = random.randint(1 << 50, 1 << 100)
+    b = BytesIO((bytes_num).to_bytes((bytes_num.bit_length() // 8) + 1))
+    cole_bytes = ColeBytes(b)
+    cole_bytes.chunk_size_bytes = 2
+
+    with pytest.raises(ValueError) as e:
+        cole_bytes.read(0)
+    assert e.match("Must read more than 0 bytes")
+    contructed_num = 0
+    while True:
+        pull_length = random.randint(1, 20)
+        try:
+            bits, num_bits_pulled = cole_bytes.read(pull_length)
+        except EOFError:
+            break
+        else:
+            contructed_num <<= num_bits_pulled
+            contructed_num |= bits
+    assert contructed_num == bytes_num
+
+
+def test_cole_bytes_with_file(tmp_path: Path):
+    bytes_num: int = random.randint(1 << 50, 1 << 100)
+    file = tmp_path / "some_file"
+    file.write_bytes(bytes_num.to_bytes((bytes_num.bit_length() // 8) + 1))
+
+    with open(str(file), "rb") as f:
+        cole_bytes = ColeBytes(f)
+        cole_bytes.chunk_size_bytes = 2
+        contructed_num = 0
+        while True:
+            pull_length = random.randint(1, 20)
+            try:
+                bits, num_bits_pulled = cole_bytes.read(pull_length)
+            except EOFError:
+                break
+            else:
+                contructed_num <<= num_bits_pulled
+                contructed_num |= bits
+        assert contructed_num == bytes_num
