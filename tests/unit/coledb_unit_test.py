@@ -17,6 +17,7 @@ from src.data.coledb.coledb import (
 )
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
+from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookSnapshotRM
 from tests.fake_exchange import OrderbookDeltaRM
@@ -411,3 +412,40 @@ def test_cole_bytes_with_file(tmp_path: Path):
                 contructed_num <<= pull_length
                 contructed_num |= bits
         assert contructed_num == bytes_num
+
+
+def test_read_chunk_apply_deltas(tmp_path: Path):
+    ticker = MarketTicker("some_ticker")
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
+    snapshot = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[2, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=datetime(2023, 8, 9, 20, 31, 55, 800000),
+    )
+    delta = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=datetime(2023, 8, 9, 20, 31, 56, 800000),
+    )
+    snapshot_bytes = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_time)
+    delta_bytes = ColeDBInterface._encode_to_bytes(delta, chunk_start_time)
+
+    test_file = tmp_path / "test_file"
+    test_file.touch()
+    with open(str(test_file), "ab") as f:
+        f.write(snapshot_bytes)
+        f.write(delta_bytes)
+
+    actual_orderbook = ColeDBInterface._read_chunk_apply_deltas(
+        test_file, ticker, chunk_start_time
+    )
+    expected_orderbook = Orderbook(
+        market_ticker=ticker,
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(31): Quantity(12345)}),
+        no=OrderbookSide(levels={Price(1): Quantity(20)}),
+        ts=delta.ts,
+    )
+    assert actual_orderbook == expected_orderbook

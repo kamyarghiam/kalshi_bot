@@ -49,7 +49,7 @@ import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
@@ -179,9 +179,13 @@ class ColeDBInterface:
             return
         needs_new_chunk = metadata.num_msgs_in_last_file == MSGS_PER_CHUNK
         if needs_new_chunk:
-            last_chunk_snapshot = self._read_chunk_apply_deltas(
-                metadata.path_to_last_chunk
+            last_chunk_snapshot = ColeDBInterface._read_chunk_apply_deltas(
+                metadata.path_to_last_chunk,
+                data.market_ticker,
+                metadata.latest_chunk_timestamp,
             )
+            if last_chunk_snapshot is None:
+                raise ValueError("Last chunk had nothing written to it")
             self._create_new_chunk(
                 OrderbookSnapshotRM.from_orderbook(last_chunk_snapshot), metadata
             )
@@ -484,8 +488,8 @@ class ColeDBInterface:
         into this function.
         """
         # Already added constant values:
-        # (timestamp_bits_length, quantity_bits_length, price, side)
-        num_bits_read = 3 + 3 + 7 + 1
+        # (delta/snpashot bit, timestamp_bits_length, quantity_bits_length, price, side)
+        num_bits_read = 1 + 3 + 3 + 7 + 1
 
         # Timestamp bytes length
         # We add one because we substracted 1 in encode to fit in 2 bits
@@ -537,8 +541,8 @@ class ColeDBInterface:
         # TODO: combine this logic with other decode function
 
         # Already added constant values:
-        # (timestamp_bits_length and side encoding per level)
-        num_bits_read = 3 + 2 * 99
+        # (delta/snapshot bit, timestamp_bits_length, side encoding per level)
+        num_bits_read = 1 + 3 + 2 * 99
 
         # Timestamp bytes length
         # We add one because we substracted 1 in encode to fit in 2 bits
@@ -572,7 +576,7 @@ class ColeDBInterface:
                 snapshot_rm.no.append((Price(price), Quantity(no_quantity)))
 
         # Read the padding to skip it
-        padding = get_num_byte_sections_per_bits(num_bits_read, 8) - num_bits_read
+        padding = (get_num_byte_sections_per_bits(num_bits_read, 8) * 8) - num_bits_read
         if padding > 0:
             b.read(padding)
 
@@ -608,11 +612,28 @@ class ColeDBInterface:
 
         ColeDBInterface._write_data_to_last_file(snapshot, metadata)
 
-    def _read_chunk_apply_deltas(self, path: Path) -> Orderbook:
+    @staticmethod
+    def _read_chunk_apply_deltas(
+        path: Path, ticker: MarketTicker, chunk_start_ts: datetime
+    ) -> Optional[Orderbook]:
         """Reads a chunk and applies the deltas from the beginning"""
-        # TODO: finish.
-        ...
-        return
+        with open(str(path), "rb") as f:
+            cole_bytes = ColeBytes(f)
+            orderbook: Optional[Orderbook] = None
+            while True:
+                try:
+                    msg = ColeDBInterface._decode_to_response_message(
+                        cole_bytes, ticker, chunk_start_ts
+                    )
+                except EOFError:
+                    return orderbook
+                else:
+                    if isinstance(msg, OrderbookSnapshotRM):
+                        orderbook = Orderbook.from_snapshot(msg)
+                    else:
+                        assert isinstance(msg, OrderbookDeltaRM)
+                        assert orderbook is not None
+                        orderbook = orderbook.apply_delta(msg)
 
 
 def ticker_to_path(ticker: MarketTicker) -> Path:
