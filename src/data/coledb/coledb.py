@@ -16,7 +16,7 @@ Market Ticker folders
 ...
 
 Within the market ticker folders, we store data in files called chunks
-that contain a fixed numer of messages (defined as MSGS_PER_CHUNK). There is also a
+that contain a fixed numer of messages (defined as msgs_per_chunk). There is also a
 metadata file that contains information about the start time of each chunk, the
 number of the last chunk, and the number of objects in the last chunk (ColeDBMetadata).
 
@@ -58,9 +58,6 @@ from src.helpers.types.money import Price
 from src.helpers.types.orderbook import Orderbook
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
-
-COLEDB_STORAGE_PATH = Path("storage")
-MSGS_PER_CHUNK = 5000
 
 
 @dataclass
@@ -107,7 +104,7 @@ class ColeBytes:
     """Bytes object used to read the binary files from db"""
 
     # Number of bytes to read per chunk
-    chunk_size_bytes = 4096  # 2^12
+    chunk_read_size_bytes = 4096  # 2^12
 
     def __init__(self, bytes_io: io.BytesIO | io.BufferedReader):
         self._bio = bytes_io
@@ -126,12 +123,12 @@ class ColeBytes:
         if size == 0:
             raise ValueError("Must read more than 0 bytes")
         if size > self.last_bits_length:
-            pulled_bytes = self._bio.read(ColeBytes.chunk_size_bytes)
+            pulled_bytes = self._bio.read(ColeBytes.chunk_read_size_bytes)
             num_bits_pulled = 8 * len(pulled_bytes)
             self.last_bits_length += num_bits_pulled
             self._last_bits <<= num_bits_pulled
             self._last_bits |= int.from_bytes(pulled_bytes)
-            if len(pulled_bytes) < ColeBytes.chunk_size_bytes:
+            if len(pulled_bytes) < ColeBytes.chunk_read_size_bytes:
                 self._eof_reached = True
 
         if self._eof_reached and size > self.last_bits_length:
@@ -148,6 +145,9 @@ class ColeBytes:
 
 class ColeDBInterface:
     """Public interface for ColeDB"""
+
+    msgs_per_chunk = 5000
+    cole_db_storeage_path = Path("src/data/coledb/storage")
 
     def __init__(self):
         # Metadata files that we opened up already
@@ -179,7 +179,9 @@ class ColeDBInterface:
                 )
             self._create_new_chunk(data, metadata)
             return
-        needs_new_chunk = metadata.num_msgs_in_last_file == MSGS_PER_CHUNK
+        needs_new_chunk = (
+            metadata.num_msgs_in_last_file == ColeDBInterface.msgs_per_chunk
+        )
         if needs_new_chunk:
             last_chunk_snapshot = ColeDBInterface._read_chunk_apply_deltas(
                 metadata.path_to_last_chunk,
@@ -649,7 +651,7 @@ class ColeDBInterface:
 
 def ticker_to_path(ticker: MarketTicker) -> Path:
     """Given a market ticker returns a path to where all its data should live"""
-    return COLEDB_STORAGE_PATH / ticker.replace("-", "/")
+    return ColeDBInterface.cole_db_storeage_path / ticker.replace("-", "/")
 
 
 def ticker_to_metadata_path(ticker: MarketTicker) -> Path:

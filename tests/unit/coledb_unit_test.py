@@ -38,13 +38,15 @@ def test_read_write_metadata(tmp_path: Path):
 
 def test_ticker_to_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
-    assert ticker_to_path(ticker) == Path("storage/SERIES/EVENT/MARKET/")
+    assert ticker_to_path(ticker) == Path(
+        "src/data/coledb/storage/SERIES/EVENT/MARKET/"
+    )
 
 
 def test_ticker_to_metadata_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
     assert ticker_to_metadata_path(ticker) == Path(
-        "storage/SERIES/EVENT/MARKET/metadata"
+        "src/data/coledb/storage/SERIES/EVENT/MARKET/metadata"
     )
 
 
@@ -383,7 +385,7 @@ def test_cole_bytes_basic():
     bytes_num: int = random.randint(1 << 50, 1 << 100)
     b = BytesIO((bytes_num).to_bytes((bytes_num.bit_length() // 8) + 1))
     cole_bytes = ColeBytes(b)
-    cole_bytes.chunk_size_bytes = 2
+    cole_bytes.chunk_read_size_bytes = 2
 
     with pytest.raises(ValueError) as e:
         cole_bytes.read(0)
@@ -413,7 +415,7 @@ def test_cole_bytes_with_file(tmp_path: Path):
 
     with open(str(file), "rb") as f:
         cole_bytes = ColeBytes(f)
-        cole_bytes.chunk_size_bytes = 2
+        cole_bytes.chunk_read_size_bytes = 2
         contructed_num = 0
         while True:
             pull_length = random.randint(1, 20)
