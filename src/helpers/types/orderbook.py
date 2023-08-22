@@ -147,6 +147,12 @@ class Orderbook:
         new_orderbook.ts = delta.ts
         return new_orderbook
 
+    def get_side(self, side: Side) -> OrderbookSide:
+        if side == Side.NO:
+            return self.no
+        assert side == Side.YES
+        return self.yes
+
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):
         yes = OrderbookSide()

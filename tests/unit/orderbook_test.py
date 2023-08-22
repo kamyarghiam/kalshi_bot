@@ -506,3 +506,21 @@ def test_from_orderbook():
     )
     book = Orderbook.from_snapshot(orderbook_snapshot)
     assert OrderbookSnapshotRM.from_orderbook(book) == orderbook_snapshot
+
+
+def test_get_side_orderbook():
+    book = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+            }
+        ),
+    )
+    assert book.get_side(Side.NO) == OrderbookSide(
+        levels={
+            Price(93): Quantity(300),
+        }
+    )
+    assert book.get_side(Side.YES) == OrderbookSide(levels={Price(2): Quantity(100)})

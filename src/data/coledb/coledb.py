@@ -27,6 +27,9 @@ deltas, and find the starting point. In order to create a new chunk, we get the
 snapshot of the new chunk by reading the previous chunk from the start and
 applying all of the deltas.
 
+It takes about 206 microseocnds per messages. This is high.
+TODO: we need to speed up reads
+
 This DB interface supports the following operations:
 1. Query by start timestamp by market
 2. Query by start and and timestamp by market
@@ -40,7 +43,6 @@ to define some of the market information (like expiration, settlement, settlemen
 direction, etc.)
 
 TODO: maybe we should parallelize the writes if it's too slow?
-TODO: ***experiment to see if 5000 is the best size for the chunks
 """
 
 
@@ -274,7 +276,7 @@ class ColeDBInterface:
         total_bits += 3
 
         # Quantity delta bytes length
-        quantity_delta_bit_length = data.delta.bit_length()
+        quantity_delta_bit_length = data.delta.bit_length() + 1  # First bit is sign bit
         quantity_delta_half_bytes_length = get_num_byte_sections_per_bits(
             quantity_delta_bit_length, 4
         )
@@ -298,7 +300,10 @@ class ColeDBInterface:
 
         # Quantity delta
         b <<= quantity_delta_half_bytes_length * 4
-        b |= data.delta
+        # First encode sign bit
+        if data.delta < 0:
+            b |= 1 << ((quantity_delta_half_bytes_length * 4) - 1)
+        b |= abs(data.delta)
         total_bits += quantity_delta_half_bytes_length * 4
 
         # Price
@@ -506,6 +511,12 @@ class ColeDBInterface:
 
         # Quantity delta
         delta = b.read(quantity_bits_length)
+        # Extract sign bit then zero it out
+        mask = 1 << quantity_bits_length - 1
+        is_negative = mask & delta
+        delta &= ~mask
+        if is_negative:
+            delta *= -1
         num_bits_read += quantity_bits_length
 
         # Price
@@ -516,7 +527,7 @@ class ColeDBInterface:
         side = Side.YES if s == 1 else Side.NO
 
         # Read the padding to skip it
-        padding = get_num_byte_sections_per_bits(num_bits_read, 8) - num_bits_read
+        padding = (get_num_byte_sections_per_bits(num_bits_read, 8) * 8) - num_bits_read
         if padding > 0:
             b.read(padding)
 

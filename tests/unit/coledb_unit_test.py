@@ -1,5 +1,6 @@
 import io
 import random
+import time
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -16,7 +17,7 @@ from src.data.coledb.coledb import (
     ticker_to_path,
 )
 from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
+from src.helpers.types.money import Price, get_opposite_side_price
 from src.helpers.types.orderbook import Orderbook, OrderbookSide
 from src.helpers.types.orders import Quantity, QuantityDelta, Side
 from src.helpers.types.websockets.response import OrderbookSnapshotRM
@@ -125,7 +126,7 @@ def test_encode_decode_orderbook_delta():
 
     # Edge cases
     ticker = MarketTicker("SOME-REALLYLONGMARKETTICKER-WITHMANYCHARACTERS")
-    delta = QuantityDelta((1 << 32) - 1)
+    delta = QuantityDelta((1 << 31) - 1)
     side = Side.NO
     price = Price(99)
     ts = datetime(2023, 8, 9, 20, 31, 56, 860000)
@@ -167,6 +168,23 @@ def test_encode_decode_orderbook_delta():
     side = Side.NO
     price = Price(1)
     ts = datetime(2023, 8, 9, 20, 31, 56, 800000)
+    msg = OrderbookDeltaRM(
+        market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
+    )
+    b = ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
+    assert (
+        ColeDBInterface._decode_to_response_message(
+            ColeBytes(io.BytesIO(b)), ticker, chunk_start_time
+        )
+        == msg
+    )
+
+    # Negative delta
+    delta = QuantityDelta(-4058)
+    price = Price(3)
+    ts = datetime(2023, 8, 10, 22, 29, 58)
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
+    side = Side.NO
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
@@ -438,7 +456,6 @@ def test_read_chunk_apply_deltas(tmp_path: Path):
     with open(str(test_file), "ab") as f:
         f.write(snapshot_bytes)
         f.write(delta_bytes)
-
     actual_orderbook = ColeDBInterface._read_chunk_apply_deltas(
         test_file, ticker, chunk_start_time
     )
@@ -449,3 +466,81 @@ def test_read_chunk_apply_deltas(tmp_path: Path):
         ts=delta.ts,
     )
     assert actual_orderbook == expected_orderbook
+
+    # To stress test: raise this value below
+    num_iterations = 10
+    f = open(str(test_file), "ab")
+    for i in range(num_iterations):
+        should_do_delta = bool(random.getrandbits(1))
+        msg_to_encode: OrderbookSnapshotRM | OrderbookDeltaRM
+        if should_do_delta:
+            side = Side.YES if bool(random.getrandbits(1)) else Side.NO
+            opposite_side = Side.YES if side == Side.NO else Side.NO
+            opposite_side_book = expected_orderbook.get_side(opposite_side)
+            highest_price_opposite_side = (
+                None
+                if len(opposite_side_book.levels) == 0
+                else opposite_side_book.get_largest_price_level()[0]
+            )
+            top_price = (
+                99
+                if highest_price_opposite_side is None
+                else get_opposite_side_price(highest_price_opposite_side) - 1
+            )
+            price = (
+                Price(1)
+                if top_price <= 1
+                else Price(
+                    random.randint(
+                        1,
+                        top_price,
+                    )
+                )
+            )
+            orderbook_side = expected_orderbook.get_side(side)
+            quantity_at_price = (
+                0
+                if price not in orderbook_side.levels
+                else orderbook_side.levels[price]
+            )
+            delta = OrderbookDeltaRM(
+                market_ticker=ticker,
+                price=price,
+                delta=QuantityDelta(
+                    random.randint((-1 * quantity_at_price) + 1, 100000)
+                ),
+                side=side,
+                ts=datetime.fromtimestamp(
+                    chunk_start_time.timestamp() + random.randint(1, 100000)
+                ),
+            )
+            expected_orderbook = expected_orderbook.apply_delta(delta)
+            msg_to_encode = delta
+        else:
+            start_yes_price = Price(random.randint(1, 99))
+            end_yes_price = Price(random.randint(start_yes_price, 99))
+            end_no_price = get_opposite_side_price(end_yes_price)
+            snapshot = OrderbookSnapshotRM(
+                market_ticker=ticker,
+                yes=[
+                    [i, random.randint(1, 10000)]  # type:ignore[misc]
+                    for i in range(start_yes_price, end_yes_price + 1)
+                ],
+                no=[
+                    [i, random.randint(1, 10000)]  # type:ignore[misc]
+                    for i in range(1, end_no_price)
+                ],
+                ts=datetime.fromtimestamp(
+                    chunk_start_time.timestamp() + random.randint(1, 100000)
+                ),
+            )
+            expected_orderbook = Orderbook.from_snapshot(snapshot)
+            msg_to_encode = snapshot
+        f.write(ColeDBInterface._encode_to_bytes(msg_to_encode, chunk_start_time))
+        f.flush()
+        time.time()
+        actual_orderbook = ColeDBInterface._read_chunk_apply_deltas(
+            test_file, ticker, chunk_start_time
+        )
+        assert actual_orderbook == expected_orderbook
+    f.close()
