@@ -586,7 +586,7 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
         test_file,
         ticker,
         chunk_start_time,
-        timestamp=snapshot.ts,
+        timestamp=delta1.ts,
     )
     expected_orderbook = Orderbook.from_snapshot(snapshot)
     expected_orderbook = expected_orderbook.apply_delta(delta1)

@@ -643,7 +643,7 @@ class ColeDBInterface:
         chunk_start_ts: datetime,
         timestamp: Optional[datetime] = None,
     ):
-        """Generator that returns messages starting after the timestamp passed in
+        """Generator that returns messages starting on and after the timestamp passed in
 
         If no timestamp is passed in, it starts from the beginning"""
         with open(str(path), "rb") as f:
@@ -669,7 +669,7 @@ class ColeDBInterface:
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
                         orderbook = orderbook.apply_delta(msg)
-                    if timestamp is None or timestamp < orderbook.ts:
+                    if timestamp is None or timestamp <= orderbook.ts:
                         yield orderbook
 
 
