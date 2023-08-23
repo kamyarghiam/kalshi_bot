@@ -571,9 +571,17 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
         side=Side.YES,
         ts=datetime(2023, 8, 9, 20, 31, 57, 800000),
     )
+    delta3 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=datetime(2023, 8, 9, 20, 31, 58, 800000),
+    )
     snapshot_bytes = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_time)
     delta_bytes1 = ColeDBInterface._encode_to_bytes(delta1, chunk_start_time)
     delta_bytes2 = ColeDBInterface._encode_to_bytes(delta2, chunk_start_time)
+    delta_bytes3 = ColeDBInterface._encode_to_bytes(delta3, chunk_start_time)
 
     test_file = tmp_path / "test_file"
     test_file.touch()
@@ -581,15 +589,54 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
         f.write(snapshot_bytes)
         f.write(delta_bytes1)
         f.write(delta_bytes2)
+        f.write(delta_bytes3)
     # Read from after the snapshot
     actual_orderbook_gen = ColeDBInterface._read_chunk_apply_deltas_generator(
         test_file,
         ticker,
         chunk_start_time,
-        timestamp=delta1.ts,
+        start_ts=delta1.ts,
     )
     expected_orderbook = Orderbook.from_snapshot(snapshot)
     expected_orderbook = expected_orderbook.apply_delta(delta1)
     assert next(actual_orderbook_gen) == expected_orderbook
     expected_orderbook = expected_orderbook.apply_delta(delta2)
     assert next(actual_orderbook_gen) == expected_orderbook
+    expected_orderbook = expected_orderbook.apply_delta(delta3)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    with pytest.raises(StopIteration):
+        next(actual_orderbook_gen)
+
+    # Reads up to delta2
+    actual_orderbook_gen = ColeDBInterface._read_chunk_apply_deltas_generator(
+        test_file,
+        ticker,
+        chunk_start_time,
+        end_ts=delta2.ts,
+    )
+    expected_orderbook = Orderbook.from_snapshot(snapshot)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    expected_orderbook = expected_orderbook.apply_delta(delta1)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    expected_orderbook = expected_orderbook.apply_delta(delta2)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    with pytest.raises(StopIteration):
+        next(actual_orderbook_gen)
+
+    # Reads delta1, delta2, and delta3
+    actual_orderbook_gen = ColeDBInterface._read_chunk_apply_deltas_generator(
+        test_file,
+        ticker,
+        chunk_start_time,
+        start_ts=delta1.ts,
+        end_ts=delta3.ts,
+    )
+    expected_orderbook = Orderbook.from_snapshot(snapshot)
+    expected_orderbook = expected_orderbook.apply_delta(delta1)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    expected_orderbook = expected_orderbook.apply_delta(delta2)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    expected_orderbook = expected_orderbook.apply_delta(delta3)
+    assert next(actual_orderbook_gen) == expected_orderbook
+    with pytest.raises(StopIteration):
+        next(actual_orderbook_gen)

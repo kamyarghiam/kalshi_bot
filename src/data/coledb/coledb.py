@@ -51,7 +51,7 @@ import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
@@ -641,11 +641,15 @@ class ColeDBInterface:
         path: Path,
         ticker: MarketTicker,
         chunk_start_ts: datetime,
-        timestamp: Optional[datetime] = None,
-    ):
-        """Generator that returns messages starting on and after the timestamp passed in
+        start_ts: Optional[datetime] = None,
+        end_ts: Optional[datetime] = None,
+    ) -> Generator[Orderbook, None, None]:
+        """Yields messages with ts >= start_ts and <= end_ts
 
-        If no timestamp is passed in, it starts from the beginning"""
+        If no start_ts / end_ts passed in, it will start from beginning /
+        go to the end."""
+        if end_ts and start_ts and (end_ts < start_ts):
+            raise ValueError("End ts must be larger than start ts")
         with open(str(path), "rb") as f:
             cole_bytes = ColeBytes(f)
             # First message must be a snapshot. If you get an EOFError here,
@@ -656,12 +660,15 @@ class ColeDBInterface:
             assert isinstance(msg, OrderbookSnapshotRM)
             orderbook = Orderbook.from_snapshot(msg)
             while True:
+                if end_ts and orderbook.ts > end_ts:
+                    return
+                if start_ts is None or start_ts <= orderbook.ts:
+                    yield orderbook
                 try:
                     msg = ColeDBInterface._decode_to_response_message(
                         cole_bytes, ticker, chunk_start_ts
                     )
                 except EOFError:
-                    yield orderbook
                     return
                 else:
                     if isinstance(msg, OrderbookSnapshotRM):
@@ -669,8 +676,6 @@ class ColeDBInterface:
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
                         orderbook = orderbook.apply_delta(msg)
-                    if timestamp is None or timestamp <= orderbook.ts:
-                        yield orderbook
 
 
 def ticker_to_path(ticker: MarketTicker) -> Path:
