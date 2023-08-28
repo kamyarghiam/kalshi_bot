@@ -2,8 +2,6 @@ import pickle
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import numpy as np
-
 from src.helpers.types.markets import MarketResult, MarketTicker
 from src.helpers.types.money import Balance, Cents, Dollars, Price
 from src.helpers.types.orderbook import Orderbook
@@ -119,7 +117,10 @@ class Position:
         )
 
     def get_value(self) -> Cents:
-        return Cents(np.dot(self.prices, self.quantities))
+        cents = 0
+        for price, quantity in zip(self.prices, self.quantities):
+            cents += price * quantity
+        return Cents(cents)
 
     def __str__(self):
         s = f"{self.ticker}: {self.side.name}"

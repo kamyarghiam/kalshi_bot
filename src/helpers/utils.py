@@ -5,8 +5,9 @@ from typing import Generic, Iterable, Iterator, List, TypeVar
 from rich.console import Console
 from rich.table import Table
 
+from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Price
-from src.helpers.types.orders import MinimalOrder, Quantity, Trade
+from src.helpers.types.orders import Order, Quantity, Side, Trade
 
 T = TypeVar("T")
 
@@ -86,5 +87,6 @@ class Printer:
 
 def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):
     """Computes pnl after fees"""
-    buy_order = MinimalOrder(buy_price, quantity, Trade.BUY)
+    # Ticker and side don't matter
+    buy_order = Order(buy_price, quantity, Trade.BUY, MarketTicker(""), Side.YES)
     return buy_order.get_predicted_pnl(sell_price)

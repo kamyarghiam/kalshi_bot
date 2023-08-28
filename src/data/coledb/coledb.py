@@ -654,9 +654,12 @@ class ColeDBInterface:
             cole_bytes = ColeBytes(f)
             # First message must be a snapshot. If you get an EOFError here,
             # it means the chunk was empty.
-            msg = ColeDBInterface._decode_to_response_message(
-                cole_bytes, ticker, chunk_start_ts
-            )
+            try:
+                msg = ColeDBInterface._decode_to_response_message(
+                    cole_bytes, ticker, chunk_start_ts
+                )
+            except EOFError:
+                return
             assert isinstance(msg, OrderbookSnapshotRM)
             orderbook = Orderbook.from_snapshot(msg)
             while True:

@@ -640,3 +640,13 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
     assert next(actual_orderbook_gen) == expected_orderbook
     with pytest.raises(StopIteration):
         next(actual_orderbook_gen)
+
+    empty_file = tmp_path / "empty"
+    empty_file.touch()
+    actual_orderbook_gen = ColeDBInterface._read_chunk_apply_deltas_generator(
+        empty_file,
+        ticker,
+        chunk_start_time,
+    )
+    with pytest.raises(StopIteration):
+        next(actual_orderbook_gen)

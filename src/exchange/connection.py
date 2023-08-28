@@ -128,7 +128,7 @@ class Websocket:
                         self.unsubscribe(self._subscriptions)
                         self._ws.close()
             case TestClient():
-                with self._connection_adapter.connect(  # type:ignore[attr-defined]
+                with self._connection_adapter.websocket_connect(
                     websocket_url
                 ) as websocket:
                     websocket: WebSocketTestSession  # type:ignore[no-redef]

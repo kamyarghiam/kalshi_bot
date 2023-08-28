@@ -5,8 +5,6 @@ from dataclasses import field as dataclass_field
 from enum import Enum
 from typing import Union
 
-from attr import field, frozen
-
 from src.helpers.types.markets import MarketTicker
 from src.helpers.types.money import Cents, Price
 from tests.unit.prices_test import get_opposite_side_price
@@ -51,11 +49,12 @@ def compute_fee(price: Price, quantity: Quantity) -> Cents:
 
 
 @dataclass()
-class MinimalOrder:
-    price: Price = field(on_setattr=frozen)
-    quantity: Quantity = field(on_setattr=frozen)
-    trade: Trade = field(on_setattr=frozen)
-
+class Order:
+    price: Price
+    quantity: Quantity
+    trade: Trade
+    ticker: MarketTicker
+    side: Side
     # Cached items
     _price_times_quantity: Cents | None = dataclass_field(default=None, compare=False)
     _fee: Cents | None = dataclass_field(default=None, compare=False)
@@ -91,12 +90,6 @@ class MinimalOrder:
         sell_order.trade = Trade.SELL
 
         return sell_order.revenue - self.cost - sell_order.fee - self.fee
-
-
-@dataclass()
-class Order(MinimalOrder):
-    ticker: MarketTicker = field(on_setattr=frozen)
-    side: Side = field(on_setattr=frozen)
 
     def __str__(self):
         return (
