@@ -3,8 +3,8 @@ from typing import Generic, List, TypeVar
 
 from pydantic import BaseModel, Extra, validator
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.websockets.common import Command, CommandId, SubscriptionId
+from helpers.types.markets import MarketTicker
+from helpers.types.websockets.common import Command, CommandId, SubscriptionId
 
 
 class Channel(str, Enum):

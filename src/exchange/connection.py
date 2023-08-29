@@ -11,9 +11,9 @@ from tenacity import retry, retry_if_not_exception_type, stop_after_delay
 from websockets.sync.client import ClientConnection as ExternalWebsocket
 from websockets.sync.client import connect as external_websocket_connect
 
-from src.helpers.constants import LOGIN_URL, LOGOUT_URL
-from src.helpers.types.api import ExternalApi, RateLimit
-from src.helpers.types.auth import (
+from helpers.constants import LOGIN_URL, LOGOUT_URL
+from helpers.types.api import ExternalApi, RateLimit
+from helpers.types.auth import (
     Auth,
     LogInRequest,
     LogInResponse,
@@ -22,14 +22,14 @@ from src.helpers.types.auth import (
     MemberId,
     Token,
 )
-from src.helpers.types.common import URL
-from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
-from src.helpers.types.websockets.request import (
+from helpers.types.common import URL
+from helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
+from helpers.types.websockets.request import (
     UnsubscribeRP,
     UpdateSubscriptionRP,
     WebsocketRequest,
 )
-from src.helpers.types.websockets.response import (
+from helpers.types.websockets.response import (
     WR,
     ErrorWR,
     OrderbookDeltaWR,

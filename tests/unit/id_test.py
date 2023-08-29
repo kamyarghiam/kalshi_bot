@@ -1,4 +1,4 @@
-from src.helpers.types.websockets.common import CommandId, SubscriptionId
+from helpers.types.websockets.common import CommandId, SubscriptionId
 
 
 def test_increment_id():

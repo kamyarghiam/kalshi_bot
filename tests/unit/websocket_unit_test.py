@@ -6,20 +6,20 @@ from mock import patch
 from pydantic import ValidationError
 from websockets.sync.client import ClientConnection as ExternalWebsocket
 
-from src.exchange.connection import Connection, SessionsWrapper, Websocket
-from src.helpers.types.auth import MemberId, Token
-from src.helpers.types.common import URL
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
-from src.helpers.types.orders import Quantity
-from src.helpers.types.websockets.common import (
+from exchange.connection import Connection, SessionsWrapper, Websocket
+from helpers.types.auth import MemberId, Token
+from helpers.types.common import URL
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
+from helpers.types.orders import Quantity
+from helpers.types.websockets.common import (
     Command,
     CommandId,
     SubscriptionId,
     Type,
     WebsocketError,
 )
-from src.helpers.types.websockets.request import (
+from helpers.types.websockets.request import (
     Channel,
     RequestParams,
     SubscribeRP,
@@ -27,7 +27,7 @@ from src.helpers.types.websockets.request import (
     UpdateSubscriptionRP,
     WebsocketRequest,
 )
-from src.helpers.types.websockets.response import (
+from helpers.types.websockets.response import (
     ErrorRM,
     ErrorWR,
     OrderbookSnapshotRM,
@@ -173,7 +173,7 @@ def test_websockets_with_session_wrapper_send_recieve():
 
 
 def test_websockets_session_wrapper_connect():
-    with patch("src.exchange.connection.external_websocket_connect") as connect:
+    with patch("exchange.connection.external_websocket_connect") as connect:
         sessions_wrapper = SessionsWrapper(URL("base_url"))
         ws = Websocket(sessions_wrapper, MagicMock(autospec=True))
         with ws.connect(
@@ -191,7 +191,7 @@ def test_websockets_session_wrapper_connect():
 
 def test_connecion_with_sessions_wrapper():
     with patch(
-        "src.exchange.connection.Auth",
+        "exchange.connection.Auth",
     ) as auth:
         auth.return_value._base_url = "base_url"
         con = Connection()
@@ -200,14 +200,16 @@ def test_connecion_with_sessions_wrapper():
 
 
 def test_encode_decode():
-    response = ResponseMessage(some_field="some_field", another_field="another_field")
+    response = ResponseMessage(
+        some_field="some_field", another_field="another_field"
+    )  # type:ignore[call-arg]
 
     assert ResponseMessage.from_pickle(response.encode()) == response
 
 
 def test_receive_until_max_messages():
     ws = Websocket(MagicMock(), MagicMock())
-    with patch("src.exchange.connection.Websocket.receive"):
+    with patch("exchange.connection.Websocket.receive"):
         with pytest.raises(WebsocketError):
             ws.receive_until(MagicMock())
 
@@ -229,9 +231,7 @@ def test_subscribe_bad_values():
     # Fix subscribe
     request.cmd = Command.SUBSCRIBE
     # Test null first response message
-    with patch(
-        "src.exchange.connection.Websocket._retry_until_subscribed"
-    ) as retry_sub:
+    with patch("exchange.connection.Websocket._retry_until_subscribed") as retry_sub:
         sub_msg = MagicMock()
         sub_msg.msg = None
         retry_sub.return_value = (sub_msg, MagicMock())

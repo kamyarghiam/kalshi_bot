@@ -3,8 +3,8 @@ from typing import List
 
 from pydantic import BaseModel, Extra
 
-from src.helpers.types.api import Cursor, ExternalApi
-from src.helpers.types.money import Price
+from helpers.types.api import Cursor, ExternalApi
+from helpers.types.money import Price
 
 
 class SeriesTicker(str):

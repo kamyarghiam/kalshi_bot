@@ -1,9 +1,9 @@
 from rich.console import Console
 from rich.table import Table
 
-from src.data.coledb.coledb import ColeDBInterface
-from src.exchange.interface import ExchangeInterface, OrderbookSubscription
-from src.helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
+from data.coledb.coledb import ColeDBInterface
+from exchange.interface import ExchangeInterface, OrderbookSubscription
+from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 
 
 class OrderbookCollectionPrinter:

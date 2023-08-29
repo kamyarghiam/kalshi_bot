@@ -5,9 +5,9 @@ from typing import Generic, Iterable, Iterator, List, TypeVar
 from rich.console import Console
 from rich.table import Table
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
-from src.helpers.types.orders import Order, Quantity, Side, Trade
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
+from helpers.types.orders import Order, Quantity, Side, Trade
 
 T = TypeVar("T")
 

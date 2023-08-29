@@ -8,15 +8,15 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi import WebSocket as FastApiWebSocket
 from starlette.responses import JSONResponse
 
-from src.helpers.constants import (
+from helpers.constants import (
     API_VERSION_ENV_VAR,
     EXCHANGE_STATUS_URL,
     LOGIN_URL,
     LOGOUT_URL,
     MARKETS_URL,
 )
-from src.helpers.types.api import Cursor
-from src.helpers.types.auth import (
+from helpers.types.api import Cursor
+from helpers.types.auth import (
     LogInRequest,
     LogInResponse,
     LogOutRequest,
@@ -25,9 +25,9 @@ from src.helpers.types.auth import (
     MemberIdAndToken,
     Token,
 )
-from src.helpers.types.common import URL
-from src.helpers.types.exchange import ExchangeStatusResponse
-from src.helpers.types.markets import (
+from helpers.types.common import URL
+from helpers.types.exchange import ExchangeStatusResponse
+from helpers.types.markets import (
     GetMarketResponse,
     GetMarketsResponse,
     Market,
@@ -35,10 +35,10 @@ from src.helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from src.helpers.types.money import Price
-from src.helpers.types.orders import QuantityDelta, Side
-from src.helpers.types.websockets.common import SeqId, SubscriptionId, Type
-from src.helpers.types.websockets.request import (
+from helpers.types.money import Price
+from helpers.types.orders import QuantityDelta, Side
+from helpers.types.websockets.common import SeqId, SubscriptionId, Type
+from helpers.types.websockets.request import (
     Channel,
     Command,
     SubscribeRP,
@@ -47,7 +47,7 @@ from src.helpers.types.websockets.request import (
     UpdateSubscriptionRP,
     WebsocketRequest,
 )
-from src.helpers.types.websockets.response import (
+from helpers.types.websockets.response import (
     ErrorRM,
     ErrorWR,
     OrderbookDeltaRM,

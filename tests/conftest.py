@@ -2,8 +2,10 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
+from pytest import TempPathFactory
 
-from src.exchange.interface import ExchangeInterface
+from data.coledb.coledb import ColeDBInterface
+from exchange.interface import ExchangeInterface
 from tests.fake_exchange import kalshi_test_exchange_factory
 
 """This file contains configuration information for testing.
@@ -56,3 +58,9 @@ def exchange_interface(fastapi_test_client: TestClient | None):
     real exchange through the ehxcnage interface"""
     with ExchangeInterface(fastapi_test_client) as exchange_interface:
         yield exchange_interface
+
+
+@pytest.fixture(scope="session", autouse=True)
+def temp_coledb_interface(tmp_path_factory: TempPathFactory):
+    tmp_path = tmp_path_factory.mktemp("coledb")
+    ColeDBInterface.cole_db_storeage_path = tmp_path

@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, TypeVar
 
 from pydantic import BaseModel, Extra, Field, validator
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.orderbook import OrderbookView
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Type
-from src.helpers.types.websockets.request import Channel
+from helpers.types.markets import MarketTicker
+from helpers.types.orderbook import OrderbookView
+from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Type
+from helpers.types.websockets.request import Channel
 from tests.unit.prices_test import Price
 
 if TYPE_CHECKING:
-    from src.helpers.types.orderbook import Orderbook
+    from helpers.types.orderbook import Orderbook
 
 WR = TypeVar("WR", bound="WebsocketResponse")
 

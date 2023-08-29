@@ -1,8 +1,8 @@
 import pytest
 
-from src.data.reading.orderbook import OrderbookReader
-from src.exchange.interface import ExchangeInterface
-from src.helpers.types.orderbook import Orderbook
+from data.reading.orderbook import OrderbookReader
+from exchange.interface import ExchangeInterface
+from helpers.types.orderbook import Orderbook
 
 
 def test_live_orderbook_reader(exchange_interface: ExchangeInterface):

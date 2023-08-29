@@ -3,11 +3,11 @@ from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_ar
 
 from fastapi.testclient import TestClient
 
-from src.exchange.connection import Connection, Websocket
-from src.helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
-from src.helpers.types.common import URL
-from src.helpers.types.exchange import ExchangeStatusResponse
-from src.helpers.types.markets import (
+from exchange.connection import Connection, Websocket
+from helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
+from helpers.types.common import URL
+from helpers.types.exchange import ExchangeStatusResponse
+from helpers.types.markets import (
     GetMarketResponse,
     GetMarketsRequest,
     GetMarketsResponse,
@@ -15,27 +15,27 @@ from src.helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from src.helpers.types.websockets.common import (
+from helpers.types.websockets.common import (
     Command,
     CommandId,
     SeqId,
     SubscriptionId,
     Type,
 )
-from src.helpers.types.websockets.request import (
+from helpers.types.websockets.request import (
     Channel,
     SubscribeRP,
     UpdateSubscriptionAction,
     UpdateSubscriptionRP,
     WebsocketRequest,
 )
-from src.helpers.types.websockets.response import (
+from helpers.types.websockets.response import (
     OrderbookDeltaWR,
     OrderbookSnapshotWR,
     SubscriptionUpdatedWR,
     WebsocketResponse,
 )
-from src.helpers.utils import PendingMessages
+from helpers.utils import PendingMessages
 
 
 class ExchangeInterface:

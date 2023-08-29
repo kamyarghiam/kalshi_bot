@@ -1,6 +1,6 @@
 import pytest
 
-from src.helpers.types.orders import Quantity, QuantityDelta
+from helpers.types.orders import Quantity, QuantityDelta
 
 
 def test_quantity():

@@ -3,10 +3,10 @@ import random
 import pytest
 from mock import patch
 
-from src.helpers.types.common import URL, NonNullStr
-from src.helpers.types.money import Balance, Cents, Dollars, Price
-from src.helpers.types.orders import Quantity, compute_fee
-from src.helpers.utils import PendingMessages, Printer, compute_pnl
+from helpers.types.common import URL, NonNullStr
+from helpers.types.money import Balance, Cents, Dollars, Price
+from helpers.types.orders import Quantity, compute_fee
+from helpers.utils import PendingMessages, Printer, compute_pnl
 
 
 def test_basic_urls():

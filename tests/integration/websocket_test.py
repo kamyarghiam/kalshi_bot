@@ -2,14 +2,14 @@ from typing import List
 
 import pytest
 
-from src.exchange.interface import ExchangeInterface, OrderbookSubscription
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
-from src.helpers.types.orderbook import Orderbook, OrderbookSide
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
-from src.helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
-from src.helpers.types.websockets.response import (
+from exchange.interface import ExchangeInterface, OrderbookSubscription
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
+from helpers.types.orderbook import Orderbook, OrderbookSide
+from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
+from helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
+from helpers.types.websockets.response import (
     ErrorRM,
     OrderbookDeltaRM,
     OrderbookDeltaWR,

@@ -5,15 +5,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, Tuple
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Cents, Price, get_opposite_side_price
-from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Cents, Price, get_opposite_side_price
+from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 
 if typing.TYPE_CHECKING:
-    from src.helpers.types.websockets.response import (
-        OrderbookDeltaRM,
-        OrderbookSnapshotRM,
-    )
+    from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
 class EmptyOrderbookSideError(Exception):

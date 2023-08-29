@@ -3,12 +3,12 @@ import copy
 import pytest
 from mock import MagicMock
 
-from src.exchange.interface import ExchangeInterface
-from src.helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
-from src.helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
-from src.helpers.types.orderbook import Orderbook, OrderbookSide
-from src.helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
-from src.helpers.types.portfolio import Portfolio, PortfolioError, Position
+from exchange.interface import ExchangeInterface
+from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
+from helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
+from helpers.types.orderbook import Orderbook, OrderbookSide
+from helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
+from helpers.types.portfolio import Portfolio, PortfolioError, Position
 from tests.fake_exchange import Price
 from tests.utils import almost_equal
 

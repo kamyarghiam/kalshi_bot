@@ -3,16 +3,16 @@ from datetime import datetime
 
 import pytest
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
-from src.helpers.types.orderbook import (
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
+from helpers.types.orderbook import (
     EmptyOrderbookSideError,
     Orderbook,
     OrderbookSide,
     OrderbookView,
 )
-from src.helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
-from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
+from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
+from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
 def test_from_snapshot():

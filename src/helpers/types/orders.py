@@ -5,8 +5,8 @@ from dataclasses import field as dataclass_field
 from enum import Enum
 from typing import Union
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Cents, Price
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Cents, Price
 from tests.unit.prices_test import get_opposite_side_price
 
 

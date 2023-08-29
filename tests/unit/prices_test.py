@@ -1,6 +1,6 @@
 import pytest
 
-from src.helpers.types.money import Price, get_opposite_side_price
+from helpers.types.money import Price, get_opposite_side_price
 
 
 def test_prices():

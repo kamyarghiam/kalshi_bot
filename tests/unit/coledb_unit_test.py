@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from mock import patch
 
-from src.data.coledb.coledb import (
+from data.coledb.coledb import (
     ColeBytes,
     ColeDBInterface,
     ColeDBMetadata,
@@ -16,11 +16,11 @@ from src.data.coledb.coledb import (
     ticker_to_metadata_path,
     ticker_to_path,
 )
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price, get_opposite_side_price
-from src.helpers.types.orderbook import Orderbook, OrderbookSide
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.response import OrderbookSnapshotRM
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Price, get_opposite_side_price
+from helpers.types.orderbook import Orderbook, OrderbookSide
+from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.websockets.response import OrderbookSnapshotRM
 from tests.fake_exchange import OrderbookDeltaRM
 
 
@@ -39,14 +39,14 @@ def test_read_write_metadata(tmp_path: Path):
 def test_ticker_to_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
     assert ticker_to_path(ticker) == Path(
-        "src/data/coledb/storage/SERIES/EVENT/MARKET/"
+        ColeDBInterface.cole_db_storeage_path / "SERIES/EVENT/MARKET/"
     )
 
 
 def test_ticker_to_metadata_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
     assert ticker_to_metadata_path(ticker) == Path(
-        "src/data/coledb/storage/SERIES/EVENT/MARKET/metadata"
+        ColeDBInterface.cole_db_storeage_path / "SERIES/EVENT/MARKET/metadata"
     )
 
 
@@ -55,7 +55,7 @@ def test_get_metadata_file(tmp_path: Path):
     cole = ColeDBInterface()
     assert not path.exists()
     with patch(
-        "src.data.coledb.coledb.ticker_to_metadata_path", return_value=path
+        "data.coledb.coledb.ticker_to_metadata_path", return_value=path
     ) as mock_ticker_to_metadata_path:
         ticker = MarketTicker("SERIES-EVENT-MARKET")
         metadata = cole.get_metadata(ticker)
@@ -65,7 +65,7 @@ def test_get_metadata_file(tmp_path: Path):
         mock_ticker_to_metadata_path.assert_called_once_with(ticker)
 
     with patch(
-        "src.data.coledb.coledb.ticker_to_metadata_path", return_value=path
+        "data.coledb.coledb.ticker_to_metadata_path", return_value=path
     ) as mock_ticker_to_metadata_path:
         # Gets the metadata file from the local cache dict
         metadata_from_dict = cole.get_metadata(ticker)
@@ -652,8 +652,7 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
         next(actual_orderbook_gen)
 
 
-def test_read_write(tmp_path: Path):
-    ColeDBInterface.cole_db_storeage_path = tmp_path
+def test_read_write():
     ticker = MarketTicker("some_ticker")
     db = ColeDBInterface()
     reader = db.read(ticker)
@@ -683,8 +682,7 @@ def test_read_write(tmp_path: Path):
     assert next(reader) == orderbook_snapshot
 
 
-def test_read_write_across_chunks(tmp_path: Path):
-    ColeDBInterface.cole_db_storeage_path = tmp_path
+def test_read_write_across_chunks():
     ColeDBInterface.msgs_per_chunk = 2
     ticker = MarketTicker("some_ticker")
     db = ColeDBInterface()

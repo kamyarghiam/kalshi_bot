@@ -1,11 +1,11 @@
 from mock import patch
 
-from src.exchange.connection import SessionsWrapper
-from src.helpers.types.common import URL
+from exchange.connection import SessionsWrapper
+from helpers.types.common import URL
 
 
 def test_sessions_wrapper():
-    with patch("src.exchange.connection.Session.request") as request:
+    with patch("exchange.connection.Session.request") as request:
         base_url = URL("base_url")
         sessions_wrapper = SessionsWrapper(base_url)
 

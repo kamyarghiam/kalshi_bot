@@ -2,16 +2,15 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import Path
 from typing import DefaultDict, Tuple
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.orderbook import Orderbook
-from src.helpers.types.orders import Quantity, Side
-from src.helpers.utils import compute_pnl
+from data.reading.orderbook import OrderbookReader
+from helpers.types.markets import MarketTicker
+from helpers.types.orderbook import Orderbook
+from helpers.types.orders import Quantity, Side
+from helpers.utils import compute_pnl
 from tests.fake_exchange import Price
 from tests.unit.common_test import Cents
-from tests.unit.orderbook_reader_test import OrderbookReader
 
 
 class PossibleProfit:
@@ -75,16 +74,9 @@ class SideProfitMetadata:
 
 
 def get_possible_profit(reader: OrderbookReader):
-    reader.add_printer()
     possible_profit = PossibleProfit()
     for msg in reader:
         possible_profit.add_msg(msg)
     total_profit = possible_profit.compute_total_profit()
     print(f"Total possible profit: ${total_profit/100}")
     return total_profit
-
-
-def run_historical_profit_reader(data_path: Path):
-    """Takes a path to a dataset that contains pickled orderbook info
-    and returns the possible moeny you could have made as a taker"""
-    return get_possible_profit(OrderbookReader.historical(data_path))

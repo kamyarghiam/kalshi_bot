@@ -1,8 +1,8 @@
 import pytest
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Cents, Price
-from src.helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Cents, Price
+from helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
 
 
 def test_order_str():

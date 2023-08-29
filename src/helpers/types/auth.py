@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from pydantic import Field
 
-from src.helpers.constants import (
+from helpers.constants import (
     API_VERSION_ENV_VAR,
     ENV_VARS,
     KALSHI_PROD_BASE_URL,
@@ -14,8 +14,8 @@ from src.helpers.constants import (
     USERNAME_ENV_VAR,
     TradingEnv,
 )
-from src.helpers.types.api import ExternalApi
-from src.helpers.types.common import URL, NonNullStr
+from helpers.types.api import ExternalApi
+from helpers.types.common import URL, NonNullStr
 
 
 class MemberId(NonNullStr):

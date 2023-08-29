@@ -1,5 +1,5 @@
-from src.helpers.types.money import Price
-from src.helpers.types.orders import Quantity, compute_fee
+from helpers.types.money import Price
+from helpers.types.orders import Quantity, compute_fee
 
 
 def test_fees():

@@ -1,12 +1,10 @@
-import pickle
-from pathlib import Path
 from typing import Dict, Generator
 
-from src.exchange.interface import OrderbookSubscription
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.orderbook import Orderbook
-from src.helpers.types.websockets.response import OrderbookSnapshotRM
-from src.helpers.utils import Printable, Printer
+from exchange.interface import OrderbookSubscription
+from helpers.types.markets import MarketTicker
+from helpers.types.orderbook import Orderbook
+from helpers.types.websockets.response import OrderbookSnapshotRM
+from helpers.utils import Printable, Printer
 from tests.conftest import ExchangeInterface
 from tests.fake_exchange import OrderbookDeltaRM
 
@@ -20,8 +18,8 @@ class OrderbookReader(Generator[Orderbook, None, None]):
 
     You could also use the class methods like:
 
-    OrderbookReader.historical(data_path)
     OrderbookReader.live(exchange_interface)
+    TODO: define a historical reader
     """
 
     def __init__(
@@ -84,27 +82,8 @@ class OrderbookReader(Generator[Orderbook, None, None]):
         return
 
     @classmethod
-    def historical(cls, path: Path) -> "OrderbookReader":
-        return cls(historical_data_reader(path))
-
-    @classmethod
     def live(cls, exchange_interface: ExchangeInterface) -> "OrderbookReader":
         return cls(live_data_reader(exchange_interface))
-
-
-def historical_data_reader(
-    path: Path,
-) -> Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None]:
-    # TODO: change this to read from influx db
-    with open(str(path), "rb") as f:
-        msg_num = 0
-        while True:
-            try:
-                msg: OrderbookSnapshotRM | OrderbookDeltaRM = pickle.load(f)
-                yield msg
-                msg_num += 1
-            except EOFError:
-                break
 
 
 def live_data_reader(

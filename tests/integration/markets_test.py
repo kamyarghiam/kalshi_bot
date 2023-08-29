@@ -1,5 +1,5 @@
-from src.exchange.interface import ExchangeInterface
-from src.helpers.types.markets import Market, MarketStatus, MarketTicker
+from exchange.interface import ExchangeInterface
+from helpers.types.markets import Market, MarketStatus, MarketTicker
 
 
 def test_get_active_markets(exchange_interface: ExchangeInterface):

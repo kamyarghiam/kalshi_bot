@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from requests import Response
 
-from src.exchange.connection import Connection, SessionsWrapper
+from exchange.connection import Connection, SessionsWrapper
 
 
 def test_empty_response():

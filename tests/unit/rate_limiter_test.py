@@ -1,9 +1,9 @@
 import time
 from unittest.mock import MagicMock, patch
 
-from src.exchange.connection import Connection, RateLimiter, SessionsWrapper, Websocket
-from src.helpers.types.api import RateLimit
-from src.helpers.types.common import URL
+from exchange.connection import Connection, RateLimiter, SessionsWrapper, Websocket
+from helpers.types.api import RateLimit
+from helpers.types.common import URL
 
 
 def almost_greater_than(x: float, y: float) -> bool:
@@ -38,7 +38,7 @@ def test_rate_limiter():
 
 
 def test_rate_limit_called_for_websockets():
-    with patch("src.exchange.connection.external_websocket_connect"):
+    with patch("exchange.connection.external_websocket_connect"):
         rate_limiter = RateLimiter(limits=[])
         ws = Websocket(SessionsWrapper(base_url=URL("anything")), rate_limiter)
         with ws.connect(

@@ -1,6 +1,6 @@
 from enum import Enum
 
-from src.helpers.types.common import URL
+from helpers.types.common import URL
 
 KALSHI_PROD_BASE_URL = "trading-api.kalshi.com"
 

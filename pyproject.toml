@@ -10,7 +10,7 @@ version = "0.1.0"
 description = ""
 authors = ["kamyarghiam <kamyarghiam@gmail.com>"]
 readme = "README.md"
-packages = [{include = "src"}]
+packages = [{include = "data", from="src"}, {include = "exchange", from="src"}, {include = "helpers", from="src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -44,5 +44,5 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-exp1 = "src.strategies.experiment_1.experiment:actual_run"
-collect_orderbook_data = "src.data.collection.orderbook:collect_prod_orderbook_data"
+exp1 = "strategies.experiment_1.experiment:actual_run"
+collect_orderbook_data = "data.collection.orderbook:collect_prod_orderbook_data"

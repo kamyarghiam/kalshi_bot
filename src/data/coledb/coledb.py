@@ -53,11 +53,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple
 
-from src.helpers.types.markets import MarketTicker
-from src.helpers.types.money import Price
-from src.helpers.types.orderbook import Orderbook
-from src.helpers.types.orders import Quantity, QuantityDelta, Side
-from src.helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
+from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
+from helpers.types.orderbook import Orderbook
+from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
 @dataclass
@@ -301,10 +301,10 @@ class ColeDBInterface:
 
         # Side (yes/no):                                    1 bit
         # Price (1-99)                                      7 bits
-        # Quantity delta (can be negative)               4-32 bits
-        # Time delta (relative to chunk_start_timestamp) 4-32 bits
         # Quantity half bytes length                        3 bits
         # Timestamp half bytes length                       3 bits
+        # Quantity delta (can be negative)               4-32 bits
+        # Time delta (relative to chunk_start_timestamp) 4-32 bits
         # Delta / Snapshot                                  1 bit
         total_bits = 0
         b = 0

@@ -3,14 +3,8 @@ from datetime import datetime, timedelta
 import pytest
 from mock import patch  # type:ignore
 
-from src.helpers.types.auth import (
-    Auth,
-    LogInResponse,
-    MemberId,
-    MemberIdAndToken,
-    Token,
-)
-from src.helpers.types.common import URL
+from helpers.types.auth import Auth, LogInResponse, MemberId, MemberIdAndToken, Token
+from helpers.types.common import URL
 
 
 @patch(

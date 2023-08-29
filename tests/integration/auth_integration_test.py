@@ -4,10 +4,10 @@ import pytest
 from httpx import HTTPStatusError
 from starlette.testclient import TestClient
 
-from src.exchange.connection import Method
-from src.exchange.interface import ExchangeInterface
-from src.helpers.constants import MARKETS_URL
-from src.helpers.types.auth import MemberId, Token
+from exchange.connection import Method
+from exchange.interface import ExchangeInterface
+from helpers.constants import MARKETS_URL
+from helpers.types.auth import MemberId, Token
 
 
 def test_sign_in_and_out(fastapi_test_client: TestClient):
