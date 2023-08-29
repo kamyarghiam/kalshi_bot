@@ -1,7 +1,7 @@
 # NOTE: to change pyhthon version, don't forget to change it
 # in the pyproject.toml as well
 default_language_version:
-  python: python3.11.2
+  python: python3.11
 
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit

@@ -20,7 +20,6 @@ from src.helpers.types.common import URL
         "API_PASSWORD": "PASS",
         "API_URL": "URL",
         "API_VERSION": "VERSION",
-        "INFLUXDB_API_TOKEN": "SOME_TOKEN",
         "TRADING_ENV": "prod",
     },
 )
@@ -164,37 +163,3 @@ def test_log_in_response():
 def test_null_api_version():
     with pytest.raises(ValueError):
         Token(None)
-
-
-@patch(
-    "os.environ",
-    {
-        "API_USERNAME": "NAME",
-        "API_PASSWORD": "PASS",
-        "API_URL": "URL",
-        "API_VERSION": "VERSION",
-        "TRADING_ENV": "demo",
-    },
-)
-def test_influxdb_api_creds_missing():
-    with pytest.raises(ValueError) as e:
-        a = Auth()
-        print(a.influxdb_api_token)
-
-    assert e.match("Missing influxdb api token!")
-
-
-@patch(
-    "os.environ",
-    {
-        "API_USERNAME": "NAME",
-        "API_PASSWORD": "PASS",
-        "API_URL": "URL",
-        "API_VERSION": "VERSION",
-        "INFLUXDB_API_TOKEN": "SOME_TOKEN",
-        "TRADING_ENV": "demo",
-    },
-)
-def test_valid_influxdb_api_creds():
-    a = Auth()
-    assert a.influxdb_api_token == "SOME_TOKEN"

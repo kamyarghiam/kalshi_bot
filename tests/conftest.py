@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,6 +18,24 @@ def pytest_addoption(parser):
         help="Run functional tests",
         default=False,
     )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def env_vars():
+    old_environ = dict(os.environ)
+    environ = {
+        "API_URL": "https://demo-api.kalshi.co/trade-api",
+        "API_VERSION": "v2",
+        "API_USERNAME": "your-email@email.com",
+        "API_PASSWORD": "some-password",
+        "TRADING_ENV": "test",
+    }
+    os.environ.update(environ)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)
 
 
 @pytest.fixture(scope="session")

@@ -7,7 +7,6 @@ from pydantic import Field
 from src.helpers.constants import (
     API_VERSION_ENV_VAR,
     ENV_VARS,
-    INFLUXDB_API_TOKEN,
     KALSHI_PROD_BASE_URL,
     PASSWORD_ENV_VAR,
     TRADING_ENV_ENV_VAR,
@@ -82,7 +81,6 @@ class Auth:
         self._password: Password = Password(os.environ.get(PASSWORD_ENV_VAR))
         self._base_url: URL = URL(os.environ.get(URL_ENV_VAR))
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
-        self._influxdb_api_token: str | None = os.environ.get(INFLUXDB_API_TOKEN)
         self.env: TradingEnv = TradingEnv(os.environ.get(TRADING_ENV_ENV_VAR))
 
         if is_test_run and KALSHI_PROD_BASE_URL in self._base_url:
@@ -108,12 +106,6 @@ class Auth:
     @property
     def api_version(self) -> URL:
         return self._api_version
-
-    @property
-    def influxdb_api_token(self) -> str:
-        if self._influxdb_api_token is None:
-            raise ValueError("Missing influxdb api token!")
-        return self._influxdb_api_token
 
     def is_valid(self):
         """Checks that we are signed in and that the token is not stale"""

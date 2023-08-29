@@ -9,7 +9,7 @@ direction of the project.
 
 ### SETUP
 
-- Make sure you have python `3.11.2`
+- Make sure you have python `3.11.2` or greater
 - Install the virtual env library with `pip3.11 install virtualenv`. This is where we will host all your dependencies for this project.
 - Create a directory for your venv `mkdir venv`
 - Create a venv `cd venv && python3.11 -m venv . && cd ..`
@@ -47,9 +47,6 @@ direction of the project.
 }
 ```
 
-- Install InfluxDB. On mac, run `brew update && brew install influxdb` for mac
-- Move the influxdb engine to the store folder. This keeps the data localized in one place. For me, it looked like `cp -r /Users/kamyarghiam/.influxdbv2/engine src/data/store/influxdb/engine`
-
 ### CREDENTIALS
 
 Credentials will be necessary for running tests and connecting to the Kalshi demo exchange.
@@ -63,7 +60,6 @@ Next, you will need to export these three variables in your local environment (e
 - API_VERSION (example: v2)
 - API_USERNAME
 - API_PASSWORD
-- INFLUXDB_API_TOKEN
 - TRADING_ENV
 
 In order for tests to pass, you need these env vars. These vars are used for functional
@@ -77,7 +73,6 @@ export API_URL='https://demo-api.kalshi.co/trade-api'
 export API_VERSION='v2'
 export API_USERNAME='your-email@email.com'
 export API_PASSWORD='some-password'
-export INFLUXDB_API_TOKEN = 'influxdb_token'
 export TRADING_ENV = 'demo' or 'prod'
 ```
 
