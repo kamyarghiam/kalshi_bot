@@ -25,7 +25,7 @@ for a particular timestamp range, we can find the chunk in which the time stamp 
 using the metadata file, we can open the file start from the snapshot, apply the
 deltas, and find the starting point. In order to create a new chunk, we get the
 snapshot of the new chunk by reading the previous chunk from the start and
-applying all of the deltas.
+applying all of the deltas. The name of the chunks are 1 indexed
 
 It takes about 206 microseocnds per messages. This is high.
 TODO: we need to speed up reads
@@ -160,6 +160,20 @@ class ColeDBInterface:
         else:
             path = ticker_to_metadata_path(ticker)
             if not path.exists():
+                # Make the top level folder first
+                folder_to_make = path.parent
+                folders_to_make: List[Path] = []
+                # Create a folder for the series, the event, and then the market
+                while True:
+                    if not folder_to_make.exists():
+                        folders_to_make.append(folder_to_make)
+                    else:
+                        break
+                    folder_to_make = folder_to_make.parent
+
+                while len(folders_to_make) > 0:
+                    folder_to_make = folders_to_make.pop()
+                    folder_to_make.mkdir()
                 metadata = ColeDBMetadata(
                     path=path,
                 )
@@ -170,6 +184,7 @@ class ColeDBInterface:
         return metadata
 
     def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
+        """Writes data to cole db"""
         metadata = self.get_metadata(data.market_ticker)
         is_new_dataset = metadata.last_chunk_num == 0
         if is_new_dataset:
@@ -183,16 +198,61 @@ class ColeDBInterface:
             metadata.num_msgs_in_last_file == ColeDBInterface.msgs_per_chunk
         )
         if needs_new_chunk:
-            last_chunk_snapshot = ColeDBInterface._read_chunk_apply_deltas(
-                metadata.path_to_last_chunk,
-                data.market_ticker,
-                metadata.latest_chunk_timestamp,
-            )
-            self._create_new_chunk(
-                OrderbookSnapshotRM.from_orderbook(last_chunk_snapshot), metadata
-            )
+            if isinstance(data, OrderbookSnapshotRM):
+                self._create_new_chunk(data, metadata)
+            else:
+                last_chunk_snapshot = ColeDBInterface._read_chunk_apply_deltas(
+                    metadata.path_to_last_chunk,
+                    data.market_ticker,
+                    metadata.latest_chunk_timestamp,
+                )
+                last_chunk_snapshot = last_chunk_snapshot.apply_delta(data)
+                self._create_new_chunk(
+                    OrderbookSnapshotRM.from_orderbook(last_chunk_snapshot), metadata
+                )
         else:
             ColeDBInterface._write_data_to_last_file(data, metadata)
+
+    def read(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+    ) -> Generator[Orderbook, None, None]:
+        """Reads data from coledb"""
+        try:
+            metadata = self.get_metadata(ticker)
+        except FileNotFoundError as err:
+            raise ValueError(f"Could not find metadata file for {ticker}") from err
+
+        if len(metadata.chunk_first_time_stamps) == 0:
+            # No data
+            return
+
+        # TODO: refactor and clean this up
+        # If this breaks, this means there are no chunks
+        chunk_start_ts = metadata.chunk_first_time_stamps[0]
+        chunk_name = 1
+        if start_ts:
+            for i, time in enumerate(metadata.chunk_first_time_stamps):
+                if time <= start_ts:
+                    chunk_name = i + 1
+                    chunk_start_ts = time
+                    break
+            else:
+                # The start_ts is out of the time range
+                return
+        while (chunk_index := (chunk_name - 1)) < len(
+            metadata.chunk_first_time_stamps
+        ) and (
+            end_ts is None or (end_ts >= metadata.chunk_first_time_stamps[chunk_index])
+        ):
+            path_to_chunk = metadata.path_to_market_data / str(chunk_name)
+            chunk_start_ts = metadata.chunk_first_time_stamps[chunk_index]
+            yield from self._read_chunk_apply_deltas_generator(
+                path_to_chunk, ticker, chunk_start_ts, start_ts, end_ts
+            )
+            chunk_name += 1
 
     @staticmethod
     def _write_data_to_last_file(
@@ -200,12 +260,13 @@ class ColeDBInterface:
         metadata: ColeDBMetadata,
     ):
         """Writes data to the latest file in the database"""
-        metadata.path_to_last_chunk.write_bytes(
-            ColeDBInterface._encode_to_bytes(
-                data,
-                metadata.latest_chunk_timestamp,
+        with open(str(metadata.path_to_last_chunk), "ab") as f:
+            f.write(
+                ColeDBInterface._encode_to_bytes(
+                    data,
+                    metadata.latest_chunk_timestamp,
+                )
             )
-        )
         metadata.num_msgs_in_last_file += 1
         metadata.save()
 
@@ -260,8 +321,10 @@ class ColeDBInterface:
             * 10
         )
         timestamp_bits_length = timestamp_delta.bit_length()
-        timestamp_half_bytes_length = get_num_byte_sections_per_bits(
-            timestamp_bits_length, 4
+        # We don't want a zero length timestamp
+        # TODO: add test for this
+        timestamp_half_bytes_length = max(
+            get_num_byte_sections_per_bits(timestamp_bits_length, 4), 1
         )
         if timestamp_bits_length > 32:
             raise ValueError(
@@ -379,8 +442,10 @@ class ColeDBInterface:
             * 10
         )
         timestamp_bits_length = timestamp_delta.bit_length()
-        timestamp_half_bytes_length = get_num_byte_sections_per_bits(
-            timestamp_bits_length, 4
+        # We don't want a zero length timestamp
+        # TODO: add test for this
+        timestamp_half_bytes_length = max(
+            get_num_byte_sections_per_bits(timestamp_bits_length, 4), 1
         )
         if timestamp_bits_length > 32:
             raise ValueError(
@@ -477,7 +542,6 @@ class ColeDBInterface:
         padding = (byte_length * 8) - total_bits
         # We pad with zeros to fit byte boundaries
         b <<= padding
-
         return b.to_bytes(get_num_byte_sections_per_bits(total_bits, 8))
 
     @staticmethod
@@ -613,11 +677,13 @@ class ColeDBInterface:
             )
 
     def _create_new_chunk(
-        self, snapshot: OrderbookDeltaRM | OrderbookSnapshotRM, metadata: ColeDBMetadata
+        self,
+        snapshot: OrderbookDeltaRM | OrderbookSnapshotRM,
+        metadata: ColeDBMetadata,
     ):
         metadata.last_chunk_num += 1
         metadata.num_msgs_in_last_file = 0
-        metadata.chunk_first_time_stamps.append(datetime.now())
+        metadata.chunk_first_time_stamps.append(snapshot.ts)
         new_chunk_file = metadata.path_to_market_data / str(metadata.last_chunk_num)
         new_chunk_file.touch()
 
@@ -662,18 +728,19 @@ class ColeDBInterface:
                 return
             assert isinstance(msg, OrderbookSnapshotRM)
             orderbook = Orderbook.from_snapshot(msg)
-            while True:
-                if end_ts and orderbook.ts > end_ts:
-                    return
-                if start_ts is None or start_ts <= orderbook.ts:
-                    yield orderbook
+            file_empty = False
+            while not file_empty:
                 try:
                     msg = ColeDBInterface._decode_to_response_message(
                         cole_bytes, ticker, chunk_start_ts
                     )
                 except EOFError:
+                    file_empty = True
+                if end_ts and orderbook.ts > end_ts:
                     return
-                else:
+                if start_ts is None or start_ts <= orderbook.ts:
+                    yield orderbook
+                if not file_empty:
                     if isinstance(msg, OrderbookSnapshotRM):
                         orderbook = Orderbook.from_snapshot(msg)
                     else:
@@ -683,7 +750,7 @@ class ColeDBInterface:
 
 def ticker_to_path(ticker: MarketTicker) -> Path:
     """Given a market ticker returns a path to where all its data should live"""
-    return ColeDBInterface.cole_db_storeage_path / ticker.replace("-", "/")
+    return ColeDBInterface.cole_db_storeage_path / Path(ticker.replace("-", "/"))
 
 
 def ticker_to_metadata_path(ticker: MarketTicker) -> Path:

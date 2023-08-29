@@ -1,7 +1,7 @@
 import io
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 
@@ -650,3 +650,142 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
     )
     with pytest.raises(StopIteration):
         next(actual_orderbook_gen)
+
+
+def test_read_write(tmp_path: Path):
+    ColeDBInterface.cole_db_storeage_path = tmp_path
+    ticker = MarketTicker("some_ticker")
+    db = ColeDBInterface()
+    reader = db.read(ticker)
+    with pytest.raises(StopIteration):
+        next(reader)
+
+    snapshot = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[2, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=datetime.now(),
+    )
+    delta = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=datetime.now(),
+    )
+    db.write(snapshot)
+    db.write(delta)
+
+    reader = db.read(ticker)
+    orderbook_snapshot = Orderbook.from_snapshot(snapshot)
+    assert next(reader) == orderbook_snapshot
+    orderbook_snapshot = orderbook_snapshot.apply_delta(delta)
+    assert next(reader) == orderbook_snapshot
+
+
+def test_read_write_across_chunks(tmp_path: Path):
+    ColeDBInterface.cole_db_storeage_path = tmp_path
+    ColeDBInterface.msgs_per_chunk = 2
+    ticker = MarketTicker("some_ticker")
+    db = ColeDBInterface()
+    reader = db.read(ticker)
+    with pytest.raises(StopIteration):
+        next(reader)
+
+    now = datetime.now()
+    snapshot1 = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[2, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=now - timedelta(seconds=10),
+    )
+    delta1 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=now - timedelta(seconds=8),
+    )
+    delta2 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(32),
+        delta=QuantityDelta(123456),
+        side=Side.YES,
+        ts=now - timedelta(seconds=6),
+    )
+    delta3 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(33),
+        delta=QuantityDelta(123456),
+        side=Side.YES,
+        ts=now - timedelta(seconds=4),
+    )
+    snapshot2 = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[3, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=datetime.now() - timedelta(seconds=2),
+    )
+    db.write(snapshot1)
+    db.write(delta1)
+    db.write(delta2)
+    db.write(delta3)
+    db.write(snapshot2)
+
+    reader = db.read(ticker)
+    orderbook_snapshot = Orderbook.from_snapshot(snapshot1)
+    next_msg = next(reader)
+    assert next_msg == orderbook_snapshot
+    assert round(next_msg.ts.timestamp(), 2) == round(
+        orderbook_snapshot.ts.timestamp(), 2
+    )
+
+    orderbook_snapshot_d1 = orderbook_snapshot.apply_delta(delta1)
+    next_msg = next(reader)
+    assert next_msg == orderbook_snapshot_d1
+    assert round(next_msg.ts.timestamp(), 2) == round(
+        orderbook_snapshot_d1.ts.timestamp(), 2
+    )
+
+    orderbook_snapshot_d2 = orderbook_snapshot_d1.apply_delta(delta2)
+    next_msg = next(reader)
+    assert next_msg == orderbook_snapshot_d2
+    assert round(next_msg.ts.timestamp(), 2) == round(
+        orderbook_snapshot_d2.ts.timestamp(), 2
+    )
+
+    orderbook_snapshot_d3 = orderbook_snapshot_d2.apply_delta(delta3)
+    next_msg = next(reader)
+    assert next_msg == orderbook_snapshot_d3
+    assert round(next_msg.ts.timestamp(), 2) == round(
+        orderbook_snapshot_d3.ts.timestamp(), 2
+    )
+
+    orderbook_snapshot2 = Orderbook.from_snapshot(snapshot2)
+    next_msg = next(reader)
+    assert next_msg == orderbook_snapshot2
+    assert round(next_msg.ts.timestamp(), 2) == round(
+        orderbook_snapshot2.ts.timestamp(), 2
+    )
+    with pytest.raises(StopIteration):
+        next(reader)
+
+    # Read range
+    reader = db.read(ticker, end_ts=delta3.ts + timedelta(seconds=1))
+    assert next(reader) == orderbook_snapshot
+    assert next(reader) == orderbook_snapshot_d1
+    assert next(reader) == orderbook_snapshot_d2
+    assert next(reader) == orderbook_snapshot_d3
+    with pytest.raises(StopIteration):
+        next(reader)
+
+    reader = db.read(
+        ticker,
+        start_ts=delta1.ts - timedelta(seconds=1),
+        end_ts=delta3.ts + timedelta(seconds=1),
+    )
+    assert next(reader) == orderbook_snapshot_d1
+    assert next(reader) == orderbook_snapshot_d2
+    assert next(reader) == orderbook_snapshot_d3
+    with pytest.raises(StopIteration):
+        next(reader)
