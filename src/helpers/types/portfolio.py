@@ -2,11 +2,11 @@ import pickle
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
-from tests.conftest import ExchangeInterface
 
 
 class Position:

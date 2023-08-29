@@ -6,8 +6,7 @@ from enum import Enum
 from typing import Union
 
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Cents, Price
-from tests.unit.prices_test import get_opposite_side_price
+from helpers.types.money import Cents, Price, get_opposite_side_price
 
 
 class QuantityDelta(int):

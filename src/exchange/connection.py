@@ -23,7 +23,13 @@ from helpers.types.auth import (
     Token,
 )
 from helpers.types.common import URL
-from helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
+from helpers.types.websockets.common import (
+    Command,
+    CommandId,
+    SubscriptionId,
+    Type,
+    WebsocketError,
+)
 from helpers.types.websockets.request import (
     UnsubscribeRP,
     UpdateSubscriptionRP,
@@ -39,7 +45,6 @@ from helpers.types.websockets.response import (
     UnsubscribedWR,
     WebsocketResponse,
 )
-from tests.fake_exchange import SubscriptionId
 
 
 class Method(Enum):
