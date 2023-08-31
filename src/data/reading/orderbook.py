@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from time import sleep
 from typing import Dict, Generator
 
-from rich.console import Console
+from rich.live import Live
 from rich.table import Table
 
 from data.coledb.coledb import ColeDBInterface
@@ -110,11 +110,10 @@ def playback_orderbook(ticker: MarketTicker, speed_multiplier: int = 1):
     The speed multiplier lets you select how fast you want to see the changes.
     """
     db = ColeDBInterface()
-    console = Console()
-
     last_ts: datetime | None = None
 
-    for msg in db.read(ticker):
+    def generate_table(msg: Orderbook) -> Table:
+        nonlocal db
         table = Table(show_header=True, header_style="bold", title="Order Book")
 
         table.add_column("Price", justify="right", style="cyan", width=12)
@@ -124,19 +123,20 @@ def playback_orderbook(ticker: MarketTicker, speed_multiplier: int = 1):
         bid = msg.get_view(OrderbookView.BID)
         ask = msg.get_view(OrderbookView.ASK)
 
-        for price in range(1, 100):
-            bid_quantity = (
-                bid.yes.levels[Price(price)] if price in bid.yes.levels else 0
-            )
-            ask_quantity = (
-                ask.yes.levels[Price(price)] if price in ask.yes.levels else 0
-            )
+        for price in range(99, 0, -1):
+            bid_quantity = bid.yes.levels.get(Price(price), 0)
+            ask_quantity = ask.yes.levels.get(Price(price), 0)
 
             table.add_row(str(price), str(bid_quantity), str(ask_quantity))
-        if last_ts is not None:
-            # No sleep on first iteration
-            delta = msg.ts - last_ts
-            sleep(delta / timedelta(seconds=speed_multiplier))
-        last_ts = msg.ts
-        console.clear()
-        console.print(table)
+
+        return table
+
+    db_reader = db.read(ticker)
+    with Live(generate_table(next(db_reader)), refresh_per_second=4) as live:
+        for msg in db_reader:
+            live.update(generate_table(msg))
+            if last_ts is not None:
+                # No sleep on first iteration
+                delta = msg.ts - last_ts
+                sleep(delta / timedelta(seconds=speed_multiplier))
+            last_ts = msg.ts
