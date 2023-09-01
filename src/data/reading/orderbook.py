@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from time import sleep
 from typing import Dict, Generator
 
@@ -9,7 +9,7 @@ from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface, OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import Orderbook, OrderbookView
+from helpers.types.orderbook import EmptyOrderbookSideError, Orderbook, OrderbookView
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 from helpers.utils import Printable, Printer
 
@@ -104,13 +104,24 @@ def live_data_reader(
             yield msg.msg
 
 
-def playback_orderbook(ticker: MarketTicker, speed_multiplier: int = 1):
+def playback_orderbook(
+    ticker: MarketTicker, speed_multiplier: int = 1, depth: int = 10
+):
     """Displays an orderbook changing over the course of time
 
     The speed multiplier lets you select how fast you want to see the changes.
+    depth lets you pick how many levels you want to see around each best offer/bid
     """
     db = ColeDBInterface()
     last_ts: datetime | None = None
+
+    def get_text_color(price):
+        # Calculate the gradient from red to green
+        normalized_price = min(99, max(1, price))  # Clamp price between 1 and 99
+        red_value = 255 - int((normalized_price - 1) / 98 * 255)
+        green_value = int((normalized_price - 1) / 98 * 255)
+        bold_text = "bold on " if price % 10 == 0 else ""
+        return bold_text + f"rgb({red_value},{green_value},0)"
 
     def generate_table(msg: Orderbook) -> Table:
         nonlocal db
@@ -123,20 +134,48 @@ def playback_orderbook(ticker: MarketTicker, speed_multiplier: int = 1):
         bid = msg.get_view(OrderbookView.BID)
         ask = msg.get_view(OrderbookView.ASK)
 
-        for price in range(99, 0, -1):
+        try:
+            best_bid, _ = bid.yes.get_largest_price_level()
+            best_bid_exists = True
+        except EmptyOrderbookSideError:
+            best_bid = Price(50)
+            best_bid_exists = False
+
+        try:
+            best_ask, _ = ask.yes.get_smallest_price_level()
+            best_ask_exists = True
+        except EmptyOrderbookSideError:
+            best_ask_exists = False
+            best_ask = Price(50)
+
+        for price in range(min(99, best_ask + depth), max(0, best_bid - depth), -1):
             bid_quantity = bid.yes.levels.get(Price(price), 0)
             ask_quantity = ask.yes.levels.get(Price(price), 0)
 
-            table.add_row(str(price), str(bid_quantity), str(ask_quantity))
+            bbo_text = (
+                "<- best bid"
+                if (best_bid_exists and price == best_bid)
+                else "<- best ask"
+                if (best_ask_exists and price == best_ask)
+                else ""
+            )
+
+            table.add_row(
+                str(price),
+                str(bid_quantity),
+                str(ask_quantity),
+                bbo_text,
+                style=get_text_color(price),
+            )
 
         return table
 
     db_reader = db.read(ticker)
-    with Live(generate_table(next(db_reader)), refresh_per_second=4) as live:
+    with Live(generate_table(next(db_reader)), refresh_per_second=100) as live:
         for msg in db_reader:
             live.update(generate_table(msg))
             if last_ts is not None:
                 # No sleep on first iteration
-                delta = msg.ts - last_ts
-                sleep(delta / timedelta(seconds=speed_multiplier))
+                delta = max(0, (msg.ts - last_ts).total_seconds())
+                sleep(delta / speed_multiplier)
             last_ts = msg.ts
