@@ -234,14 +234,15 @@ class ColeDBInterface:
         chunk_start_ts = metadata.chunk_first_time_stamps[0]
         chunk_name = 1
         if start_ts:
-            for i, time in enumerate(metadata.chunk_first_time_stamps):
-                if time <= start_ts:
-                    chunk_name = i + 1
-                    chunk_start_ts = time
-                    break
-            else:
-                # The start_ts is out of the time range
-                return
+            if start_ts > chunk_start_ts:
+                for i, time in enumerate(metadata.chunk_first_time_stamps):
+                    if time <= start_ts:
+                        chunk_name = i + 1
+                        chunk_start_ts = time
+                        break
+                else:
+                    # The start_ts is out of the time range
+                    return
         while (chunk_index := (chunk_name - 1)) < len(
             metadata.chunk_first_time_stamps
         ) and (
