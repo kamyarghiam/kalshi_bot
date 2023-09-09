@@ -1,4 +1,4 @@
-from rich.console import Console
+from rich.live import Live
 from rich.table import Table
 
 from data.coledb.coledb import ColeDBInterface
@@ -6,18 +6,18 @@ from exchange.interface import ExchangeInterface, OrderbookSubscription
 from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 
 
-class OrderbookCollectionPrinter:
-    def __init__(self):
-        self._console = Console()
-        self.num_snapshots = 0
-        self.num_deltas = 0
+def generate_table(num_snapshot_msgs: int, num_delta_msgs: int) -> Table:
+    table = Table(show_header=True, header_style="bold", title="Collection")
 
-    def run(self):
-        self._console.clear()
-        table = Table(title="Portfolio")
-        table.add_row("Snapshot msgs", str(self.num_snapshots))
-        table.add_row("Delta msgs", str(self.num_deltas))
-        self._console.print(table)
+    table.add_column("Snapshot msgs", style="cyan", width=12)
+    table.add_column("Delta msgs", style="cyan", width=12)
+
+    table.add_row(
+        str(num_snapshot_msgs),
+        str(num_delta_msgs),
+    )
+
+    return table
 
 
 def collect_orderbook_data(exchange_interface: ExchangeInterface):
@@ -30,25 +30,29 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
     pages = 1 if is_test_run else None
     open_markets = exchange_interface.get_active_markets(pages=pages)
     market_tickers = [market.ticker for market in open_markets]
-    printer = OrderbookCollectionPrinter()
     db = ColeDBInterface()
+    num_snapshot_msgs = 0
+    num_delta_msgs = 0
 
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, market_tickers)
         gen = sub.continuous_receive()
-        while True:
-            data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
-            if isinstance(data, OrderbookSnapshotWR):
-                printer.num_snapshots += 1
-            else:
-                assert isinstance(data, OrderbookDeltaWR)
-                printer.num_deltas += 1
-            printer.run()
-            db.write(data.msg)
+        with Live(
+            generate_table(num_snapshot_msgs, num_delta_msgs), refresh_per_second=1
+        ) as live:
+            while True:
+                data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
+                if isinstance(data, OrderbookSnapshotWR):
+                    num_snapshot_msgs += 1
+                else:
+                    assert isinstance(data, OrderbookDeltaWR)
+                    num_delta_msgs += 1
+                live.update(generate_table(num_snapshot_msgs, num_delta_msgs))
+                db.write(data.msg)
 
-            if is_test_run and printer.num_deltas + printer.num_snapshots == 3:
-                # For testing, we don't want to run it too many times
-                break
+                if is_test_run and num_snapshot_msgs + num_delta_msgs == 3:
+                    # For testing, we don't want to run it too many times
+                    break
 
 
 if __name__ == "__main__":
