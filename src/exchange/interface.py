@@ -1,3 +1,4 @@
+import datetime
 from time import sleep
 from types import TracebackType
 from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_args
@@ -149,7 +150,10 @@ class OrderbookSubscription:
             try:
                 response = self._get_next_message()
             except WebsocketError as e:
-                print(f"Received websocket error: {str(e)}. Reconnecting...")
+                print(
+                    f"Received {str(e)} at {str(datetime.datetime.now())}. "
+                    + "Reconnecting..."
+                )
                 # This is a small hack to help test this code
                 # We mock out the sleep function so we can break out of the while loop
                 should_break = sleep(10)  # type:ignore[func-returns-value]
