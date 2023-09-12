@@ -684,7 +684,7 @@ def test_read_write():
 
 def test_read_write_across_chunks():
     ColeDBInterface.msgs_per_chunk = 2
-    ticker = MarketTicker("some_ticker")
+    ticker = MarketTicker("TEST-READ-WRITEACROSSCHUNKS")
     db = ColeDBInterface()
     reader = db.read(ticker)
     with pytest.raises(StopIteration):

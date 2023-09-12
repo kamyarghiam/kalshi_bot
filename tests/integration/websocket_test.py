@@ -1,6 +1,7 @@
 from typing import List
 
 import pytest
+from mock import patch
 
 from exchange.interface import ExchangeInterface, OrderbookSubscription
 from helpers.types.markets import MarketTicker
@@ -10,7 +11,6 @@ from helpers.types.orders import Quantity, QuantityDelta, Side
 from helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
 from helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from helpers.types.websockets.response import (
-    ErrorRM,
     OrderbookDeltaRM,
     OrderbookDeltaWR,
     OrderbookSnapshotWR,
@@ -97,10 +97,11 @@ def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterfac
         gen = sub.continuous_receive()
 
         # The last message in the fake exchnage returns a runtime error
-        with pytest.raises(WebsocketError) as e:
-            next(gen)
-
-        assert e.match(str(ErrorRM(code=8, msg="Something went wrong")))
+        with patch("exchange.interface.sleep") as mock_sleep:
+            mock_sleep.return_value = "SHOULD_BREAK"
+            with pytest.raises(StopIteration):
+                next(gen)
+            mock_sleep.assert_called_once_with(10)
 
 
 def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface):

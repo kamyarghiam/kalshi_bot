@@ -1,3 +1,4 @@
+from time import sleep
 from types import TracebackType
 from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_args
 
@@ -21,6 +22,7 @@ from helpers.types.websockets.common import (
     SeqId,
     SubscriptionId,
     Type,
+    WebsocketError,
 )
 from helpers.types.websockets.request import (
     Channel,
@@ -144,11 +146,21 @@ class OrderbookSubscription:
 
         self._subscribe()
         while True:
-            response = self._get_next_message()
-            if self._is_seq_id_valid(response):
-                yield response
-            else:
+            try:
+                response = self._get_next_message()
+            except WebsocketError as e:
+                print(f"Received websocket error: {str(e)}. Reconnecting...")
+                # This is a small hack to help test this code
+                # We mock out the sleep function so we can break out of the while loop
+                should_break = sleep(10)  # type:ignore[func-returns-value]
+                if should_break == "SHOULD_BREAK":
+                    break
                 self._resubscribe()
+            else:
+                if self._is_seq_id_valid(response):
+                    yield response
+                else:
+                    self._resubscribe()
 
     def _get_next_message(self):
         """We either pull the next message from the pending message queue
