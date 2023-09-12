@@ -157,9 +157,9 @@ class OrderbookSubscription:
                 # This is a small hack to help test this code
                 # We mock out the sleep function so we can break out of the while loop
                 should_break = sleep(10)  # type:ignore[func-returns-value]
+                self._resubscribe()
                 if should_break == "SHOULD_BREAK":
                     break
-                self._resubscribe()
             else:
                 if self._is_seq_id_valid(response):
                     yield response

@@ -13,7 +13,7 @@ from helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Ty
 from helpers.types.websockets.request import Channel
 
 if TYPE_CHECKING:
-    from helpers.types.orderbook import Orderbook
+    from helpers.types.orderbook import Orderbook  # pragma: no cover
 
 WR = TypeVar("WR", bound="WebsocketResponse")
 

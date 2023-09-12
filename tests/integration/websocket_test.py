@@ -98,10 +98,12 @@ def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterfac
 
         # The last message in the fake exchnage returns a runtime error
         with patch("exchange.interface.sleep") as mock_sleep:
-            mock_sleep.return_value = "SHOULD_BREAK"
-            with pytest.raises(StopIteration):
-                next(gen)
-            mock_sleep.assert_called_once_with(10)
+            with patch.object(sub, "_resubscribe") as mock_resubscribe:
+                mock_sleep.return_value = "SHOULD_BREAK"
+                with pytest.raises(StopIteration):
+                    next(gen)
+                mock_sleep.assert_called_once_with(10)
+                mock_resubscribe.assert_called_once_with()
 
 
 def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface):

@@ -22,8 +22,25 @@ def pytest_addoption(parser):
     )
 
 
+@pytest.fixture(scope="session")
+def fastapi_test_client(request):
+    """Returns the test client, if there is one"""
+    pytest.is_functional = request.config.getoption("--functional")
+    if pytest.is_functional:
+        # We want to run this against the demo env. Pick up the creds from the env vars
+        yield None
+    else:
+        with TestClient(kalshi_test_exchange_factory()) as test_client:
+            yield test_client
+
+
 @pytest.fixture(scope="session", autouse=True)
-def env_vars():
+def env_vars(request):
+    pytest.is_functional = request.config.getoption("--functional")
+    if pytest.is_functional:
+        # We rely on the actual env vars
+        yield
+        return
     old_environ = dict(os.environ)
     environ = {
         "API_URL": "https://demo-api.kalshi.co/trade-api",
@@ -38,18 +55,6 @@ def env_vars():
     finally:
         os.environ.clear()
         os.environ.update(old_environ)
-
-
-@pytest.fixture(scope="session")
-def fastapi_test_client(request):
-    """Returns the test client, if there is one"""
-    pytest.is_functional = request.config.getoption("--functional")
-    if pytest.is_functional:
-        # We want to run this against the demo env. Pick up the creds from the env vars
-        yield None
-    else:
-        with TestClient(kalshi_test_exchange_factory()) as test_client:
-            yield test_client
 
 
 @pytest.fixture(scope="session")
