@@ -160,32 +160,40 @@ class ColeDBInterface:
         else:
             path = ticker_to_metadata_path(ticker)
             if not path.exists():
-                # Make the top level folder first
-                folder_to_make = path.parent
-                folders_to_make: List[Path] = []
-                # Create a folder for the series, the event, and then the market
-                while True:
-                    if not folder_to_make.exists():
-                        folders_to_make.append(folder_to_make)
-                    else:
-                        break
-                    folder_to_make = folder_to_make.parent
-
-                while len(folders_to_make) > 0:
-                    folder_to_make = folders_to_make.pop()
-                    folder_to_make.mkdir()
-                metadata = ColeDBMetadata(
-                    path=path,
-                )
-                metadata.save()
+                raise FileNotFoundError(f"Could not find metadata file for {ticker}")
             else:
                 metadata = ColeDBMetadata.load(path)
             self._open_metadata_files[ticker] = metadata
         return metadata
 
+    def create_metadata_file(self, ticker: MarketTicker) -> ColeDBMetadata:
+        # Make the top level folder first
+        path = ticker_to_metadata_path(ticker)
+        folder_to_make = path.parent
+        folders_to_make: List[Path] = []
+        # Create a folder for the series, the event, and then the market
+        while True:
+            if not folder_to_make.exists():
+                folders_to_make.append(folder_to_make)
+            else:
+                break
+            folder_to_make = folder_to_make.parent
+
+        while len(folders_to_make) > 0:
+            folder_to_make = folders_to_make.pop()
+            folder_to_make.mkdir()
+        metadata = ColeDBMetadata(
+            path=path,
+        )
+        metadata.save()
+        return metadata
+
     def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
         """Writes data to cole db"""
-        metadata = self.get_metadata(data.market_ticker)
+        try:
+            metadata = self.get_metadata(data.market_ticker)
+        except FileNotFoundError:
+            metadata = self.create_metadata_file(data.market_ticker)
         is_new_dataset = metadata.last_chunk_num == 0
         if is_new_dataset:
             if not isinstance(data, OrderbookSnapshotRM):
@@ -220,15 +228,7 @@ class ColeDBInterface:
         end_ts: datetime | None = None,
     ) -> Generator[Orderbook, None, None]:
         """Reads data from coledb"""
-        try:
-            metadata = self.get_metadata(ticker)
-        except FileNotFoundError as err:
-            raise ValueError(f"Could not find metadata file for {ticker}") from err
-
-        if len(metadata.chunk_first_time_stamps) == 0:
-            # No data
-            return
-
+        metadata = self.get_metadata(ticker)
         # TODO: refactor and clean this up
         # If this breaks, this means there are no chunks
         chunk_start_ts = metadata.chunk_first_time_stamps[0]
@@ -240,9 +240,6 @@ class ColeDBInterface:
                         chunk_name = i + 1
                         chunk_start_ts = time
                         break
-                else:
-                    # The start_ts is out of the time range
-                    return
         while (chunk_index := (chunk_name - 1)) < len(
             metadata.chunk_first_time_stamps
         ) and (

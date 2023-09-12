@@ -50,7 +50,7 @@ def test_ticker_to_metadata_path():
     )
 
 
-def test_get_metadata_file(tmp_path: Path):
+def test_create_get_metadata_file(tmp_path: Path):
     path = tmp_path / "metadata"
     cole = ColeDBInterface()
     assert not path.exists()
@@ -58,11 +58,16 @@ def test_get_metadata_file(tmp_path: Path):
         "data.coledb.coledb.ticker_to_metadata_path", return_value=path
     ) as mock_ticker_to_metadata_path:
         ticker = MarketTicker("SERIES-EVENT-MARKET")
+        with pytest.raises(FileNotFoundError) as e:
+            cole.get_metadata(ticker)
+        assert e.match("Could not find metadata file for SERIES-EVENT-MARKET")
+        metadata_create = cole.create_metadata_file(ticker)
         metadata = cole.get_metadata(ticker)
+        assert metadata_create == metadata
         assert metadata.path == path
         assert path.exists()
         assert ticker in cole._open_metadata_files
-        mock_ticker_to_metadata_path.assert_called_once_with(ticker)
+        mock_ticker_to_metadata_path.assert_any_call(ticker)
 
     with patch(
         "data.coledb.coledb.ticker_to_metadata_path", return_value=path
@@ -652,12 +657,15 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
         next(actual_orderbook_gen)
 
 
-def test_read_write():
+def test_read_write_coledb():
     ticker = MarketTicker("some_ticker")
     db = ColeDBInterface()
     reader = db.read(ticker)
-    with pytest.raises(StopIteration):
-        next(reader)
+    # Reading a dataset that does not exist
+    with pytest.raises(FileNotFoundError) as e:
+        next(db.read(MarketTicker("BAD-TICKER")))
+
+    assert e.match("Could not find metadata file for BAD-TICKER")
 
     snapshot = OrderbookSnapshotRM(
         market_ticker=ticker,
@@ -672,6 +680,15 @@ def test_read_write():
         side=Side.YES,
         ts=datetime.now(),
     )
+    # Writing a delta first in a new dataset is bad
+    with pytest.raises(TypeError) as e:  # type:ignore
+        db.write(delta)
+    assert e.match(
+        "New dataset writes must start with a snapshot! Data: "
+        + "market_ticker='some_ticker' price=31 delta=12345 "
+        + "side=<Side.YES: 'yes'> ts=datetime.datetime"
+    )
+
     db.write(snapshot)
     db.write(delta)
 
@@ -687,7 +704,7 @@ def test_read_write_across_chunks():
     ticker = MarketTicker("TEST-READ-WRITEACROSSCHUNKS")
     db = ColeDBInterface()
     reader = db.read(ticker)
-    with pytest.raises(StopIteration):
+    with pytest.raises(FileNotFoundError):
         next(reader)
 
     now = datetime.now()
