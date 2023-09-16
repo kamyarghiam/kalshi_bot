@@ -11,7 +11,7 @@ from helpers.utils import send_alert_email
 
 
 def generate_table(num_snapshot_msgs: int, num_delta_msgs: int) -> Table:
-    table = Table(show_header=True, header_style="bold", title="Collection")
+    table = Table(show_header=True, header_style="bold", title="Orderbook Collection")
 
     table.add_column("Snapshot msgs", style="cyan", width=12)
     table.add_column("Delta msgs", style="cyan", width=12)
@@ -25,7 +25,7 @@ def generate_table(num_snapshot_msgs: int, num_delta_msgs: int) -> Table:
 
 
 def collect_orderbook_data(exchange_interface: ExchangeInterface):
-    """Writes live data to influxdb
+    """Writes live data to coledb
 
     We assume the influx databse is up already by the time you
     hit this function.
@@ -77,4 +77,6 @@ def retry_collect_orderbook_data(exchange_interface: ExchangeInterface):
 
 
 if __name__ == "__main__":
-    retry_collect_orderbook_data(ExchangeInterface(is_test_run=False))
+    retry_collect_orderbook_data(
+        ExchangeInterface(is_test_run=False)  # pragma: no cover
+    )

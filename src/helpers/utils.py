@@ -3,10 +3,7 @@ import smtplib
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Generic, Iterable, Iterator, List, TypeVar
-
-from rich.console import Console
-from rich.table import Table
+from typing import Generic, Iterable, Iterator, TypeVar
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
@@ -52,40 +49,6 @@ class Printable(Generic[P]):
 
     name: str
     value: P
-
-
-class Printer:
-    """Abstract printer that allows us to print things to the console
-    When you create a new object, it returns a printable. This printable
-    can be updated to change the value in the table.
-
-    TODO: checkout rich.live. Allows for auto-refresh
-    TODO: should this run in another loop so that you can just hit run once and
-    #refresh interval?
-    """
-
-    def __init__(self):
-        self._console = Console()
-        self._printables: List[Printable] = []
-
-    def run(self):
-        self._console.clear()
-        self._console.print(self._generate_table())
-
-    def add(self, name: str, value: P) -> Printable:
-        """Add a new row to the table. Update the printable to
-        update the value in the table"""
-        printable: Printable[P] = Printable(name, value)
-        self._printables.append(printable)
-        return printable
-
-    def _generate_table(self) -> Table:
-        """Make a new table."""
-        table = Table()
-        for printable in self._printables:
-            table.add_row(printable.name, str(printable.value))
-
-        return table
 
 
 def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):

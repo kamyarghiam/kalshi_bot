@@ -3,6 +3,7 @@ from datetime import datetime
 
 import pytest
 
+from data.collection.orderbook import generate_table
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import (
@@ -524,3 +525,13 @@ def test_get_side_orderbook():
         }
     )
     assert book.get_side(Side.YES) == OrderbookSide(levels={Price(2): Quantity(100)})
+
+
+def test_generate_table():
+    table = generate_table(50, 10)
+    assert len(table.columns) == 2
+    assert table.title == "Orderbook Collection"
+    assert table.columns[0].header == "Snapshot msgs"
+    assert table.columns[0]._cells == ["50"]
+    assert table.columns[1].header == "Delta msgs"
+    assert table.columns[1]._cells == ["10"]

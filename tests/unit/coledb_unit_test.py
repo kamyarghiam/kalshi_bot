@@ -6,7 +6,7 @@ from io import BytesIO
 from pathlib import Path
 
 import pytest
-from mock import patch
+from mock import MagicMock, patch
 
 from data.coledb.coledb import (
     ColeBytes,
@@ -554,6 +554,19 @@ def test_read_chunk_apply_deltas(tmp_path: Path):
 
 
 def test_read_chunk_apply_deltas_generator(tmp_path: Path):
+    # Can't get generator if end_ts is < start_ts
+    with pytest.raises(ValueError) as e:
+        next(
+            ColeDBInterface._read_chunk_apply_deltas_generator(
+                MagicMock(),
+                MagicMock(),
+                MagicMock(),
+                datetime.now(),
+                datetime.now() - timedelta(days=1),
+            )
+        )
+    assert e.match("End ts must be larger than start ts")
+
     ticker = MarketTicker("some_ticker")
     chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
     snapshot = OrderbookSnapshotRM(

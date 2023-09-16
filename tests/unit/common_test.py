@@ -1,12 +1,11 @@
 import random
 
 import pytest
-from mock import patch
 
 from helpers.types.common import URL, NonNullStr
 from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orders import Quantity, compute_fee
-from helpers.utils import PendingMessages, Printer, compute_pnl
+from helpers.utils import PendingMessages, compute_pnl
 
 
 def test_basic_urls():
@@ -84,26 +83,6 @@ def test_cents_str():
 def test_balance_str():
     b = Balance(Cents(10))
     assert str(b) == "$0.10"
-
-
-def test_printer_class():
-    printer = Printer()
-    row_name = "ROW"
-    with patch.object(printer, "_console") as console:
-        printable = printer.add(row_name, 0)
-        assert len(printer._printables) == 1
-        assert printer._printables[0].name == "ROW"
-        assert printer._printables[0].value == 0
-        printer.run()
-        console.clear.assert_called_once()
-        console.print.assert_called_once()
-
-        printable.value = 1
-        assert len(printer._printables) == 1
-        assert printer._printables[0].name == "ROW"
-        assert printer._printables[0].value == 1
-
-        printer.run()
 
 
 def test_compute_pnl():

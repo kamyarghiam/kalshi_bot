@@ -23,3 +23,5 @@ def test_live_orderbook_reader(exchange_interface: ExchangeInterface):
     assert isinstance(msg3, Orderbook)
     assert msg3.yes.levels == {10: 20}
     assert msg3.no.levels == {20: 40, 10: 10}
+
+    assert reader.previous_snapshot(msg3.market_ticker) == msg3
