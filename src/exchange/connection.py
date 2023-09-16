@@ -130,7 +130,6 @@ class Websocket:
                     try:
                         yield self
                     finally:
-                        self.unsubscribe(self._subscriptions)
                         self._ws.close()
             case TestClient():
                 with self._connection_adapter.websocket_connect(
