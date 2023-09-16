@@ -110,10 +110,7 @@ class Websocket:
 
     @contextmanager
     def connect(self, websocket_url: URL, member_id: MemberId, api_token: Token):
-        """Main entry point. Call this function to get websocket connection session
-
-        Automaitcally unsubscribes you from all subscriptions after session is
-        closed."""
+        """Main entry point. Call this function to get websocket connection session"""
         match self._connection_adapter:
             case SessionsWrapper():
                 ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
