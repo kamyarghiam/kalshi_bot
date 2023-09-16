@@ -1,3 +1,5 @@
+from time import sleep
+
 from rich.live import Live
 from rich.table import Table
 
@@ -55,5 +57,16 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
                     break
 
 
+def retry_collect_orderbook_data(exchange_interface: ExchangeInterface):
+    """Adds retries to collect_orderbook_data"""
+    # TODO: add alerting
+    while True:
+        try:
+            collect_orderbook_data(exchange_interface)
+        except Exception as e:
+            print(f"Received error: {str(e)}. Re-running collect orderbook algo")
+            sleep(10)
+
+
 if __name__ == "__main__":
-    collect_orderbook_data(ExchangeInterface(is_test_run=False))
+    retry_collect_orderbook_data(ExchangeInterface(is_test_run=False))
