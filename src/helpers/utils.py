@@ -1,5 +1,8 @@
 import itertools
+import smtplib
 from dataclasses import dataclass
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Generic, Iterable, Iterator, List, TypeVar
 
 from rich.console import Console
@@ -90,3 +93,32 @@ def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):
     # Ticker and side don't matter
     buy_order = Order(buy_price, quantity, Trade.BUY, MarketTicker(""), Side.YES)
     return buy_order.get_predicted_pnl(sell_price)
+
+
+def send_alert_email(message: str):
+    # TODO: put this in the auth class
+    sender_email = "kamyarkalshibot@gmail.com"
+    password = "joofgqmczbeoqolb"
+    receiver_email = "kamyarghiam@gmail.com"
+    subject = "Alert from Kalshi bot"
+
+    # Create a MIMEText object to represent the email message
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(message, "plain"))
+    # Establish a connection with the SMTP server
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, password)
+
+        # Send the email
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        # Close the SMTP server connection
+        server.quit()

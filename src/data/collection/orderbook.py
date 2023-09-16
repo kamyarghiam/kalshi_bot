@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from time import sleep
 
 from rich.live import Live
@@ -6,6 +7,7 @@ from rich.table import Table
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface, OrderbookSubscription
 from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
+from helpers.utils import send_alert_email
 
 
 def generate_table(num_snapshot_msgs: int, num_delta_msgs: int) -> Table:
@@ -59,12 +61,18 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
 
 def retry_collect_orderbook_data(exchange_interface: ExchangeInterface):
     """Adds retries to collect_orderbook_data"""
-    # TODO: add alerting
+    time_between_emails = timedelta(days=1)
+    # We send the last email sent in the past so we trigger send on the first alert
+    last_email_sent_ts = datetime.now() - time_between_emails
     while True:
         try:
             collect_orderbook_data(exchange_interface)
         except Exception as e:
-            print(f"Received error: {str(e)}. Re-running collect orderbook algo")
+            error_msg = f"Received error: {str(e)}. Re-running collect orderbook algo"
+            print(error_msg)
+            if (now := datetime.now()) - time_between_emails > last_email_sent_ts:
+                send_alert_email(error_msg)
+                last_email_sent_ts = now
             sleep(10)
 
 
