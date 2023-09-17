@@ -1,11 +1,12 @@
 import random
 
 import pytest
+from mock import MagicMock, patch
 
 from helpers.types.common import URL, NonNullStr
 from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orders import Quantity, compute_fee
-from helpers.utils import PendingMessages, compute_pnl
+from helpers.utils import PendingMessages, compute_pnl, send_alert_email
 
 
 def test_basic_urls():
@@ -116,3 +117,22 @@ def test_dollars():
 
     d = Dollars(10)
     assert d == Cents(1_000)
+
+
+def test_send_email_alert():
+    with patch("helpers.utils.smtplib.SMTP.__new__") as mock_new_smtp:
+        mock_SMTP = MagicMock()
+        mock_new_smtp.return_value = mock_SMTP
+        send_alert_email("test_message")
+        mock_SMTP.starttls.assert_called_once_with()
+        mock_SMTP.login.assert_called_once()
+        mock_SMTP.sendmail.assert_called_once()
+
+    # Nothing happens when an exception happens
+    with patch("helpers.utils.smtplib.SMTP.__new__") as mock_new_smtp:
+        mock_SMTP = MagicMock()
+        mock_new_smtp.return_value = mock_SMTP
+        mock_SMTP.sendmail.side_effect = ValueError()
+        send_alert_email("test_message")
+        mock_SMTP.starttls.assert_called_once_with()
+        mock_SMTP.login.assert_called_once()

@@ -79,9 +79,10 @@ def live_data_reader(
             yield msg.msg
 
 
+# Currently pretty hard to test this
 def playback_orderbook(
     ticker: MarketTicker, speed_multiplier: int = 1, depth: int = 10
-):
+):  # pragma: no cover
     """Displays an orderbook changing over the course of time
 
     The speed multiplier lets you select how fast you want to see the changes.

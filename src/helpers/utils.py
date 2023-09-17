@@ -81,7 +81,7 @@ def send_alert_email(message: str):
         server.sendmail(sender_email, receiver_email, msg.as_string())
         print("Email sent successfully!")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred with sending email: {e}")
     finally:
         # Close the SMTP server connection
         server.quit()
