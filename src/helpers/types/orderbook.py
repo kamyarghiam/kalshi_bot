@@ -128,7 +128,6 @@ class Orderbook:
             )
         if self.view != OrderbookView.BID:
             raise ValueError("Can only apply delta on bid view")
-        # TODO: this copy probably takes a while
         new_orderbook = copy.deepcopy(self)
         if delta.side == Side.NO:
             new_orderbook.no.apply_delta(delta.price, delta.delta)

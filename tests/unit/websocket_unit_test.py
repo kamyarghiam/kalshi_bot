@@ -59,7 +59,7 @@ def test_convert_websocket_response():
     all_response_types = [
         SubscribedWR,
         ErrorWR,
-        # TODO: polyfactory can't transalte the price field in the below two classes
+        # TODO: polyfactory can't translate the price field in the below two classes
         # OrderbookSnapshotWR,
         # OrderbookDeltaWR,
         UnsubscribedWR,
