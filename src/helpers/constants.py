@@ -9,7 +9,7 @@ EXCHANGE_STATUS_URL = URL("/exchange/status")
 LOGIN_URL = URL("/login")
 MARKETS_URL = URL("/markets")
 LOGOUT_URL = URL("/logout")
-TRADE_URL = URL("/markets/trades")
+TRADES_URL = URL("/markets/trades")
 
 # Env vars
 USERNAME_ENV_VAR = "API_USERNAME"

@@ -6,7 +6,7 @@ from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_ar
 from fastapi.testclient import TestClient
 
 from exchange.connection import Connection, Websocket
-from helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL, TRADE_URL
+from helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL, TRADES_URL
 from helpers.types.common import URL
 from helpers.types.exchange import ExchangeStatusResponse
 from helpers.types.markets import (
@@ -44,9 +44,9 @@ from helpers.utils import PendingMessages
 
 class ExchangeInterface:
     def __init__(self, test_client: TestClient | None = None, is_test_run: bool = True):
-        """This class provides a high level interace with the exchange.
+        """This class provides a high level interface with the exchange.
 
-        It is a context manager that autoamtically signs you into and out
+        It is a context manager that automatically signs you into and out
         of the exchange. To use this class properly do:
 
         with ExchangeInterface() as exchange_interface:
@@ -61,7 +61,6 @@ class ExchangeInterface:
         """
         self.is_test_run = is_test_run
         self._connection = Connection(test_client, is_test_run)
-        self._subsciptions: List[SubscriptionId] = []
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(
@@ -101,24 +100,35 @@ class ExchangeInterface:
         ticker: MarketTicker,
         min_ts: datetime | None = None,
         max_ts: datetime | None = None,
+        limit: int | None = None,
     ) -> Generator[Trade, None, None]:
-        # TODO: add tests for this and create interface that
-        # seamlessly reads trades continiously without having to worry about api layer
+        """Get trades for a market
+
+        Each call to next on this generator lets you get the next trade. You don't
+        need to manage the cursor (does it automatically).
+
+        ticker: market ticker
+        min_ts: restricts to trades after this timestamp
+        max_ts: restricts to trades before this timestamp
+        limit: number of elements per cursor page. Mostly used for testing,
+        but also lets you adjust how much space you want to hold in memory. Max 100"""
         request = GetTradesRequest(
             ticker=ticker,
             min_ts=min_ts,
             max_ts=max_ts,
+            limit=limit,
         )
         while True:
             response = GetTradesResponse.parse_obj(
                 self._connection.get(
-                    url=TRADE_URL,
+                    url=TRADES_URL,
                     params=request.dict(exclude_none=True),
                 )
             )
             yield from response.trades
             if response.has_empty_cursor():
                 break
+            request.cursor = response.cursor
 
     ######## Helpers ############
 

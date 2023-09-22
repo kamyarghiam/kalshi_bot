@@ -2,6 +2,7 @@ import asyncio
 import os
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List
 
 from fastapi import APIRouter, FastAPI, Request
@@ -14,6 +15,7 @@ from helpers.constants import (
     LOGIN_URL,
     LOGOUT_URL,
     MARKETS_URL,
+    TRADES_URL,
 )
 from helpers.types.api import Cursor
 from helpers.types.auth import (
@@ -36,7 +38,8 @@ from helpers.types.markets import (
     MarketTicker,
 )
 from helpers.types.money import Price
-from helpers.types.orders import QuantityDelta, Side
+from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.trades import GetTradesResponse, Trade
 from helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from helpers.types.websockets.request import (
     Channel,
@@ -110,6 +113,45 @@ def kalshi_test_exchange_factory():
     def exchange_status():
         """Returns a dummy exchange status"""
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
+
+    @router.get(TRADES_URL)
+    def get_trades(
+        ticker: MarketTicker,
+        cursor: Cursor | None = None,
+        min_ts: datetime | None = None,
+        max_ts: datetime | None = None,
+        limit: int | None = None,
+    ):
+        """Returns trades for a specific market ticker"""
+        trades: List[Trade] = [
+            Trade(
+                count=Quantity(10),
+                # Note: the actual exchange has non-inclusive timestamps
+                created_time=min_ts or max_ts or datetime.now(),
+                no_price=Price(10),
+                yes_price=Price(90),
+                taker_side="yes",
+                ticker=ticker,
+                trade_id="some_id",
+            )
+            for _ in range(limit or 100)
+        ]
+        # We hardcode that there are 3 pages
+        if cursor is None:
+            return GetTradesResponse(
+                cursor=Cursor("1"),
+                trades=trades,
+            )
+        elif cursor == Cursor("1"):
+            return GetTradesResponse(
+                cursor=Cursor("2"),
+                trades=trades,
+            )
+        elif cursor == Cursor("2"):
+            return GetTradesResponse(
+                cursor=Cursor(""),
+                trades=trades,
+            )
 
     @router.get(MARKETS_URL + "/{ticker}")
     def get_market(ticker: MarketTicker):
@@ -282,7 +324,7 @@ def kalshi_test_exchange_factory():
     async def handle_unknown_channel(
         websocket: FastApiWebSocket, data: WebsocketRequest
     ):
-        """Sends message that we've foudn an unknown channel"""
+        """Sends message that we've found an unknown channel"""
         unknown_channel = ErrorWR(
             id=data.id,
             type=Type.ERROR,
