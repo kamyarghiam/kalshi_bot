@@ -102,6 +102,8 @@ class ExchangeInterface:
         min_ts: datetime | None = None,
         max_ts: datetime | None = None,
     ):
+        # TODO: add tests for this, use cursor, and create interface that
+        # seamlessly reads trades continiously without having to worry about api layer
         request = GetTradesRequest(
             ticker=ticker,
             min_ts=min_ts,
