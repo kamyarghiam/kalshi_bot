@@ -112,10 +112,10 @@ class Auth:
         if not (self._member_id and self._token and self._sign_in_time):
             return False
         now = datetime.now()
-        # We want the token to be less than 30 days old
-        thirty_days_ago = now - timedelta(days=30)
+        # We want the token to be less than 1 hour old
+        one_hour_ago = now - timedelta(hours=1)
         time_signed_in = typing.cast(datetime, self._sign_in_time)
-        return time_signed_in > thirty_days_ago
+        return time_signed_in > one_hour_ago
 
     def refresh(self, login_response: LogInResponse):
         self._member_id = login_response.member_id
