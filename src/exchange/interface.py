@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from time import sleep
 from types import TracebackType
 from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_args
@@ -6,7 +6,7 @@ from typing import ContextManager, Generator, List, TypeAlias, TypeGuard, get_ar
 from fastapi.testclient import TestClient
 
 from exchange.connection import Connection, Websocket
-from helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL
+from helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL, TRADE_URL
 from helpers.types.common import URL
 from helpers.types.exchange import ExchangeStatusResponse
 from helpers.types.markets import (
@@ -17,6 +17,7 @@ from helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
+from helpers.types.trades import GetTradesRequest, GetTradesResponse
 from helpers.types.websockets.common import (
     Command,
     CommandId,
@@ -95,6 +96,24 @@ class ExchangeInterface:
             )
         ).market
 
+    def get_trades(
+        self,
+        ticker: MarketTicker,
+        min_ts: datetime | None = None,
+        max_ts: datetime | None = None,
+    ):
+        request = GetTradesRequest(
+            ticker=ticker,
+            min_ts=min_ts,
+            max_ts=max_ts,
+        )
+        return GetTradesResponse.parse_obj(
+            self._connection.get(
+                url=TRADE_URL,
+                params=request.dict(exclude_none=True),
+            )
+        )
+
     ######## Helpers ############
 
     def _get_markets(self, request: GetMarketsRequest) -> GetMarketsResponse:
@@ -151,8 +170,7 @@ class OrderbookSubscription:
                 response = self._get_next_message()
             except WebsocketError as e:
                 print(
-                    f"Received {str(e)} at {str(datetime.datetime.now())}. "
-                    + "Reconnecting..."
+                    f"Received {str(e)} at {str(datetime.now())}. " + "Reconnecting..."
                 )
                 # This is a small hack to help test this code
                 # We mock out the sleep function so we can break out of the while loop
