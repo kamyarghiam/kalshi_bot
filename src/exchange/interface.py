@@ -17,7 +17,7 @@ from helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from helpers.types.trades import GetTradesRequest, GetTradesResponse
+from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 from helpers.types.websockets.common import (
     Command,
     CommandId,
@@ -101,20 +101,24 @@ class ExchangeInterface:
         ticker: MarketTicker,
         min_ts: datetime | None = None,
         max_ts: datetime | None = None,
-    ):
-        # TODO: add tests for this, use cursor, and create interface that
+    ) -> Generator[Trade, None, None]:
+        # TODO: add tests for this and create interface that
         # seamlessly reads trades continiously without having to worry about api layer
         request = GetTradesRequest(
             ticker=ticker,
             min_ts=min_ts,
             max_ts=max_ts,
         )
-        return GetTradesResponse.parse_obj(
-            self._connection.get(
-                url=TRADE_URL,
-                params=request.dict(exclude_none=True),
+        while True:
+            response = GetTradesResponse.parse_obj(
+                self._connection.get(
+                    url=TRADE_URL,
+                    params=request.dict(exclude_none=True),
+                )
             )
-        )
+            yield from response.trades
+            if response.has_empty_cursor():
+                break
 
     ######## Helpers ############
 

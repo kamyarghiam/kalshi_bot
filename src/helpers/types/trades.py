@@ -28,3 +28,7 @@ class Trade(ExternalApi):
 
 class GetTradesResponse(ExternalApi):
     trades: List[Trade]
+    cursor: Cursor
+
+    def has_empty_cursor(self) -> bool:
+        return len(self.cursor) == 0
