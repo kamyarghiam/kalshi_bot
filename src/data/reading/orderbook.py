@@ -81,7 +81,11 @@ def live_data_reader(
 
 # Currently pretty hard to test this
 def playback_orderbook(
-    ticker: MarketTicker, speed_multiplier: int = 1, depth: int = 10
+    ticker: MarketTicker,
+    speed_multiplier: int = 1,
+    depth: int = 10,
+    start_ts: datetime | None = None,
+    end_ts: datetime | None = None,
 ):  # pragma: no cover
     """Displays an orderbook changing over the course of time
 
@@ -101,7 +105,9 @@ def playback_orderbook(
 
     def generate_table(msg: Orderbook) -> Table:
         nonlocal db
-        table = Table(show_header=True, header_style="bold", title="Order Book")
+        table = Table(
+            show_header=True, header_style="bold", title=f"Order Book at {msg.ts}"
+        )
 
         table.add_column("Price", justify="right", style="cyan", width=12)
         table.add_column("Bid", justify="right", style="magenta", width=12)
@@ -148,7 +154,7 @@ def playback_orderbook(
 
         return table
 
-    db_reader = db.read(ticker)
+    db_reader = db.read(ticker, start_ts=start_ts, end_ts=end_ts)
     with Live(generate_table(next(db_reader)), refresh_per_second=100) as live:
         for msg in db_reader:
             live.update(generate_table(msg))
@@ -157,3 +163,7 @@ def playback_orderbook(
                 delta = max(0, (msg.ts - last_ts).total_seconds())
                 sleep(delta / speed_multiplier)
             last_ts = msg.ts
+
+
+# ticker = MarketTicker("INXD-23AUG31-B4537")
+# playback_orderbook(ticker, 1, 5, datetime(2023, 8, 31, 9, 32))
