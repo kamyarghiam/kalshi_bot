@@ -35,6 +35,11 @@ class Side(str, Enum):
     YES = "yes"
     NO = "no"
 
+    def get_other_side(self):
+        if self == Side.YES:
+            return Side.NO
+        return Side.YES
+
 
 class Trade(str, Enum):
     BUY = "buy"

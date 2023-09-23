@@ -13,10 +13,6 @@ if typing.TYPE_CHECKING:
     from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
-class EmptyOrderbookSideError(Exception):
-    """The orderbook side is empty"""
-
-
 @dataclass
 class OrderbookSide:
     """Represents levels on side of the order book (either the no side or yes side)
@@ -24,17 +20,19 @@ class OrderbookSide:
     We use a basemodel because this is used for type validation when
     we read an orderbook snapshot on the websocket layer."""
 
+    # TODO: make a level class variable so that we can return Level(Price, Quantity).
+    # or make it a named tuple
     levels: Dict[Price, Quantity] = field(default_factory=dict)
 
     def add_level(self, price: Price, quantity: Quantity):
         if price in self.levels:
             raise ValueError(
-                f"Price {price} to quntity {quantity} already exists in {self.levels}"
+                f"Price {price} to quantity {quantity} already exists in {self.levels}"
             )
         self.levels[price] = quantity
 
     def apply_delta(self, price: Price, delta: QuantityDelta):
-        """Destrucively applies an orderbook delta to the orderbook side"""
+        """Destructively applies an orderbook delta to the orderbook side"""
         if price not in self.levels:
             self.levels[price] = Quantity(0)
         self.levels[price] += delta
@@ -45,15 +43,15 @@ class OrderbookSide:
     def is_empty(self):
         return len(self.levels) == 0
 
-    def get_largest_price_level(self) -> Tuple[Price, Quantity]:
+    def get_largest_price_level(self) -> Tuple[Price, Quantity] | None:
         if self.is_empty():
-            raise EmptyOrderbookSideError("Empty levels")
+            return None
 
         return max(self.levels.items())
 
-    def get_smallest_price_level(self) -> Tuple[Price, Quantity]:
+    def get_smallest_price_level(self) -> Tuple[Price, Quantity] | None:
         if self.is_empty():
-            raise EmptyOrderbookSideError("Empty levels")
+            return None
 
         return min(self.levels.items())
 
@@ -61,7 +59,7 @@ class OrderbookSide:
         return Quantity(sum(quantity for quantity in self.levels.values()))
 
     def invert_prices(self) -> "OrderbookSide":
-        """Non-destructively inverts prices on orderboook side
+        """Non-destructively inverts prices on orderbook side
 
         Useful for changing the view of the orderbook"""
         inverted_levels: Dict[Price, Quantity] = {}
@@ -103,20 +101,22 @@ class Orderbook:
     def _is_valid_orderbook(self):
         """Checks to make sure the orderbook prices don't overlap"""
         if self.yes.is_empty() or self.no.is_empty():
-            # Vacously true
+            # Vacuously true
             return True
 
         if self.view == OrderbookView.BID:
-            yes_price, _ = self.yes.get_largest_price_level()
-            no_price, _ = self.no.get_largest_price_level()
-            # We do <= instead of < becasue there have been instances on the orderbook
+            # We know these won't be none because they are not empty from check above
+            yes_price, _ = self.yes.get_largest_price_level()  # type:ignore[misc]
+            no_price, _ = self.no.get_largest_price_level()  # type:ignore[misc]
+            # We do <= instead of < because there have been instances on the orderbook
             # where we saw that the orders summed to 100, even though this shouldn't
             # be possible
             return yes_price + no_price <= Cents(100)
         else:
             assert self.view == OrderbookView.ASK
-            yes_price, _ = self.yes.get_smallest_price_level()
-            no_price, _ = self.no.get_smallest_price_level()
+            # We know these won't be none because they are not empty from check above
+            yes_price, _ = self.yes.get_smallest_price_level()  # type:ignore[misc]
+            no_price, _ = self.no.get_smallest_price_level()  # type:ignore[misc]
             # Ditto on equality, see comment above
             return yes_price + no_price >= Cents(100)
 
@@ -149,6 +149,22 @@ class Orderbook:
         assert side == Side.YES
         return self.yes
 
+    def get_bbo(
+        self,
+    ) -> Tuple[Tuple[Price, Quantity] | None, Tuple[Price, Quantity] | None]:
+        """Returns tuple of bid and ask at bbo yes side, if it exists"""
+        ob = self.get_view(OrderbookView.BID)
+        bid = ob.yes.get_largest_price_level()
+
+        ask = ob.no.get_largest_price_level()
+        if ask is not None:
+            # Need to take opposite price
+            ask_price, ask_quantity = ask
+            ask_price = get_opposite_side_price(ask_price)
+            ask = (ask_price, ask_quantity)
+
+        return (bid, ask)
+
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):
         yes = OrderbookSide()
@@ -176,14 +192,14 @@ class Orderbook:
             view=view,
         )
 
-    def _get_small_price_level(self, side) -> Tuple[Price, Quantity]:
+    def _get_small_price_level(self, side) -> Tuple[Price, Quantity] | None:
         if side == Side.NO:
             return self.no.get_smallest_price_level()
         else:
             assert side == Side.YES
             return self.yes.get_smallest_price_level()
 
-    def _get_largest_price_level(self, side) -> Tuple[Price, Quantity]:
+    def _get_largest_price_level(self, side) -> Tuple[Price, Quantity] | None:
         if side == Side.NO:
             return self.no.get_largest_price_level()
         else:
@@ -194,15 +210,14 @@ class Orderbook:
         """Spits out an order that would buy at the best price"""
         ob = self.get_view(OrderbookView.ASK)
 
-        try:
-            price, quantity = ob._get_small_price_level(side)
-        except EmptyOrderbookSideError:
+        bbo = ob._get_small_price_level(side)
+        if bbo is None:
             return None
         return Order(
             ticker=ob.market_ticker,
             side=side,
-            price=price,
-            quantity=quantity,
+            price=bbo[0],
+            quantity=bbo[1],
             trade=Trade.BUY,
         )
 
@@ -210,14 +225,15 @@ class Orderbook:
         """Spits out an order that would sell at the best price"""
         ob = self.get_view(OrderbookView.BID)
 
-        try:
-            price, quantity = ob._get_largest_price_level(side)
-        except EmptyOrderbookSideError:
+        bbo = ob._get_largest_price_level(side)
+
+        if bbo is None:
             return None
+
         return Order(
             ticker=ob.market_ticker,
             side=side,
-            price=price,
-            quantity=quantity,
+            price=bbo[0],
+            quantity=bbo[1],
             trade=Trade.SELL,
         )

@@ -9,7 +9,7 @@ from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface, OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import EmptyOrderbookSideError, Orderbook, OrderbookView
+from helpers.types.orderbook import Orderbook, OrderbookView
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
@@ -110,19 +110,21 @@ def playback_orderbook(
         bid = msg.get_view(OrderbookView.BID)
         ask = msg.get_view(OrderbookView.ASK)
 
-        try:
-            best_bid, _ = bid.yes.get_largest_price_level()
-            best_bid_exists = True
-        except EmptyOrderbookSideError:
+        bbo = bid.yes.get_largest_price_level()
+        if bbo is None:
             best_bid = Price(50)
             best_bid_exists = False
+        else:
+            best_bid = bbo[0]
+            best_bid_exists = True
 
-        try:
-            best_ask, _ = ask.yes.get_smallest_price_level()
-            best_ask_exists = True
-        except EmptyOrderbookSideError:
-            best_ask_exists = False
+        bbo = ask.yes.get_smallest_price_level()
+        if bbo is None:
             best_ask = Price(50)
+            best_ask_exists = False
+        else:
+            best_ask = bbo[0]
+            best_ask_exists = True
 
         for price in range(min(99, best_ask + depth), max(0, best_bid - depth), -1):
             bid_quantity = bid.yes.levels.get(Price(price), 0)

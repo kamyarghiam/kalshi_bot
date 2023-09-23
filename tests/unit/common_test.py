@@ -5,7 +5,7 @@ from mock import MagicMock, patch
 
 from helpers.types.common import URL, NonNullStr
 from helpers.types.money import Balance, Cents, Dollars, Price
-from helpers.types.orders import Quantity, compute_fee
+from helpers.types.orders import Quantity, Side, compute_fee
 from helpers.utils import PendingMessages, compute_pnl, send_alert_email
 
 
@@ -136,3 +136,10 @@ def test_send_email_alert():
         send_alert_email("test_message")
         mock_SMTP.starttls.assert_called_once_with()
         mock_SMTP.login.assert_called_once()
+
+
+def test_get_other_side():
+    yes = Side.YES
+    assert yes.get_other_side() == Side.NO
+    no = Side.NO
+    assert no.get_other_side() == Side.YES

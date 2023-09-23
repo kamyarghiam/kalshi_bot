@@ -6,12 +6,7 @@ import pytest
 from data.collection.orderbook import generate_table
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import (
-    EmptyOrderbookSideError,
-    Orderbook,
-    OrderbookSide,
-    OrderbookView,
-)
+from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
@@ -228,9 +223,7 @@ def test_apply_delta_on_bid_view():
 def test_get_largest_price_level():
     book = OrderbookSide()
 
-    with pytest.raises(EmptyOrderbookSideError):
-        # Book is empty
-        book.get_largest_price_level()
+    assert book.get_largest_price_level() is None
 
     book.add_level(Price(10), Quantity(1))
     book.add_level(Price(12), Quantity(2))
@@ -244,9 +237,7 @@ def test_get_largest_price_level():
 def test_get_smallest_price_level():
     book = OrderbookSide()
 
-    with pytest.raises(EmptyOrderbookSideError):
-        # Book is empty
-        book.get_smallest_price_level()
+    assert book.get_smallest_price_level() is None
 
     book.add_level(Price(10), Quantity(1))
     book.add_level(Price(12), Quantity(2))
@@ -535,3 +526,15 @@ def test_generate_table():
     assert table.columns[0]._cells == ["50"]
     assert table.columns[1].header == "Delta msgs"
     assert table.columns[1]._cells == ["10"]
+
+
+def test_get_bbo():
+    o = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(90): Quantity(10), Price(89): Quantity(100)}),
+        no=OrderbookSide(levels={Price(5): Quantity(20), Price(6): Quantity(50)}),
+    )
+    bid, ask = o.get_bbo()
+
+    assert bid == (Price(90), Quantity(10))
+    assert ask == (Price(94), Quantity(50))
