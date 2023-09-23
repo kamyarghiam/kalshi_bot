@@ -7,7 +7,7 @@ from exchange.interface import ExchangeInterface
 from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide
-from helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
+from helpers.types.orders import Order, Quantity, Side, TradeType, compute_fee
 from helpers.types.portfolio import Portfolio, PortfolioError, Position
 from tests.fake_exchange import Price
 from tests.utils import almost_equal
@@ -20,7 +20,7 @@ def test_empty_position():
             price=Price(10),
             quantity=Quantity(10),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     assert not position.is_empty()
@@ -31,7 +31,7 @@ def test_empty_position():
             price=Price(10),
             quantity=Quantity(10),
             side=Side.NO,
-            trade=Trade.SELL,
+            trade=TradeType.SELL,
         )
     )
 
@@ -44,21 +44,21 @@ def test_add_remove_get_value_positions():
         side=Side.NO,
         price=Price(5),
         quantity=Quantity(100),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     order2 = Order(
         ticker=MarketTicker("ticker"),
         side=Side.NO,
         price=Price(10),
         quantity=Quantity(150),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     order3 = Order(
         ticker=MarketTicker("ticker"),
         side=Side.NO,
         price=Price(15),
         quantity=Quantity(200),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     position = Position(order1)
     position.buy(order2)
@@ -70,7 +70,7 @@ def test_add_remove_get_value_positions():
         side=Side.NO,
         price=Price(20),
         quantity=Quantity(300),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     position.buy(order4)
 
@@ -92,7 +92,7 @@ def test_add_remove_get_value_positions():
         side=Side.NO,
         price=Price(30),
         quantity=Quantity(751),  # too much
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
     with pytest.raises(ValueError):
         position.sell(sell_order)
@@ -166,7 +166,7 @@ def test_add_duplicate_price_point():
             price=Price(10),
             quantity=Quantity(30),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     position.buy(
@@ -175,7 +175,7 @@ def test_add_duplicate_price_point():
             price=Price(10),
             quantity=Quantity(40),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     assert position.prices == [Price(10)]
@@ -187,7 +187,7 @@ def test_add_duplicate_price_point():
             price=Price(10),
             quantity=Quantity(50),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     assert position.prices == [Price(10)]
@@ -202,7 +202,7 @@ def test_portfolio_buy():
             price=Price(5),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
@@ -214,7 +214,7 @@ def test_portfolio_buy():
             price=Price(10),
             quantity=Quantity(10),
             side=Side.YES,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     fees_paid += compute_fee(Price(10), Quantity(10))
@@ -226,7 +226,7 @@ def test_portfolio_buy():
             price=Price(15),
             quantity=Quantity(5),
             side=Side.YES,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     fees_paid += compute_fee(Price(15), Quantity(5))
@@ -241,7 +241,7 @@ def test_portfolio_buy():
             price=Price(20),
             quantity=Quantity(25),
             side=Side.YES,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     fees_paid += compute_fee(Price(20), Quantity(25))
@@ -261,7 +261,7 @@ def test_portfolio_buy():
                 price=Price(20),
                 quantity=Quantity(50000),
                 side=Side.YES,
-                trade=Trade.BUY,
+                trade=TradeType.BUY,
             )
         )
     money_remaining = portfolio._cash_balance._balance
@@ -274,7 +274,7 @@ def test_portfolio_buy():
             price=Price(1),
             quantity=Quantity(money_remaining - 250),  # subtract some fee
             side=Side.YES,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
 
@@ -286,7 +286,7 @@ def test_portfolio_buy():
                 price=Price(1),
                 quantity=Quantity(money_remaining + 1),
                 side=Side.YES,
-                trade=Trade.BUY,
+                trade=TradeType.BUY,
             )
         )
 
@@ -300,7 +300,7 @@ def test_portfolio_sell():
             price=Price(5),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
@@ -316,7 +316,7 @@ def test_portfolio_sell():
                 price=Price(5),
                 quantity=Quantity(100),
                 side=Side.NO,
-                trade=Trade.SELL,
+                trade=TradeType.SELL,
             )
         )
     # Wrong side
@@ -327,7 +327,7 @@ def test_portfolio_sell():
                 price=Price(5),
                 quantity=Quantity(100),
                 side=Side.YES,
-                trade=Trade.SELL,
+                trade=TradeType.SELL,
             )
         )
 
@@ -337,7 +337,7 @@ def test_portfolio_sell():
             price=Price(6),
             quantity=Quantity(50),
             side=Side.NO,
-            trade=Trade.SELL,
+            trade=TradeType.SELL,
         )
     )
     buy_fee = (50 / 100) * compute_fee(Price(5), Quantity(100))
@@ -357,7 +357,7 @@ def test_portfolio_sell():
                 price=Price(3),
                 quantity=Quantity(100),  # More than what's available
                 side=Side.NO,
-                trade=Trade.SELL,
+                trade=TradeType.SELL,
             )
         )
     # Sell exactly what's available
@@ -369,7 +369,7 @@ def test_portfolio_sell():
             price=Price(3),
             quantity=position.total_quantity,
             side=Side.NO,
-            trade=Trade.SELL,
+            trade=TradeType.SELL,
         )
     )
     buy_fee = (50 / 100) * compute_fee(Price(5), Quantity(100))
@@ -393,7 +393,7 @@ def test_find_sell_opportunites():
             price=Price(5),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     portfolio.buy(
@@ -402,7 +402,7 @@ def test_find_sell_opportunites():
             price=Price(6),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     portfolio.buy(
@@ -411,7 +411,7 @@ def test_find_sell_opportunites():
             price=Price(10),
             quantity=Quantity(10),
             side=Side.YES,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
 
@@ -423,7 +423,7 @@ def test_find_sell_opportunites():
                 price=Price(6),
                 quantity=Quantity(100),
                 side=Side.YES,
-                trade=Trade.BUY,
+                trade=TradeType.BUY,
             )
         )
 
@@ -467,7 +467,7 @@ def test_save_load(tmp_path):
             price=Price(5),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     portfolio.buy(
@@ -476,7 +476,7 @@ def test_save_load(tmp_path):
             price=Price(6),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     portfolio.buy(
@@ -485,7 +485,7 @@ def test_save_load(tmp_path):
             price=Price(10),
             quantity=Quantity(10),
             side=Side.YES,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     assert not Portfolio.saved_portfolio_exists(tmp_path)
@@ -502,24 +502,24 @@ def test_position_error_scenarios():
         side=Side.NO,
         price=Price(10),
         quantity=Quantity(50),
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
     with pytest.raises(ValueError) as err:
         Position(order)
     assert err.match("Order must be a buy order to open a new position")
 
-    order.trade = Trade.BUY
+    order.trade = TradeType.BUY
     position = Position(order)
 
     bad_order = copy.deepcopy(order)
-    bad_order.trade = Trade.SELL
+    bad_order.trade = TradeType.SELL
 
     with pytest.raises(ValueError) as err:
         position.buy(bad_order)
     assert err.match("Not a buy order: .*")
 
     # Make order trade good
-    bad_order.trade = Trade.BUY
+    bad_order.trade = TradeType.BUY
     # Make order side bad
     bad_order.side = Side.YES
 
@@ -543,14 +543,14 @@ def test_position_error_scenarios():
     # Make order ticker good
     bad_order.ticker = order.ticker
     # Make order trade bad
-    bad_order.trade = Trade.BUY
+    bad_order.trade = TradeType.BUY
 
     with pytest.raises(ValueError) as err:
         position.sell(bad_order)
     assert err.match("Not a buy order: .*")
 
     # Make order trade bad
-    bad_order.trade = Trade.SELL
+    bad_order.trade = TradeType.SELL
     # Make side bad
     bad_order.side = Side.YES
 
@@ -579,7 +579,7 @@ def test_position_print():
             price=Price(10),
             quantity=Quantity(10),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     position.buy(
@@ -588,7 +588,7 @@ def test_position_print():
             price=Price(15),
             quantity=Quantity(20),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     assert str(position) == "hi: NO | 10 @ 10¢ | 20 @ 15¢"
@@ -602,7 +602,7 @@ def test_potfolio_print():
             price=Price(5),
             quantity=Quantity(100),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     portfolio.buy(
@@ -611,7 +611,7 @@ def test_potfolio_print():
             price=Price(6),
             quantity=Quantity(200),
             side=Side.NO,
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
     )
     portfolio.sell(
@@ -620,7 +620,7 @@ def test_potfolio_print():
             price=Price(5),
             quantity=Quantity(150),
             side=Side.NO,
-            trade=Trade.SELL,
+            trade=TradeType.SELL,
         )
     )
 
@@ -646,7 +646,7 @@ def test_get_unrealized_pnl():
         Order(
             price=Price(10),
             quantity=Quantity(100),
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
             ticker=MarketTicker("determined_profit"),
             side=Side.NO,
         )
@@ -655,7 +655,7 @@ def test_get_unrealized_pnl():
         Order(
             price=Price(5),
             quantity=Quantity(1000),
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
             ticker=MarketTicker("determined_loss"),
             side=Side.NO,
         )
@@ -664,7 +664,7 @@ def test_get_unrealized_pnl():
         Order(
             price=Price(10),
             quantity=Quantity(1000),
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
             ticker=MarketTicker("not_determined"),
             side=Side.NO,
         )

@@ -7,7 +7,7 @@ from typing import Generic, Iterable, Iterator, TypeVar
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orders import Order, Quantity, Side, Trade
+from helpers.types.orders import Order, Quantity, Side, TradeType
 
 T = TypeVar("T")
 
@@ -54,7 +54,7 @@ class Printable(Generic[P]):
 def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):
     """Computes pnl after fees"""
     # Ticker and side don't matter
-    buy_order = Order(buy_price, quantity, Trade.BUY, MarketTicker(""), Side.YES)
+    buy_order = Order(buy_price, quantity, TradeType.BUY, MarketTicker(""), Side.YES)
     return buy_order.get_predicted_pnl(sell_price)
 
 

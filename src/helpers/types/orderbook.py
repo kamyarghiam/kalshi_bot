@@ -7,7 +7,7 @@ from typing import Dict, Tuple
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
-from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
+from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 
 if typing.TYPE_CHECKING:
     from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
@@ -21,7 +21,7 @@ class OrderbookSide:
     we read an orderbook snapshot on the websocket layer."""
 
     # TODO: make a level class variable so that we can return Level(Price, Quantity).
-    # or make it a named tuple
+    # or make it a named tuple. Also make the representation more compact
     levels: Dict[Price, Quantity] = field(default_factory=dict)
 
     def add_level(self, price: Price, quantity: Quantity):
@@ -218,7 +218,7 @@ class Orderbook:
             side=side,
             price=bbo[0],
             quantity=bbo[1],
-            trade=Trade.BUY,
+            trade=TradeType.BUY,
         )
 
     def sell_order(self, side: Side) -> Order | None:
@@ -235,5 +235,5 @@ class Orderbook:
             side=side,
             price=bbo[0],
             quantity=bbo[1],
-            trade=Trade.SELL,
+            trade=TradeType.SELL,
         )

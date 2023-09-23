@@ -2,7 +2,7 @@ import pytest
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price
-from helpers.types.orders import Order, Quantity, Side, Trade, compute_fee
+from helpers.types.orders import Order, Quantity, Side, TradeType, compute_fee
 
 
 def test_order_str():
@@ -11,7 +11,7 @@ def test_order_str():
         side=Side.NO,
         price=Price(15),
         quantity=Quantity(200),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     assert str(o) == "Ticker: Bought NO | 200 @ 15¢"
 
@@ -22,7 +22,7 @@ def test_order_cost_and_revenue():
         price=Price(5),
         quantity=Quantity(100),
         side=Side.NO,
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
 
     assert o.cost == Cents(500)
@@ -37,7 +37,7 @@ def test_order_cost_and_revenue():
         price=Price(6),
         quantity=Quantity(200),
         side=Side.NO,
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
 
     assert o.revenue == Cents(1200)
@@ -54,7 +54,7 @@ def test_order_get_predicted_pnl():
         price=Price(5),
         quantity=Quantity(100),
         side=Side.NO,
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     assert o.get_predicted_pnl(sell_price=Price(6)) == Cents(100) - compute_fee(
         Price(5), Quantity(100)
@@ -65,7 +65,7 @@ def test_order_get_predicted_pnl():
         price=Price(10),
         quantity=Quantity(200),
         side=Side.NO,
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     assert o.get_predicted_pnl(sell_price=Price(1)) == Cents(-1800) - compute_fee(
         Price(10), Quantity(200)
@@ -77,7 +77,7 @@ def test_order_get_predicted_pnl():
         price=Price(10),
         quantity=Quantity(200),
         side=Side.NO,
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
     with pytest.raises(ValueError) as err:
         o.get_predicted_pnl(Price(10))

@@ -7,7 +7,7 @@ from data.collection.orderbook import generate_table
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView
-from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
+from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
 
@@ -329,14 +329,14 @@ def test_buy_order():
         side=Side.YES,
         price=Price(5),
         quantity=Quantity(500),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     assert sell_book.buy_order(Side.NO) == Order(
         ticker=sell_book.market_ticker,
         side=Side.NO,
         price=Price(98),
         quantity=Quantity(100),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
 
     buy_book = sell_book.get_view(OrderbookView.ASK)
@@ -345,14 +345,14 @@ def test_buy_order():
         side=Side.YES,
         price=Price(5),
         quantity=Quantity(500),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
     assert buy_book.buy_order(Side.NO) == Order(
         ticker=buy_book.market_ticker,
         side=Side.NO,
         price=Price(98),
         quantity=Quantity(100),
-        trade=Trade.BUY,
+        trade=TradeType.BUY,
     )
 
 
@@ -374,14 +374,14 @@ def test_sell_order():
         side=Side.YES,
         price=Price(2),
         quantity=Quantity(100),
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
     assert sell_book.sell_order(Side.NO) == Order(
         ticker=sell_book.market_ticker,
         side=Side.NO,
         price=Price(95),
         quantity=Quantity(500),
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
 
     buy_book = sell_book.get_view(OrderbookView.ASK)
@@ -390,14 +390,14 @@ def test_sell_order():
         side=Side.YES,
         price=Price(2),
         quantity=Quantity(100),
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
     assert buy_book.sell_order(Side.NO) == Order(
         ticker=buy_book.market_ticker,
         side=Side.NO,
         price=Price(95),
         quantity=Quantity(500),
-        trade=Trade.SELL,
+        trade=TradeType.SELL,
     )
 
 

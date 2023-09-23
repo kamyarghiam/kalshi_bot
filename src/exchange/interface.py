@@ -17,7 +17,7 @@ from helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
+from helpers.types.trades import ExternalTrade, GetTradesRequest, GetTradesResponse
 from helpers.types.websockets.common import (
     Command,
     CommandId,
@@ -101,7 +101,7 @@ class ExchangeInterface:
         min_ts: datetime | None = None,
         max_ts: datetime | None = None,
         limit: int | None = None,
-    ) -> Generator[Trade, None, None]:
+    ) -> Generator[ExternalTrade, None, None]:
         """Get trades for a market
 
         Each call to next on this generator lets you get the next trade. You don't

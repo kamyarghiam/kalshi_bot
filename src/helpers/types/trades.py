@@ -15,7 +15,7 @@ class GetTradesRequest(ExternalApi):
     limit: int | None = None
 
 
-class Trade(ExternalApi):
+class ExternalTrade(ExternalApi):
     count: Quantity
     created_time: datetime
     no_price: Price
@@ -27,7 +27,7 @@ class Trade(ExternalApi):
 
 
 class GetTradesResponse(ExternalApi):
-    trades: List[Trade]
+    trades: List[ExternalTrade]
     cursor: Cursor
 
     def has_empty_cursor(self) -> bool:

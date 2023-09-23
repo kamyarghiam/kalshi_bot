@@ -41,7 +41,7 @@ class Side(str, Enum):
         return Side.YES
 
 
-class Trade(str, Enum):
+class TradeType(str, Enum):
     BUY = "buy"
     SELL = "sell"
 
@@ -56,7 +56,7 @@ def compute_fee(price: Price, quantity: Quantity) -> Cents:
 class Order:
     price: Price
     quantity: Quantity
-    trade: Trade
+    trade: TradeType
     ticker: MarketTicker
     side: Side
     # Cached items
@@ -71,7 +71,7 @@ class Order:
 
     @property
     def cost(self) -> Cents:
-        if self.trade != Trade.BUY:
+        if self.trade != TradeType.BUY:
             raise ValueError("Cost only applies on buys")
         if self._price_times_quantity is None:
             self._price_times_quantity = Cents(self.price * self.quantity)
@@ -79,7 +79,7 @@ class Order:
 
     @property
     def revenue(self) -> Cents:
-        if self.trade != Trade.SELL:
+        if self.trade != TradeType.SELL:
             raise ValueError("Revenue only applies on sells")
         if self._price_times_quantity is None:
             self._price_times_quantity = Cents(self.price * self.quantity)
@@ -87,16 +87,16 @@ class Order:
 
     def get_predicted_pnl(self, sell_price: Price) -> Cents:
         """Given the sell price, gets you the pnl after fees"""
-        if self.trade != Trade.BUY:
+        if self.trade != TradeType.BUY:
             raise ValueError("Order must be a buy order")
         sell_order = copy.deepcopy(self)
         sell_order.price = sell_price
-        sell_order.trade = Trade.SELL
+        sell_order.trade = TradeType.SELL
 
         return sell_order.revenue - self.cost - sell_order.fee - self.fee
 
     def __str__(self):
         return (
-            f"{self.ticker}: {'Bought' if self.trade == Trade.BUY else 'Sold'} "
+            f"{self.ticker}: {'Bought' if self.trade == TradeType.BUY else 'Sold'} "
             + f"{self.side.name} | {self.quantity} @ {self.price}"
         )

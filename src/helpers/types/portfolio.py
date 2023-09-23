@@ -6,12 +6,12 @@ from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orderbook import Orderbook
-from helpers.types.orders import Order, Quantity, QuantityDelta, Side, Trade
+from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 
 
 class Position:
     def __init__(self, order: Order):
-        if order.trade != Trade.BUY:
+        if order.trade != TradeType.BUY:
             raise ValueError("Order must be a buy order to open a new position")
         self.ticker = order.ticker
         # We can be holding a position at several different price points
@@ -37,7 +37,7 @@ class Position:
     def buy(self, order: Order):
         """Adds a new price point for this position"""
         assert len(self.prices) == len(self.quantities)
-        if order.trade != Trade.BUY:
+        if order.trade != TradeType.BUY:
             raise ValueError(f"Not a buy order: {order}")
         if self.side != order.side:
             raise ValueError(
@@ -65,7 +65,7 @@ class Position:
         :param bool for_info: if true, does not actually sell the position. Only
         provides info about what the position would do
         """
-        if order.trade != Trade.SELL:
+        if order.trade != TradeType.SELL:
             raise ValueError(f"Not a buy order: {order}")
         if self.side != order.side:
             raise ValueError(
@@ -169,7 +169,7 @@ class Portfolio:
                         ticker=market.ticker,
                         price=market.last_price,
                         quantity=position.total_quantity,
-                        trade=Trade.SELL,
+                        trade=TradeType.SELL,
                         side=position.side,
                     ),
                     for_info=True,

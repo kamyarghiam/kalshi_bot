@@ -39,7 +39,7 @@ from helpers.types.markets import (
 )
 from helpers.types.money import Price
 from helpers.types.orders import Quantity, QuantityDelta, Side
-from helpers.types.trades import GetTradesResponse, Trade
+from helpers.types.trades import ExternalTrade, GetTradesResponse
 from helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from helpers.types.websockets.request import (
     Channel,
@@ -123,8 +123,8 @@ def kalshi_test_exchange_factory():
         limit: int | None = None,
     ):
         """Returns trades for a specific market ticker"""
-        trades: List[Trade] = [
-            Trade(
+        trades: List[ExternalTrade] = [
+            ExternalTrade(
                 count=Quantity(10),
                 # Note: the actual exchange has non-inclusive timestamps
                 created_time=min_ts or max_ts or datetime.now(),
