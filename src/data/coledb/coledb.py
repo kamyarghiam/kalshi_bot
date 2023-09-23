@@ -64,7 +64,10 @@ from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapsho
 class ColeDBMetadata:
     """This class defines the metadata file that exists in all the
     market data folders. This file is used to discover the location
-    of deltas and snapshots
+    of deltas and snapshots.
+
+    WARNING: be careful when editing this class because it is pickled
+    so your changes my not be backwards compatible.
 
     path: path to the metadata file
     chunk_first_time_stamps: the starting timestamp of each chunk

@@ -1,11 +1,14 @@
 import random
+from datetime import datetime
 
 import pytest
 from mock import MagicMock, patch
 
 from helpers.types.common import URL, NonNullStr
+from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orders import Quantity, Side, compute_fee
+from helpers.types.trades import ExternalTrade
 from helpers.utils import PendingMessages, compute_pnl, send_alert_email
 
 
@@ -143,3 +146,24 @@ def test_get_other_side():
     assert yes.get_other_side() == Side.NO
     no = Side.NO
     assert no.get_other_side() == Side.YES
+
+
+def test_to_internal_trade():
+    trade = ExternalTrade(
+        count=Quantity(10),
+        created_time=datetime.now(),
+        no_price=Price(10),
+        yes_price=Price(20),
+        taker_side=Side.NO,
+        ticker=MarketTicker("some_ticker"),
+        trade_id="SOME_ID",
+    )
+
+    internal_trade = trade.to_internal_trade()
+
+    assert trade.count == internal_trade.count
+    assert trade.created_time == internal_trade.created_time
+    assert trade.no_price == internal_trade.no_price
+    assert trade.yes_price == internal_trade.yes_price
+    assert trade.taker_side == internal_trade.taker_side
+    assert trade.ticker == internal_trade.ticker

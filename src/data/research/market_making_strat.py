@@ -3,7 +3,7 @@ from typing import Generator
 from exchange.interface import ExchangeInterface, MarketTicker
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
-from helpers.types.trades import ExternalTrade
+from helpers.types.trades import Trade
 from tests.conftest import ColeDBInterface
 
 
@@ -19,11 +19,11 @@ def market_making_profit(exchange_interface: ExchangeInterface):
 
 def strategy(
     orderbook_reader: Generator[Orderbook, None, None],
-    trade_reader: Generator[ExternalTrade, None, None],
+    trade_reader: Generator[Trade, None, None],
 ) -> Cents:
     # Top orderbook and trade
     orderbook: Orderbook | None = None
-    trade: ExternalTrade | None = None
+    trade: Trade | None = None
     while True:
         try:
             # Only update if it's not None

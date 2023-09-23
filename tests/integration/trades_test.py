@@ -2,6 +2,9 @@ import pytest
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
+from helpers.types.orders import Quantity, Side
+from helpers.types.trades import Trade
 
 
 def test_get_trades(exchange_interface: ExchangeInterface):
@@ -12,4 +15,12 @@ def test_get_trades(exchange_interface: ExchangeInterface):
             assert next(trades).ticker == ticker
     else:
         for trade in trades:
-            assert trade.ticker == ticker
+            # From fake exchange
+            assert trade == Trade(
+                count=Quantity(10),
+                no_price=Price(10),
+                yes_price=Price(90),
+                taker_side=Side.YES,
+                ticker=ticker,
+                created_time=trade.created_time,
+            )

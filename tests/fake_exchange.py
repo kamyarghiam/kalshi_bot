@@ -130,7 +130,7 @@ def kalshi_test_exchange_factory():
                 created_time=min_ts or max_ts or datetime.now(),
                 no_price=Price(10),
                 yes_price=Price(90),
-                taker_side="yes",
+                taker_side=Side.YES,
                 ticker=ticker,
                 trade_id="some_id",
             )

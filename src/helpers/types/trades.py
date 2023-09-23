@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
@@ -5,6 +6,7 @@ from exchange.interface import MarketTicker
 from helpers.types.api import Cursor, ExternalApi
 from helpers.types.money import Price
 from helpers.types.orders import Quantity
+from helpers.utils import Side
 
 
 class GetTradesRequest(ExternalApi):
@@ -16,14 +18,25 @@ class GetTradesRequest(ExternalApi):
 
 
 class ExternalTrade(ExternalApi):
+    """External trade for the api. Don't use this for internal computation"""
+
     count: Quantity
     created_time: datetime
     no_price: Price
     yes_price: Price
-    # Side for the taker of this trade. Either yes or no
-    taker_side: str
+    taker_side: Side
     ticker: MarketTicker
     trade_id: str
+
+    def to_internal_trade(self):
+        return Trade(
+            count=self.count,
+            created_time=self.created_time,
+            no_price=self.no_price,
+            yes_price=self.yes_price,
+            taker_side=self.taker_side,
+            ticker=self.ticker,
+        )
 
 
 class GetTradesResponse(ExternalApi):
@@ -32,3 +45,15 @@ class GetTradesResponse(ExternalApi):
 
     def has_empty_cursor(self) -> bool:
         return len(self.cursor) == 0
+
+
+@dataclass
+class Trade:
+    """Trade data used for internal computation"""
+
+    count: Quantity
+    created_time: datetime
+    no_price: Price
+    yes_price: Price
+    taker_side: Side
+    ticker: MarketTicker
