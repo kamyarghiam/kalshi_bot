@@ -38,6 +38,8 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
     num_snapshot_msgs = 0
     num_delta_msgs = 0
 
+    last_update_time = datetime.now()
+
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, market_tickers)
         gen = sub.continuous_receive()
@@ -57,6 +59,13 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
                 if is_test_run and num_snapshot_msgs + num_delta_msgs == 3:
                     # For testing, we don't want to run it too many times
                     break
+                # We need to update market tickers every day. Otherwise, we miss tickers
+                # Kinda hacky because it triggers on orderbook updates
+                if (now := datetime.now()) - last_update_time > timedelta(hours=24):
+                    open_markets = exchange_interface.get_active_markets(pages=pages)
+                    market_tickers = [market.ticker for market in open_markets]
+                    sub.update_subscription(market_tickers)
+                    last_update_time = now
 
 
 def retry_collect_orderbook_data(exchange_interface: ExchangeInterface):
