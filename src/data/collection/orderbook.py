@@ -39,6 +39,8 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
     num_delta_msgs = 0
 
     last_update_time = datetime.now()
+    time_5pm = 17
+    time_5am = 5
 
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, market_tickers)
@@ -63,7 +65,9 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
                 # Kinda hacky because it triggers on orderbook updates
                 # Also hacky because this update can happen during the day, which adds
                 # lag on timestamps
-                if (now := datetime.now()) - last_update_time > timedelta(hours=8):
+                if (now := datetime.now()) - last_update_time > timedelta(hours=8) and (
+                    time_5pm <= now.hour or now.hour <= time_5am
+                ):
                     open_markets = exchange_interface.get_active_markets(pages=pages)
                     market_tickers = [market.ticker for market in open_markets]
                     sub.update_subscription(market_tickers)
