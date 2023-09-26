@@ -146,8 +146,12 @@ class UnsubscribedWR(WebsocketResponse):
     sid: SubscriptionId
 
 
+class SubscriptionUpdatedRM(ResponseMessage):
+    market_tickers: List[MarketTicker]
+
+
 class SubscriptionUpdatedWR(WebsocketResponse):
     id: CommandId
     sid: SubscriptionId
     seq: SeqId
-    market_tickers: List[MarketTicker]
+    msg: SubscriptionUpdatedRM

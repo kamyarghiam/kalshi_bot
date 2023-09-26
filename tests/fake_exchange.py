@@ -59,6 +59,7 @@ from helpers.types.websockets.response import (
     OrderbookSnapshotWR,
     SubscribedRM,
     SubscribedWR,
+    SubscriptionUpdatedRM,
     SubscriptionUpdatedWR,
     UnsubscribedWR,
 )
@@ -317,7 +318,9 @@ def kalshi_test_exchange_factory():
                 sid=data.params.sid,
                 seq=SeqId(123),  # purposefully send bad seq id
                 type=Type.SUBSCRIPTION_UPDATED,
-                market_tickers=storage.subscribed_markets[data.params.sid],
+                msg=SubscriptionUpdatedRM(
+                    market_tickers=storage.subscribed_markets[data.params.sid],
+                ),
             ).json()
         )
 
