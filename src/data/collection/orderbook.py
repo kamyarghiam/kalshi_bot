@@ -61,6 +61,8 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
                     break
                 # We need to update market tickers every day. Otherwise, we miss tickers
                 # Kinda hacky because it triggers on orderbook updates
+                # Also hacky because this update can happen during the day, which adds
+                # lag on timestamps
                 if (now := datetime.now()) - last_update_time > timedelta(hours=24):
                     open_markets = exchange_interface.get_active_markets(pages=pages)
                     market_tickers = [market.ticker for market in open_markets]
