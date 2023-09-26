@@ -63,7 +63,7 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
                 # Kinda hacky because it triggers on orderbook updates
                 # Also hacky because this update can happen during the day, which adds
                 # lag on timestamps
-                if (now := datetime.now()) - last_update_time > timedelta(hours=24):
+                if (now := datetime.now()) - last_update_time > timedelta(hours=8):
                     open_markets = exchange_interface.get_active_markets(pages=pages)
                     market_tickers = [market.ticker for market in open_markets]
                     sub.update_subscription(market_tickers)
