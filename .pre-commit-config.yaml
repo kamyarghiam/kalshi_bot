@@ -50,8 +50,8 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: venv/bin/pytest
-        language: script
+        entry: pytest
+        language: python_venv
         pass_filenames: false
         always_run: true
         args: ["-n", "auto"]

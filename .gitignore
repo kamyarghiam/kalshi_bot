@@ -5,3 +5,4 @@
 .DS_Store
 # Don't want to store actual data in github
 /src/data/coledb/storage/*
+/scripts/*
