@@ -13,7 +13,7 @@ readme = "README.md"
 packages = [{include = "data", from="src"}, {include = "exchange", from="src"}, {include = "helpers", from="src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.13"
 pytest = "^7.2.2"
 pathlib = "^1.0.1"
 pydantic = "^1.10.7"
@@ -37,6 +37,8 @@ matplotlib = "^3.7.1"
 filelock = "^3.12.2"
 attr = "^0.3.2"
 pre-commit = "^3.3.3"
+pandas = "^2.1.1"
+ipython = "^8.15.0"
 
 
 [build-system]
