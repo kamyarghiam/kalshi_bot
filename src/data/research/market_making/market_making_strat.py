@@ -198,9 +198,10 @@ def graph_es_against_starting_point():
     # Graphs es against the daily spy up and down
     ticker = MarketTicker("INXZ-23AUG31-T4514.87")
     es_df = get_es_predictions()
+    rolling_prediction = es_df["prediction"].rolling(window=100)
     plt.plot(
         es_df["ts_recv"],
-        es_df["prediction"],
+        rolling_prediction,
         color="red",
     )
     bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
@@ -293,3 +294,19 @@ def hyperparameter_search():
                 best_params = [b, m, shift_up]
     print("best params are")
     print(best_params)
+
+
+def place_orders(bbo_no, bbo_yes, predicted_price):
+    # Returns where we should place orders:
+    # no_price, no_quantity, yes_price, yes_quantity
+    desired_yes_ask_price = predicted_price + 1
+    predicted_price - 1
+    100 - desired_yes_ask_price
+
+
+def market_making_strategy():
+    # TODO: add latency for receiving data and sending order to Kalshi
+    return
+
+
+# graph_es_predictions_against_trades()
