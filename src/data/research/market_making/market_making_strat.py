@@ -1,3 +1,5 @@
+import math
+from datetime import datetime
 from typing import Generator
 
 import matplotlib.pyplot as plt
@@ -43,6 +45,8 @@ def strategy(
 
 def read_es_data(normalize=True):
     # Clean and normalize es data. Normalize means to put it between 0 and 1
+    utc_tz = pytz.timezone("UTC")
+    eastern_tz = pytz.timezone("US/Eastern")
     df = pd.read_csv("/Users/kamyarghiam/Desktop/es_data/aug31.csv")
     df = df[df["ts_recv"] <= 1693512000e9]
     df = df[df["action"] == "F"]
@@ -55,6 +59,9 @@ def read_es_data(normalize=True):
     if normalize:
         scaler = MinMaxScaler()
         df["price"] = scaler.fit_transform(df[["price"]])
+    df["ts_recv"] = df["ts_recv"].apply(
+        lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
+    )
     return df
 
 
@@ -158,4 +165,131 @@ def graph_price_change_es_kalshi():
     plt.show()
 
 
-# graph_price_change_es_kalshi()
+def sigmoid(x, width=1, shift_up=0.155):
+    # Width represents the width of the sigmoid function
+    return (1 / (1 + math.exp(-x * width))) + shift_up
+
+
+def compute_w(
+    curr_time: datetime,
+    m=0.025,
+    b=170,
+):
+    start_time = datetime(2023, 8, 31, 9, 30).astimezone(pytz.timezone("US/Eastern"))
+    diff = (curr_time - start_time).total_seconds()
+    return m * diff + b
+
+
+def get_es_predictions():
+    es_df = read_es_data(normalize=False)
+    es_df["price"] /= 1e9
+    # We will use this as our baseline for up or down
+    previous_day_es_close = 4526.75
+    es_df["perc_diff"] = (es_df["price"] - previous_day_es_close) / es_df["price"]
+
+    # price predictions
+    es_df["prediction"] = es_df.apply(
+        lambda row: sigmoid(row["perc_diff"], width=compute_w(row["ts_recv"])), axis=1
+    )
+    return es_df
+
+
+def graph_es_against_starting_point():
+    # Graphs es against the daily spy up and down
+    ticker = MarketTicker("INXZ-23AUG31-T4514.87")
+    es_df = get_es_predictions()
+    plt.plot(
+        es_df["ts_recv"],
+        es_df["prediction"],
+        color="red",
+    )
+    bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
+    plt.scatter(times, bids, color="purple", label="Bids")
+    plt.scatter(times, asks, color="orange", label="Asks")
+    plt.plot(times, midpoints, color="green")
+    plt.show()  # display
+
+
+def get_trades_data_for_scatterplot(ticker):
+    exchange_interface: ExchangeInterface = ExchangeInterface(is_test_run=False)
+    trades = exchange_interface.get_trades(ticker)
+    eastern_tz = pytz.timezone("US/Eastern")
+
+    times = []
+    yes_prices = []
+    quantities = []
+    for trade in trades:
+        times.append(trade.created_time.astimezone(eastern_tz))
+        yes_prices.append(trade.yes_price / 100)
+        quantities.append(trade.count)
+    return times, yes_prices, quantities
+
+
+def graph_es_predictions_against_trades():
+    es_df = get_es_predictions()
+    plt.plot(
+        es_df["ts_recv"],
+        es_df["prediction"],
+        color="red",
+    )
+
+    ticker = MarketTicker("INXZ-23AUG31-T4514.87")
+    bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
+    plt.scatter(times, bids, color="purple", label="Bids")
+    plt.scatter(times, asks, color="orange", label="Asks")
+    plt.plot(times, midpoints, color="green")
+
+    times, yes_prices, quantities = get_trades_data_for_scatterplot(ticker)
+    plt.scatter(times, yes_prices, color="green", s=quantities)
+
+    plt.show()
+
+
+def hyperparameter_search():
+    ticker = MarketTicker("INXZ-23AUG31-T4514.87")
+    bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
+    ob_df = pd.DataFrame({"times": times, "price": midpoints})
+    # Search for b, shift, and slope on sigmoid
+    es_df = read_es_data(normalize=False)
+    es_df["price"] /= 1e9
+    # We will use this as our baseline for up or down
+    previous_day_es_close = 4526.75
+    es_df["perc_diff"] = (es_df["price"] - previous_day_es_close) / es_df["price"]
+
+    start_b = 170
+    start_m = 0.025
+
+    smallest_loss = float("inf")
+    best_params = None
+    for b_delta in range(50):
+        b = start_b + b_delta * 10
+        print(smallest_loss)
+        print(best_params)
+        print(b_delta)
+        for m_delta in range(50):
+            m = start_m + m_delta * 0.005
+            # for shift_delta in range(100):
+            # fixing shift_up because the search takes too long
+            # shift_up = start_shift_up + shift_delta * 0.02
+            shift_up = 0.155
+            random_sample = es_df.sample(1000)
+            random_sample["prediction"] = random_sample.apply(
+                lambda row: sigmoid(
+                    row["perc_diff"],
+                    width=compute_w(row["ts_recv"], m, b),
+                    shift_up=shift_up,
+                ),
+                axis=1,
+            )
+            random_sample["actual"] = random_sample["ts_recv"].apply(
+                lambda time: ob_df.iloc[ob_df["times"].searchsorted(time) - 1].price
+            )
+            random_sample["loss"] = abs(
+                random_sample["actual"] - random_sample["prediction"]
+            )
+            loss = sum(random_sample["loss"])
+            if loss < smallest_loss:
+                smallest_loss = loss
+                best_params = [b, m, shift_up]
+    print("best params are")
+    print(best_params)
