@@ -271,9 +271,8 @@ class Connection:
             self._rate_limiter = RateLimiter(limits=[])
         else:
             self._connection_adapter = SessionsWrapper(base_url=self._auth._base_url)
-            # Limit is 10 queries per second and 100 queries per minute
+            # Limit is 10 queries per second and 600 queries per minute
             # TODO: this might be higher -- is it separate for reads and writes?
-            # read kalshi github
             self._rate_limiter = RateLimiter(
                 [
                     RateLimit(transactions=10, seconds=1),
