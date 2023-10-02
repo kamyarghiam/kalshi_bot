@@ -191,6 +191,8 @@ def get_es_predictions():
     es_df["prediction"] = es_df.apply(
         lambda row: sigmoid(row["perc_diff"], width=compute_w(row["ts_recv"])), axis=1
     )
+    # round to the nearest 2 decimal points
+    es_df["prediction"] = es_df["prediction"].round(2)
     return es_df
 
 
@@ -309,4 +311,4 @@ def market_making_strategy():
     return
 
 
-# graph_es_predictions_against_trades()
+graph_es_predictions_against_trades()
