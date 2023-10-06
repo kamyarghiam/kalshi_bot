@@ -150,18 +150,26 @@ class ColeDBInterface:
     """Public interface for ColeDB"""
 
     msgs_per_chunk = 5000
-    cole_db_storeage_path = Path("src/data/coledb/storage")
+    cole_db_storage_path = Path("src/data/coledb/storage")
 
     def __init__(self):
         # Metadata files that we opened up already
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
+
+    def ticker_to_path(self, ticker: MarketTicker) -> Path:
+        """Given a market ticker returns a path to where all its data should live"""
+        return self.cole_db_storage_path / Path(ticker.replace("-", "/"))
+
+    def ticker_to_metadata_path(self, ticker: MarketTicker) -> Path:
+        """Given a market ticker returns a path to the metadata file"""
+        return self.ticker_to_path(ticker) / "metadata"
 
     def get_metadata(self, ticker: MarketTicker) -> ColeDBMetadata:
         """Gets the metadata file for the market if it exists. Otherwise, creates it"""
         if ticker in self._open_metadata_files:
             metadata = self._open_metadata_files[ticker]
         else:
-            path = ticker_to_metadata_path(ticker)
+            path = self.ticker_to_metadata_path(ticker)
             if not path.exists():
                 raise FileNotFoundError(f"Could not find metadata file for {ticker}")
             else:
@@ -171,7 +179,7 @@ class ColeDBInterface:
 
     def create_metadata_file(self, ticker: MarketTicker) -> ColeDBMetadata:
         # Make the top level folder first
-        path = ticker_to_metadata_path(ticker)
+        path = self.ticker_to_metadata_path(ticker)
         folder_to_make = path.parent
         folders_to_make: List[Path] = []
         # Create a folder for the series, the event, and then the market
@@ -745,16 +753,6 @@ class ColeDBInterface:
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
                         orderbook = orderbook.apply_delta(msg)
-
-
-def ticker_to_path(ticker: MarketTicker) -> Path:
-    """Given a market ticker returns a path to where all its data should live"""
-    return ColeDBInterface.cole_db_storeage_path / Path(ticker.replace("-", "/"))
-
-
-def ticker_to_metadata_path(ticker: MarketTicker) -> Path:
-    """Given a market ticker returns a path to the metdata file"""
-    return ticker_to_path(ticker) / "metadata"
 
 
 def get_num_byte_sections_per_bits(num_bits: int, byte_section_size: int) -> int:

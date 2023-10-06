@@ -68,4 +68,4 @@ def exchange_interface(fastapi_test_client: TestClient | None):
 @pytest.fixture(scope="session", autouse=True)
 def temp_coledb_interface(tmp_path_factory: TempPathFactory):
     tmp_path = tmp_path_factory.mktemp("coledb")
-    ColeDBInterface.cole_db_storeage_path = tmp_path
+    ColeDBInterface.cole_db_storage_path = tmp_path

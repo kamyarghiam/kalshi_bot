@@ -13,12 +13,10 @@ from data.coledb.coledb import (
     ColeDBInterface,
     ColeDBMetadata,
     get_num_byte_sections_per_bits,
-    ticker_to_metadata_path,
-    ticker_to_path,
 )
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price, get_opposite_side_price
-from helpers.types.orderbook import Orderbook, OrderbookSide
+from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView
 from helpers.types.orders import Quantity, QuantityDelta, Side
 from helpers.types.websockets.response import OrderbookSnapshotRM
 from tests.fake_exchange import OrderbookDeltaRM
@@ -38,15 +36,17 @@ def test_read_write_metadata(tmp_path: Path):
 
 def test_ticker_to_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
-    assert ticker_to_path(ticker) == Path(
-        ColeDBInterface.cole_db_storeage_path / "SERIES/EVENT/MARKET/"
+    db = ColeDBInterface()
+    assert db.ticker_to_path(ticker) == Path(
+        ColeDBInterface.cole_db_storage_path / "SERIES/EVENT/MARKET/"
     )
 
 
 def test_ticker_to_metadata_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
-    assert ticker_to_metadata_path(ticker) == Path(
-        ColeDBInterface.cole_db_storeage_path / "SERIES/EVENT/MARKET/metadata"
+    db = ColeDBInterface()
+    assert db.ticker_to_metadata_path(ticker) == Path(
+        ColeDBInterface.cole_db_storage_path / "SERIES/EVENT/MARKET/metadata"
     )
 
 
@@ -54,8 +54,8 @@ def test_create_get_metadata_file(tmp_path: Path):
     path = tmp_path / "metadata"
     cole = ColeDBInterface()
     assert not path.exists()
-    with patch(
-        "data.coledb.coledb.ticker_to_metadata_path", return_value=path
+    with patch.object(
+        cole, "ticker_to_metadata_path", return_value=path
     ) as mock_ticker_to_metadata_path:
         ticker = MarketTicker("SERIES-EVENT-MARKET")
         with pytest.raises(FileNotFoundError) as e:
@@ -69,8 +69,10 @@ def test_create_get_metadata_file(tmp_path: Path):
         assert ticker in cole._open_metadata_files
         mock_ticker_to_metadata_path.assert_any_call(ticker)
 
-    with patch(
-        "data.coledb.coledb.ticker_to_metadata_path", return_value=path
+    with patch.object(
+        cole,
+        "ticker_to_metadata_path",
+        return_value=path,
     ) as mock_ticker_to_metadata_path:
         # Gets the metadata file from the local cache dict
         metadata_from_dict = cole.get_metadata(ticker)
@@ -486,8 +488,9 @@ def test_read_chunk_apply_deltas(tmp_path: Path):
             opposite_side_book = expected_orderbook.get_side(opposite_side)
             highest_price_opposite_side = (
                 None
-                if len(opposite_side_book.levels) == 0
-                else opposite_side_book.get_largest_price_level()[0]
+                if (highest_price_level := opposite_side_book.get_largest_price_level())
+                is None
+                else highest_price_level[0]
             )
             top_price = (
                 99
@@ -817,3 +820,29 @@ def test_read_write_across_chunks():
     assert next(reader) == orderbook_snapshot_d3
     with pytest.raises(StopIteration):
         next(reader)
+
+
+def test_backward_compatibility():
+    """Tests that we can still open old data files
+
+    I took some data captured early on from the db and put it in
+    the tests/data folder. Any changes to coledb should still allow
+    us to open these files, or we need to convert all the old data"""
+
+    db = ColeDBInterface()
+    db.cole_db_storage_path = Path("tests/data/")
+    data = db.read(MarketTicker("INXD-23AUG31-B4512"))
+
+    assert next(data) == Orderbook(
+        market_ticker=MarketTicker("INXD-23AUG31-B4512"),
+        yes=OrderbookSide(levels={Price(11): Quantity(135)}),
+        no=OrderbookSide(
+            levels={
+                Price(48): Quantity(31),
+                Price(50): Quantity(5),
+                Price(60): Quantity(5),
+            }
+        ),
+        view=OrderbookView.BID,
+        ts=datetime(2023, 8, 31, 9, 30, 11, 177187),
+    )
