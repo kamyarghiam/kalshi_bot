@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
-from exchange.interface import MarketTicker
 from helpers.types.api import Cursor, ExternalApi
+from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orders import Quantity
 from helpers.utils import Side
