@@ -2,9 +2,12 @@ import copy
 import math
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from datetime import datetime
 from enum import Enum
 from typing import Union
 
+from helpers.types.api import ExternalApi
+from helpers.types.auth import MemberId
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
 
@@ -18,7 +21,7 @@ class Quantity(int):
 
     def __new__(cls, num: int):
         if num < 0:
-            raise ValueError(f"{num} invalid quantitiy")
+            raise ValueError(f"{num} invalid quantity")
         return super(Quantity, cls).__new__(cls, num)
 
     def __add__(
@@ -44,6 +47,11 @@ class Side(str, Enum):
 class TradeType(str, Enum):
     BUY = "buy"
     SELL = "sell"
+
+
+class OrderType(str, Enum):
+    MARKET = "market"
+    LIMIT = "limit"
 
 
 def compute_fee(price: Price, quantity: Quantity) -> Cents:
@@ -100,3 +108,26 @@ class Order:
             f"{self.ticker}: {'Bought' if self.trade == TradeType.BUY else 'Sold'} "
             + f"{self.side.name} | {self.quantity} @ {self.price}"
         )
+
+
+class CreateOrderRequest(ExternalApi):
+    action: TradeType
+    client_order_id: MemberId
+    count: Quantity
+    side: Side
+    ticker: MarketTicker
+    type: OrderType
+    # Can't specify both yes and no price.
+    # Must be specified for limit orders
+    # TODO: add a check for this
+    no_price: Price | None = None
+    yes_price: Price | None = None
+    # If not supplied, then it's Good Till Cancelled
+    # If time is in past, then it's IOC
+    # If in future, unfilled quantity will expire in future
+    expiration_ts: datetime | None = None
+    # SellPositionFloor will not let you flip position for a market order if set to 0.
+    sell_position_floor: Quantity | None = None
+    # If type = market and action = buy, buy_max_cost
+    # represents the maximum cents that can be spent to acquire a position
+    buy_max_cost: Cents | None = None
