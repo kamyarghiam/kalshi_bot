@@ -1,5 +1,8 @@
 import math
+import time
 from datetime import datetime
+from datetime import time as datetime_time
+from datetime import timedelta
 from typing import Generator
 
 import matplotlib.pyplot as plt
@@ -43,12 +46,34 @@ def strategy(
     return Cents(0)
 
 
-def read_es_data(normalize=True):
+def read_es_data(normalize=True, filename="aug31.csv"):
     # Clean and normalize es data. Normalize means to put it between 0 and 1
     utc_tz = pytz.timezone("UTC")
     eastern_tz = pytz.timezone("US/Eastern")
-    df = pd.read_csv("/Users/kamyarghiam/Desktop/es_data/aug31.csv")
-    df = df[df["ts_recv"] <= 1693512000e9]
+    df = pd.read_csv(f"/Users/kamyarghiam/Desktop/es_data/{filename}")
+    day_of_data = (
+        pd.to_datetime(df.iloc[0]["ts_recv"], unit="ns")
+        .tz_localize(utc_tz)
+        .tz_convert(eastern_tz)
+    )
+
+    market_open = datetime_time(9, 30)
+    market_open_full_datetime_ns = (
+        datetime.combine(day_of_data.date(), market_open)
+        .astimezone(pytz.timezone("US/Eastern"))
+        .timestamp()
+    ) * 1e9
+    market_close = datetime_time(16, 0)
+    market_close_full_datetime_ns = (
+        datetime.combine(day_of_data.date(), market_close)
+        .astimezone(pytz.timezone("US/Eastern"))
+        .timestamp()
+    ) * 1e9
+
+    df = df[
+        (market_open_full_datetime_ns <= df["ts_recv"])
+        & (df["ts_recv"] <= market_close_full_datetime_ns)
+    ]
     df = df[df["action"] == "F"]
     columns_to_keep = ["ts_recv", "price"]
     df = df[columns_to_keep]
@@ -175,13 +200,16 @@ def compute_w(
     m=0.025,
     b=170,
 ):
-    start_time = datetime(2023, 8, 31, 9, 30).astimezone(pytz.timezone("US/Eastern"))
-    diff = (curr_time - start_time).total_seconds()
+    market_open = datetime_time(9, 30)
+    market_open_full_datetime = datetime.combine(
+        curr_time.date(), market_open
+    ).astimezone(pytz.timezone("US/Eastern"))
+    diff = (curr_time - market_open_full_datetime).total_seconds()
     return m * diff + b
 
 
-def get_es_predictions():
-    es_df = read_es_data(normalize=False)
+def get_es_predictions(filename="aug31.csv"):
+    es_df = read_es_data(normalize=False, filename=filename)
     es_df["price"] /= 1e9
     # We will use this as our baseline for up or down
     previous_day_es_close = 4526.75
@@ -193,6 +221,13 @@ def get_es_predictions():
     )
     # round to the nearest 2 decimal points
     es_df["prediction"] = es_df["prediction"].round(2)
+    # Latency to receive ES data then message kalshi
+    latency_from_es_data_to_kalshi_sec = 0.1
+    es_df["prediction_ts"] = es_df.apply(
+        lambda row: row["ts_recv"]
+        + timedelta(seconds=latency_from_es_data_to_kalshi_sec),
+        axis=1,
+    )
     return es_df
 
 
@@ -229,14 +264,8 @@ def get_trades_data_for_scatterplot(ticker):
 
 
 def graph_es_predictions_against_trades():
-    es_df = get_es_predictions()
-    plt.plot(
-        es_df["ts_recv"],
-        es_df["prediction"],
-        color="red",
-    )
-
-    ticker = MarketTicker("INXZ-23AUG31-T4514.87")
+    es_df = get_es_predictions("sep05.csv")
+    ticker = MarketTicker("INXZ-23SEP05-T4515.77")
     bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
     plt.scatter(times, bids, color="purple", label="Bids")
     plt.scatter(times, asks, color="orange", label="Asks")
@@ -244,6 +273,15 @@ def graph_es_predictions_against_trades():
 
     times, yes_prices, quantities = get_trades_data_for_scatterplot(ticker)
     plt.scatter(times, yes_prices, color="green", s=quantities)
+
+    # Remove trades that don't change the price from the last trade
+    mask = es_df["prediction"] != es_df["prediction"].shift(1)
+    es_df = es_df[mask]
+    plt.scatter(
+        es_df["prediction_ts"],
+        es_df["prediction"],
+        color="red",
+    )
 
     plt.show()
 
@@ -298,16 +336,40 @@ def hyperparameter_search():
     print(best_params)
 
 
-def place_orders(bbo_no, bbo_yes, predicted_price):
-    # Returns where we should place orders:
-    # no_price, no_quantity, yes_price, yes_quantity
-    desired_yes_ask_price = predicted_price + 1
-    predicted_price - 1
-    100 - desired_yes_ask_price
+def compute_exchange_latency():
+    # I ran this a few times at 7:30 pm on Friday lol :(
+    # Looks like RTT is around 80 - 90 millis. Kinda slow damn
+    # To lower this, we can run it in AWS, closer to the exchange
+    # But I'll set it to 100 millisecond for the sake of sim
+    e = ExchangeInterface(is_test_run=False)
+    start = time.time()
+    e.get_exchange_status()
+    end = time.time()
+    print(end - start)
+
+
+def predict_kalshi_price(
+    previous_day_es_close,
+    current_es_price,
+    trade_time,
+):
+    percentage_diff = (current_es_price - previous_day_es_close) / current_es_price
+    return sigmoid(percentage_diff, width=compute_w(trade_time)).round(2)
+
+
+def get_order_placement(predicted_yes_price):
+    """Returns prices around the predicted yes price, our fair value"""
+
+    desired_yes_ask_price = predicted_yes_price + 1
+    desired_yes_bid_price = predicted_yes_price - 1
+    desired_no_bid_price = 100 - desired_yes_ask_price
+
+    return desired_yes_bid_price, desired_no_bid_price
 
 
 def market_making_strategy():
-    # TODO: add latency for receiving data and sending order to Kalshi
+    # RTT is 100 millis
+
     return
 
 
