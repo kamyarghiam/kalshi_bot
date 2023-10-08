@@ -208,12 +208,31 @@ def compute_w(
     return m * diff + b
 
 
-def get_es_predictions(filename="aug31.csv"):
+def get_es_predictions(
+    previous_day_es_close=4526.75,
+    filename="aug31.csv",
+):
+    # sample_midpoint_price and sample_time help us compute the y axis of the sigmoid
     es_df = read_es_data(normalize=False, filename=filename)
     es_df["price"] /= 1e9
-    # We will use this as our baseline for up or down
-    previous_day_es_close = 4526.75
     es_df["perc_diff"] = (es_df["price"] - previous_day_es_close) / es_df["price"]
+
+    # I tried to shift the y axis based on the previous orderbook data, but this
+    # led my predictions to become delayed
+    # predictions = []
+    # shift_up = 0
+    # for _, row in es_df.iterrows():
+    #     prediction = sigmoid(
+    #         row.perc_diff, width=compute_w(row.ts_recv), shift_up=shift_up
+    #     )
+    #     closest_sample_index = midpoints_df["time"].searchsorted(row.ts_recv)
+    #     # Tune the sigmoid to a sample point
+
+    #     # This is the loss
+    #     actual_price = midpoints_df.iloc[closest_sample_index - 1].price
+    #     shift_up += actual_price - prediction
+    #     predictions.append(prediction)
+    # es_df["prediction"] = predictions
 
     # price predictions
     es_df["prediction"] = es_df.apply(
@@ -228,6 +247,8 @@ def get_es_predictions(filename="aug31.csv"):
         + timedelta(seconds=latency_from_es_data_to_kalshi_sec),
         axis=1,
     )
+    mask = es_df["prediction"] != es_df["prediction"].shift(1)
+    es_df = es_df[mask]
     return es_df
 
 
@@ -264,20 +285,32 @@ def get_trades_data_for_scatterplot(ticker):
 
 
 def graph_es_predictions_against_trades():
-    es_df = get_es_predictions("sep05.csv")
-    ticker = MarketTicker("INXZ-23SEP05-T4515.77")
+    # ticker = MarketTicker("INXZ-23SEP05-T4515.77")
+    # previous_day_es_close=4521.50
+    # filename = "sep05.csv"
+    ticker = MarketTicker("INXZ-23AUG31-T4514.87")
+    previous_day_es_close = 4526.75
+    filename = "aug31.csv"
     bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
-    plt.scatter(times, bids, color="purple", label="Bids")
-    plt.scatter(times, asks, color="orange", label="Asks")
-    plt.plot(times, midpoints, color="green")
+    es_df = get_es_predictions(
+        filename=filename,
+        previous_day_es_close=previous_day_es_close,
+    )
+    # plt.scatter(times, bids, color="purple", label="Bids")
+    # plt.scatter(times, asks, color="orange", label="Asks")
+    plt.scatter(times, midpoints, color="black")
+    plt.plot(times, midpoints, color="black")
 
     times, yes_prices, quantities = get_trades_data_for_scatterplot(ticker)
-    plt.scatter(times, yes_prices, color="green", s=quantities)
+    plt.scatter(times, yes_prices, color="green")
+    plt.plot(times, yes_prices, color="green")
 
-    # Remove trades that don't change the price from the last trade
-    mask = es_df["prediction"] != es_df["prediction"].shift(1)
-    es_df = es_df[mask]
     plt.scatter(
+        es_df["prediction_ts"],
+        es_df["prediction"],
+        color="red",
+    )
+    plt.plot(
         es_df["prediction_ts"],
         es_df["prediction"],
         color="red",
@@ -367,10 +400,82 @@ def get_order_placement(predicted_yes_price):
     return desired_yes_bid_price, desired_no_bid_price
 
 
-def market_making_strategy():
-    # RTT is 100 millis
+def graph_rolling_predictions():
+    """Hypothesis: we can buy by doing a rolling min/max across a
+    certain time period and seeing if ticks go up / down in that period"""
+    # ticker = MarketTicker("INXZ-23SEP05-T4515.77")
+    # previous_day_es_close=4521.50
+    # filename = "sep05.csv"
+    ticker = MarketTicker("INXZ-23AUG31-T4514.87")
+    previous_day_es_close = 4526.75
+    filename = "aug31.csv"
+    bids, asks, midpoints, times = get_orderbook_scatterplot_points(ticker)
+    es_df = get_es_predictions(
+        filename=filename,
+        previous_day_es_close=previous_day_es_close,
+    )
+    es_df.set_index("prediction_ts", inplace=True)
+    window_size = "10s"
+    price_increase = 0.04
+    roll = es_df["prediction"].rolling(window=window_size)
+    # 1 means buy, -1 means sell, 0 means no action
+    orders = roll.apply(
+        lambda x: 0
+        if (x.max() - x.min() < price_increase)
+        else 1
+        if x.idxmin() < x.idxmax()
+        else -1
+    )
 
-    return
+    plt.scatter(times, bids, color="purple", label="Bids")
+    plt.scatter(times, asks, color="orange", label="Asks")
+    plt.plot(times, midpoints, color="black")
+
+    # times, yes_prices, quantities = get_trades_data_for_scatterplot(ticker)
+    # plt.scatter(times, yes_prices, color="green")
+    # plt.plot(times, yes_prices, color="green")
+
+    # Remove trades that don't change the price from the last trade
+
+    # plt.scatter(
+    #     es_df["prediction_ts"],
+    #     es_df["prediction"],
+    #     color="red",
+    # )
+    # plt.plot(
+    #     es_df["prediction_ts"],
+    #     es_df["prediction"],
+    #     color="red",
+    # )
+    prices_df = pd.DataFrame({"time": times, "bid": bids, "ask": asks})
+    # Sells
+    sell_timestamps = orders[orders == -1].index
+    sell_prices = [
+        prices_df.iloc[(prices_df["time"].searchsorted(ts)) - 1].bid
+        for ts in sell_timestamps
+    ]
+    plt.scatter(
+        sell_timestamps,
+        sell_prices,
+        color="red",
+    )
+
+    # Buys
+    buy_timestamps = orders[orders == 1].index
+    buy_prices = [
+        prices_df.iloc[(prices_df["time"].searchsorted(ts)) - 1].ask
+        for ts in buy_timestamps
+    ]
+    plt.scatter(
+        buy_timestamps,
+        buy_prices,
+        color="green",
+    )
+
+    plt.show()
 
 
-graph_es_predictions_against_trades()
+# Next to do: experiment with shorter time frames, fewer upticks,
+# different days, and computing profit
+# graph_rolling_predictions()
+# graph_es_predictions_against_trades()
