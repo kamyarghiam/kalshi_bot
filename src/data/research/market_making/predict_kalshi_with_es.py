@@ -404,7 +404,7 @@ def graph_rolling_predictions():
     """Hypothesis: we can buy by doing a rolling min/max across a
     certain time period and seeing if ticks go up / down in that period"""
     # ticker = MarketTicker("INXZ-23SEP05-T4515.77")
-    # previous_day_es_close=4521.50
+    # previous_day_es_close = 4521.50
     # filename = "sep05.csv"
     ticker = MarketTicker("INXZ-23AUG31-T4514.87")
     previous_day_es_close = 4526.75
@@ -415,8 +415,8 @@ def graph_rolling_predictions():
         previous_day_es_close=previous_day_es_close,
     )
     es_df.set_index("prediction_ts", inplace=True)
-    window_size = "10s"
-    price_increase = 0.04
+    window_size = "5s"
+    price_increase = 0.03
     roll = es_df["prediction"].rolling(window=window_size)
     # 1 means buy, -1 means sell, 0 means no action
     orders = roll.apply(
@@ -442,11 +442,12 @@ def graph_rolling_predictions():
     #     es_df["prediction"],
     #     color="red",
     # )
-    # plt.plot(
-    #     es_df["prediction_ts"],
-    #     es_df["prediction"],
-    #     color="red",
-    # )
+    es_df.reset_index(inplace=True)
+    plt.plot(
+        es_df["prediction_ts"],
+        es_df["prediction"],
+        color="red",
+    )
     prices_df = pd.DataFrame({"time": times, "bid": bids, "ask": asks})
     # Sells
     sell_timestamps = orders[orders == -1].index
@@ -474,8 +475,7 @@ def graph_rolling_predictions():
 
     plt.show()
 
-
-# Next to do: experiment with shorter time frames, fewer upticks,
-# different days, and computing profit
-# graph_rolling_predictions()
-# graph_es_predictions_against_trades()
+    # Next to do: experiment with shorter time frames, fewer upticks,
+    # different days, and computing profit
+    # graph_rolling_predictions()
+    # graph_es_predictions_against_trades()
