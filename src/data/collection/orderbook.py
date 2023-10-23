@@ -5,7 +5,8 @@ from rich.live import Live
 from rich.table import Table
 
 from data.coledb.coledb import ColeDBInterface
-from exchange.interface import ExchangeInterface, OrderbookSubscription
+from exchange.interface import ExchangeInterface
+from exchange.orderbook import OrderbookSubscription
 from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
 from helpers.utils import send_alert_email
 

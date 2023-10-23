@@ -6,7 +6,8 @@ from rich.live import Live
 from rich.table import Table
 
 from data.coledb.coledb import ColeDBInterface
-from exchange.interface import ExchangeInterface, OrderbookSubscription
+from exchange.interface import ExchangeInterface
+from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookView

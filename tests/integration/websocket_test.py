@@ -3,7 +3,8 @@ from typing import List
 import pytest
 from mock import patch
 
-from exchange.interface import ExchangeInterface, OrderbookSubscription
+from exchange.interface import ExchangeInterface
+from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
@@ -97,7 +98,7 @@ def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterfac
         gen = sub.continuous_receive()
 
         # The last message in the fake exchnage returns a runtime error
-        with patch("exchange.interface.sleep") as mock_sleep:
+        with patch("exchange.orderbook.sleep") as mock_sleep:
             with patch.object(sub, "_resubscribe") as mock_resubscribe:
                 mock_sleep.return_value = "SHOULD_BREAK"
                 with pytest.raises(StopIteration):
