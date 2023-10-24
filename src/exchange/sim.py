@@ -5,7 +5,7 @@ against the exchange without actually sending orders"""
 from datetime import timedelta
 from typing import Generator
 
-from helpers.types.money import Balance, Cents
+from helpers.types.money import Balance, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Side, TradeType
 from helpers.types.portfolio import Portfolio
@@ -44,18 +44,35 @@ class PassiveIOCStrategySimulator:
                 if order.time_placed + self.latency_to_exchange < orderbook.ts:
                     break
 
-            bbo = orderbook.get_bbo()
+            bbo = last_orderbook.get_bbo()
             # Check if we can place this order
-            # TODO: keep track of what orders we were able to place
             if (order.side == Side.YES and order.trade == TradeType.BUY) or (
                 order.side == Side.NO and order.trade == TradeType.SELL
             ):
                 # We are trying to obtain a yes contract
                 if bbo.ask is None:
+                    # Cannot place order
                     continue
-                # TODO: check if prices are right per side
-                return
+
+                buy_price = (
+                    order.price
+                    if order.side == Side.YES
+                    else get_opposite_side_price(order.price)
+                )
+                buy_qty = order.quantity
+                # NOTE: we intentionally don't allow orders with bad prices
+                if buy_price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
+                    self.portfolio.place_order(order)
+            else:
+                if bbo.bid is None:
+                    continue
+                sell_price = (
+                    order.price
+                    if order.side == Side.YES
+                    else get_opposite_side_price(order.price)
+                )
+                sell_qty = order.quantity
+                if sell_price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
+                    self.portfolio.place_order(order)
 
             last_orderbook = orderbook
-        print(last_orderbook)
-        return
