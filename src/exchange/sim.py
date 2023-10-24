@@ -4,8 +4,10 @@ against the exchange without actually sending orders"""
 
 from typing import Generator
 
+from helpers.types.money import Balance, Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
+from helpers.types.portfolio import Portfolio
 
 
 class PassiveIOCStrategySimulator:
@@ -20,18 +22,21 @@ class PassiveIOCStrategySimulator:
         self,
         orders: Generator[Order, None, None],
         orderbook_updates: Generator[Orderbook, None, None],
+        portfolio_balance: Balance = Balance(Cents(100_000_000)),
     ):
         self.orders = orders
         self.orderbook_updates = orderbook_updates
+        self.portfolio = Portfolio(portfolio_balance)
 
     def run(self):
         """TODO problems to solve:
-
-        Need to keep track of some sort of portfolio? We need to see
-        what open positions there are.
 
         Need to return whether order succeeds or fails
 
         Need settlement info --> this may need to be a separate thing
         """
+        last_orderbook: Orderbook = next(self.orderbook_updates)
+        # TODO: check the timestamps of the orderbook at when my order was placed
+        # TODO: include some measure of latency
+        print(last_orderbook)
         return

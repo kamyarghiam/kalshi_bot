@@ -1,6 +1,7 @@
 import copy
 import math
 from dataclasses import dataclass
+from dataclasses import field
 from dataclasses import field as dataclass_field
 from datetime import datetime
 from enum import Enum
@@ -67,6 +68,7 @@ class Order:
     trade: TradeType
     ticker: MarketTicker
     side: Side
+    time_placed: datetime = field(default_factory=datetime.now, compare=False)
     # Cached items
     _price_times_quantity: Cents | None = dataclass_field(default=None, compare=False)
     _fee: Cents | None = dataclass_field(default=None, compare=False)
