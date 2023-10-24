@@ -6,7 +6,7 @@ import pytest
 from data.collection.orderbook import generate_table
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView
+from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView, SideBBO
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
@@ -534,7 +534,7 @@ def test_get_bbo():
         yes=OrderbookSide(levels={Price(90): Quantity(10), Price(89): Quantity(100)}),
         no=OrderbookSide(levels={Price(5): Quantity(20), Price(6): Quantity(50)}),
     )
-    bid, ask = o.get_bbo()
+    bbo = o.get_bbo()
 
-    assert bid == (Price(90), Quantity(10))
-    assert ask == (Price(94), Quantity(50))
+    assert bbo.bid == SideBBO(price=Price(90), quantity=Quantity(10))
+    assert bbo.ask == SideBBO(price=Price(94), quantity=Quantity(50))

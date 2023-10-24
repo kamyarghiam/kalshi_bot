@@ -100,12 +100,12 @@ def get_orderbook_scatterplot_points(ticker):
     times = []
 
     for o in orderbooks:
-        bid, ask = o.get_bbo()
+        bbo = o.get_bbo()
 
-        if bid and ask:
-            bids.append(bid[0] / 100)
-            asks.append(ask[0] / 100)
-            midpoints.append(((bid[0] + ask[0]) / 2) / 100)
+        if bbo.bid and bbo.ask:
+            bids.append(bbo.bid.price / 100)
+            asks.append(bbo.ask.price / 100)
+            midpoints.append(((bbo.bid.price + bbo.ask.price) / 2) / 100)
             times.append(o.ts.astimezone(pytz.timezone("US/Eastern")))
 
     return bids, asks, midpoints, times

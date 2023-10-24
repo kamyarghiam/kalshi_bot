@@ -80,6 +80,22 @@ class OrderbookView(str, Enum):
 
 
 @dataclass
+class SideBBO:
+    """Top level information about a side"""
+
+    price: Price
+    quantity: Quantity
+
+
+@dataclass
+class BBO:
+    """Information about top of book"""
+
+    bid: SideBBO | None
+    ask: SideBBO | None
+
+
+@dataclass
 class Orderbook:
     """Internal representation of the orderbook.
 
@@ -151,19 +167,24 @@ class Orderbook:
 
     def get_bbo(
         self,
-    ) -> Tuple[Tuple[Price, Quantity] | None, Tuple[Price, Quantity] | None]:
+    ) -> BBO:
         """Returns tuple of bid and ask at bbo yes side, if it exists"""
         ob = self.get_view(OrderbookView.BID)
         bid = ob.yes.get_largest_price_level()
+        bid_side_bbo: SideBBO | None = None
+        if bid is not None:
+            bid_price, bid_qty = bid
+            bid_side_bbo = SideBBO(price=bid_price, quantity=bid_qty)
 
         ask = ob.no.get_largest_price_level()
+        ask_side_bbo: SideBBO | None = None
         if ask is not None:
             # Need to take opposite price
-            ask_price, ask_quantity = ask
+            ask_price, ask_qty = ask
             ask_price = get_opposite_side_price(ask_price)
-            ask = (ask_price, ask_quantity)
+            ask_side_bbo = SideBBO(price=ask_price, quantity=ask_qty)
 
-        return (bid, ask)
+        return BBO(bid=bid_side_bbo, ask=ask_side_bbo)
 
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):
