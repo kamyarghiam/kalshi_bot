@@ -229,8 +229,14 @@ class Portfolio:
             return False
         return True
 
+    def place_order(self, order: Order):
+        if order.trade == TradeType.BUY:
+            self.buy(order)
+        else:
+            self.sell(order)
+
     def buy(self, order: Order):
-        """Adds position to potfolio. Raises OutOfMoney error if we ran out of money"""
+        """Adds position to portfolio. Raises OutOfMoney error if we ran out of money"""
         if not self.can_buy(order):
             raise PortfolioError(
                 "Either not enough balance or already holding position on other side"

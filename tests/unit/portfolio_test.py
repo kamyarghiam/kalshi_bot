@@ -1,7 +1,7 @@
 import copy
 
 import pytest
-from mock import MagicMock
+from mock import MagicMock, patch
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
@@ -698,3 +698,28 @@ def test_get_unrealized_pnl():
     profit3 = (Price(95) - Price(10)) * Quantity(1000)
 
     assert p.get_unrealized_pnl(mock_exchange) == profit1 + profit2 + profit3
+
+
+def test_place_order():
+    portfolio = Portfolio(Balance(Cents(5000)))
+    buy_o = Order(
+        price=Price(10),
+        quantity=Quantity(100),
+        trade=TradeType.BUY,
+        ticker=MarketTicker("determined_profit"),
+        side=Side.NO,
+    )
+    sell_o = Order(
+        price=Price(10),
+        quantity=Quantity(100),
+        trade=TradeType.SELL,
+        ticker=MarketTicker("determined_profit"),
+        side=Side.NO,
+    )
+    with patch.object(portfolio, "buy") as mock_buy:
+        portfolio.place_order(buy_o)
+        mock_buy.assert_called_once_with(buy_o)
+
+    with patch.object(portfolio, "sell") as mock_sell:
+        portfolio.place_order(sell_o)
+        mock_sell.assert_called_once_with(sell_o)
