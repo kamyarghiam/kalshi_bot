@@ -11,6 +11,7 @@ from helpers.types.orders import Order, Side, TradeType
 from helpers.types.portfolio import Portfolio
 
 
+# TODO: test this class
 class PassiveIOCStrategySimulator:
     """This class takes in a generator of orders and orderbook updates
     and tells you how much your strategy would have made.
