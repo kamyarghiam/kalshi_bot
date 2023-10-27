@@ -15,6 +15,10 @@ class PassiveIOCStrategySimulator:
     """This class takes in a generator of orders and orderbook updates
     and tells you how much your strategy would have made.
 
+    NOTE: it is the caller's responsibility to ensure the timestamps
+    of the orders sent in are correct relative to the timestamps of the
+    orderbook updates. Though, latency computation is done for you
+
     LIMITATION: this simulator only works with passive IOC strategies that
     pick orders up from the orderbook. We return true or false whether an
     order has went through"""
@@ -32,11 +36,7 @@ class PassiveIOCStrategySimulator:
         self.latency_to_exchange = latency_to_exchange
 
     def run(self):
-        """TODO problems to solve:
-
-        Make sure that the orders passed in have correct relative timestamp
-        Need settlement info --> this may need to be a separate thing
-        """
+        """Runs the sim!"""
 
         last_orderbook: Orderbook = next(self.orderbook_updates)
         for order in self.orders:
@@ -76,3 +76,5 @@ class PassiveIOCStrategySimulator:
                     self.portfolio.place_order(order)
 
             last_orderbook = orderbook
+        print(self.portfolio)
+        # NOTE: you may want to check whether the market settled
