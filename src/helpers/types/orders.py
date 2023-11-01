@@ -107,8 +107,8 @@ class Order:
 
     def __str__(self):
         return (
-            f"{self.ticker}: {'Bought' if self.trade == TradeType.BUY else 'Sold'} "
-            + f"{self.side.name} | {self.quantity} @ {self.price}"
+            f"{self.ticker}: {self.trade.name} {self.side.name} "
+            + f"| {self.quantity} @ {self.price} ({self.time_placed})"
         )
 
 

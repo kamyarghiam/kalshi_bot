@@ -3,7 +3,7 @@ against the exchange without actually sending orders"""
 
 
 from datetime import timedelta
-from typing import Generator
+from typing import Generator, Iterable
 
 from helpers.types.money import Balance, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
@@ -26,13 +26,15 @@ class PassiveIOCStrategySimulator:
 
     def __init__(
         self,
-        orders: Generator[Order, None, None],
+        orders: Iterable[Order],
         orderbook_updates: Generator[Orderbook, None, None],
         portfolio_balance: Balance = Balance(Cents(100_000_000)),
         latency_to_exchange: timedelta = timedelta(milliseconds=100),
     ):
-        self.orders = orders
+        # These are orders that we requested to place in the exchange
+        self.orders_requested = orders
         self.orderbook_updates = orderbook_updates
+        # Get all results from the portfolio here
         self.portfolio = Portfolio(portfolio_balance)
         self.latency_to_exchange = latency_to_exchange
 
@@ -40,7 +42,7 @@ class PassiveIOCStrategySimulator:
         """Runs the sim!"""
 
         last_orderbook: Orderbook = next(self.orderbook_updates)
-        for order in self.orders:
+        for order in self.orders_requested:
             for orderbook in self.orderbook_updates:
                 if order.time_placed + self.latency_to_exchange < orderbook.ts:
                     break
@@ -52,6 +54,7 @@ class PassiveIOCStrategySimulator:
             ):
                 # We are trying to obtain a yes contract
                 if bbo.ask is None:
+                    print("Cannot place order: ", order)
                     # Cannot place order
                     continue
 
@@ -61,11 +64,14 @@ class PassiveIOCStrategySimulator:
                     else get_opposite_side_price(order.price)
                 )
                 buy_qty = order.quantity
-                # NOTE: we intentionally don't allow orders with bad prices
+                # NOTE: we intentionally don't allow orders with prices not at bbo
                 if buy_price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
                     self.portfolio.place_order(order)
+                else:
+                    print("Cannot place order: ", order)
             else:
                 if bbo.bid is None:
+                    print("Cannot place order: ", order)
                     continue
                 sell_price = (
                     order.price
@@ -75,6 +81,8 @@ class PassiveIOCStrategySimulator:
                 sell_qty = order.quantity
                 if sell_price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
                     self.portfolio.place_order(order)
+                else:
+                    print("Cannot place order: ", order)
 
             last_orderbook = orderbook
         print(self.portfolio)

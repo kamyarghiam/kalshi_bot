@@ -1,4 +1,5 @@
 import copy
+import datetime
 
 import pytest
 from mock import MagicMock, patch
@@ -594,8 +595,9 @@ def test_position_print():
     assert str(position) == "hi: NO | 10 @ 10¢ | 20 @ 15¢"
 
 
-def test_potfolio_print():
+def test_portfolio_print():
     portfolio = Portfolio(Balance(Cents(5000)))
+    ts = datetime.datetime(2023, 11, 1, 7, 23)
     portfolio.buy(
         Order(
             ticker=MarketTicker("Ticker1"),
@@ -603,6 +605,7 @@ def test_potfolio_print():
             quantity=Quantity(100),
             side=Side.NO,
             trade=TradeType.BUY,
+            time_placed=ts,
         )
     )
     portfolio.buy(
@@ -612,6 +615,7 @@ def test_potfolio_print():
             quantity=Quantity(200),
             side=Side.NO,
             trade=TradeType.BUY,
+            time_placed=ts,
         )
     )
     portfolio.sell(
@@ -621,6 +625,7 @@ def test_potfolio_print():
             quantity=Quantity(150),
             side=Side.NO,
             trade=TradeType.SELL,
+            time_placed=ts,
         )
     )
 
@@ -634,9 +639,9 @@ Current positions ($8.00):
   Ticker1: NO | 100 @ 5¢
   Ticker2: NO | 50 @ 6¢
 Orders:
-  Ticker1: Bought NO | 100 @ 5¢
-  Ticker2: Bought NO | 200 @ 6¢
-  Ticker2: Sold NO | 150 @ 5¢"""
+  Ticker1: BUY NO | 100 @ 5¢ (2023-11-01 07:23:00)
+  Ticker2: BUY NO | 200 @ 6¢ (2023-11-01 07:23:00)
+  Ticker2: SELL NO | 150 @ 5¢ (2023-11-01 07:23:00)"""
     )
 
 

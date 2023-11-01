@@ -23,3 +23,7 @@ def random_data_from_basemodel(
 
 def almost_equal(x: float, y: float):
     return abs(x - y) < 0.01
+
+
+def list_to_generator(list_: typing.List) -> typing.Generator:
+    return (x for x in list_)

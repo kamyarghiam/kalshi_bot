@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from helpers.types.markets import MarketTicker
@@ -12,8 +14,9 @@ def test_order_str():
         price=Price(15),
         quantity=Quantity(200),
         trade=TradeType.BUY,
+        time_placed=datetime(2023, 8, 31, 7, 31, 32),
     )
-    assert str(o) == "Ticker: Bought NO | 200 @ 15¢"
+    assert str(o) == "Ticker: BUY NO | 200 @ 15¢ (2023-08-31 07:31:32)"
 
 
 def test_order_cost_and_revenue():
