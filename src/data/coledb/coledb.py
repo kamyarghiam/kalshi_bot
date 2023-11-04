@@ -85,7 +85,10 @@ class ColeDBMetadata:
 
     @classmethod
     def load(cls, path: Path):
-        return pickle.loads(path.read_bytes())
+        metadata: ColeDBMetadata = pickle.loads(path.read_bytes())
+        # In case we move around the folder structure
+        metadata.path = path
+        return metadata
 
     @property
     def path_to_market_data(self) -> Path:
