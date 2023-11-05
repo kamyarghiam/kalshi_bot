@@ -37,8 +37,13 @@ class PassiveIOCStrategySimulator:
         self.portfolio = Portfolio(portfolio_balance)
         self.latency_to_exchange = latency_to_exchange
 
-    def run(self):
-        """Runs the sim!"""
+    def run(self, ignore_price=False):
+        """Runs the sim!
+
+        ignore_price: lets say you want to place market orders without
+        regard to what the price is at. This flag ignores the price you input
+        and rather just replaces it with the bbo.
+        """
 
         last_orderbook: Orderbook = next(self.orderbook_updates)
         for order in self.orders_requested:
@@ -47,6 +52,11 @@ class PassiveIOCStrategySimulator:
                     break
 
             bbo = last_orderbook.get_bbo()
+            price = (
+                order.price
+                if order.side == Side.YES
+                else get_opposite_side_price(order.price)
+            )
             # Check if we can place this order
             if (order.side == Side.YES and order.trade == TradeType.BUY) or (
                 order.side == Side.NO and order.trade == TradeType.SELL
@@ -57,14 +67,9 @@ class PassiveIOCStrategySimulator:
                     # Cannot place order
                     continue
 
-                buy_price = (
-                    order.price
-                    if order.side == Side.YES
-                    else get_opposite_side_price(order.price)
-                )
                 buy_qty = order.quantity
                 # NOTE: we intentionally don't allow orders with prices not at bbo
-                if buy_price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
+                if price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
                     self.portfolio.place_order(order)
                 else:
                     print("Cannot place order: ", order)
@@ -72,13 +77,8 @@ class PassiveIOCStrategySimulator:
                 if bbo.bid is None:
                     print("Cannot place order: ", order)
                     continue
-                sell_price = (
-                    order.price
-                    if order.side == Side.YES
-                    else get_opposite_side_price(order.price)
-                )
                 sell_qty = order.quantity
-                if sell_price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
+                if price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
                     self.portfolio.place_order(order)
                 else:
                     print("Cannot place order: ", order)
