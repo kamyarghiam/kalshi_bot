@@ -17,6 +17,14 @@ from helpers.types.orderbook import Orderbook
 from helpers.types.trades import Trade
 
 
+def convert_zst_file(load_path: str, save_path: str):
+    """Databento has zst files. This function loads the csv.zst file and saves as csv
+
+    Make sure to do pip3 install zstandard
+    """
+    pd.read_csv(load_path).to_csv(save_path)
+
+
 def market_making_profit(exchange_interface: ExchangeInterface):
     """Try to market make"""
     ticker = MarketTicker("INXD-23AUG31-B4537")
@@ -86,6 +94,13 @@ def read_es_data(normalize=True, filename="aug31.csv"):
         df["price"] = scaler.fit_transform(df[["price"]])
     df["ts_recv"] = df["ts_recv"].apply(
         lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
+    )
+    # Latency to receive ES data then message kalshi
+    latency_from_es_data_to_kalshi_sec = 0.05
+    df["ts_recv"] = df.apply(
+        lambda row: row["ts_recv"]
+        + timedelta(seconds=latency_from_es_data_to_kalshi_sec),
+        axis=1,
     )
     return df
 
@@ -240,13 +255,6 @@ def get_es_predictions(
     )
     # round to the nearest 2 decimal points
     es_df["prediction"] = es_df["prediction"].round(2)
-    # Latency to receive ES data then message kalshi
-    latency_from_es_data_to_kalshi_sec = 0.1
-    es_df["prediction_ts"] = es_df.apply(
-        lambda row: row["ts_recv"]
-        + timedelta(seconds=latency_from_es_data_to_kalshi_sec),
-        axis=1,
-    )
     mask = es_df["prediction"] != es_df["prediction"].shift(1)
     es_df = es_df[mask]
     return es_df
@@ -479,3 +487,10 @@ def graph_rolling_predictions():
     # different days, and computing profit
     # graph_rolling_predictions()
     # graph_es_predictions_against_trades()
+
+
+def create_orders():
+    es_data = read_es_data(normalize=False)
+    for row in es_data.iterrows():
+        print(row)
+        break
