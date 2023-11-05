@@ -113,3 +113,36 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     )
     sim.run()
     assert sim.portfolio.orders == orders
+
+
+def test_passive_ioc_strategy_simulator_ignore_price():
+    ticker = MarketTicker("some-ticker")
+    ts1 = datetime.now()
+    ts2 = ts1 + timedelta(seconds=10)
+    updates = [
+        Orderbook(
+            ticker,
+            yes=OrderbookSide(
+                levels={Price(10): Quantity(10), Price(11): Quantity(20)}
+            ),
+            no=OrderbookSide(levels={Price(88): Quantity(10), Price(87): Quantity(20)}),
+            ts=ts1,
+        ),
+        Orderbook(
+            ticker,
+            yes=OrderbookSide(levels={Price(10): Quantity(10)}),
+            no=OrderbookSide(levels={Price(88): Quantity(10), Price(87): Quantity(20)}),
+            ts=ts2,
+        ),
+    ]
+    orders = [
+        Order(Price(65), Quantity(1), TradeType.BUY, ticker, Side.NO, ts1),
+        Order(Price(30), Quantity(1), TradeType.SELL, ticker, Side.NO, ts2),
+    ]
+
+    simulator = PassiveIOCStrategySimulator(
+        orders, list_to_generator(updates), portfolio_balance=Balance(Cents(100))
+    )
+    simulator.run(ignore_price=True)
+
+    assert simulator.portfolio.pnl == -1

@@ -66,6 +66,11 @@ class PassiveIOCStrategySimulator:
                     print("Cannot place order: ", order)
                     # Cannot place order
                     continue
+                if ignore_price:
+                    price = bbo.ask.price
+                    order.price = price
+                    if order.side == Side.NO:
+                        order.price = get_opposite_side_price(order.price)
 
                 buy_qty = order.quantity
                 # NOTE: we intentionally don't allow orders with prices not at bbo
@@ -77,6 +82,12 @@ class PassiveIOCStrategySimulator:
                 if bbo.bid is None:
                     print("Cannot place order: ", order)
                     continue
+                if ignore_price:
+                    price = bbo.bid.price
+                    order.price = price
+                    if order.side == Side.NO:
+                        order.price = get_opposite_side_price(order.price)
+
                 sell_qty = order.quantity
                 if price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
                     self.portfolio.place_order(order)
