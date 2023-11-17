@@ -48,6 +48,7 @@ TODO: maybe we should parallelize the writes if it's too slow?
 
 import io
 import pickle
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -149,6 +150,25 @@ class ColeBytes:
         return bits
 
 
+class OrderbookCursor(ABC):
+    @abstractmethod
+    def start(self) -> Generator[Orderbook, None, None]:
+        pass
+
+
+@dataclass
+class ColeDBCursor(OrderbookCursor):
+    interface: "ColeDBInterface"
+    ticker: MarketTicker
+    start_ts: datetime | None = None
+    end_ts: datetime | None = None
+
+    def start(self) -> Generator[Orderbook, None, None]:
+        return self.interface.read(
+            ticker=self.ticker, start_ts=self.start_ts, end_ts=self.end_ts
+        )
+
+
 class ColeDBInterface:
     """Public interface for ColeDB"""
 
@@ -235,6 +255,19 @@ class ColeDBInterface:
         else:
             ColeDBInterface._write_data_to_last_file(data, metadata)
 
+    def read_cursor(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+    ) -> ColeDBCursor:
+        """
+        Returns a cursor that can be used to read through coledb entries multiple times.
+        """
+        return ColeDBCursor(
+            interface=self, ticker=ticker, start_ts=start_ts, end_ts=end_ts
+        )
+
     def read(
         self,
         ticker: MarketTicker,
@@ -242,6 +275,7 @@ class ColeDBInterface:
         end_ts: datetime | None = None,
     ) -> Generator[Orderbook, None, None]:
         """Reads data from coledb"""
+
         metadata = self.get_metadata(ticker)
         # If this breaks, this means there are no chunks
         chunk_start_ts = metadata.chunk_first_time_stamps[0]

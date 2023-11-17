@@ -9,7 +9,7 @@ from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTick
 from helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType, compute_fee
-from helpers.types.portfolio import Portfolio, PortfolioError, Position
+from helpers.types.portfolio import PortfolioError, PortfolioHistory, Position
 from tests.fake_exchange import Price
 from tests.utils import almost_equal
 
@@ -196,7 +196,7 @@ def test_add_duplicate_price_point():
 
 
 def test_portfolio_buy():
-    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
     portfolio.buy(
         Order(
             ticker=MarketTicker("hi"),
@@ -293,7 +293,7 @@ def test_portfolio_buy():
 
 
 def test_portfolio_sell():
-    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
     assert len(portfolio._positions) == 0
     portfolio.buy(
         Order(
@@ -387,7 +387,7 @@ def test_portfolio_sell():
 
 
 def test_find_sell_opportunites():
-    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
     portfolio.buy(
         Order(
             ticker=MarketTicker("hi"),
@@ -461,7 +461,7 @@ def test_find_sell_opportunites():
 
 
 def test_save_load(tmp_path):
-    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
     portfolio.buy(
         Order(
             ticker=MarketTicker("hi"),
@@ -489,11 +489,11 @@ def test_save_load(tmp_path):
             trade=TradeType.BUY,
         )
     )
-    assert not Portfolio.saved_portfolio_exists(tmp_path)
+    assert not PortfolioHistory.saved_portfolio_exists(tmp_path)
     portfolio.save(tmp_path)
-    assert Portfolio.saved_portfolio_exists(tmp_path)
+    assert PortfolioHistory.saved_portfolio_exists(tmp_path)
 
-    assert Portfolio.load(tmp_path) == portfolio
+    assert PortfolioHistory.load(tmp_path) == portfolio
 
 
 def test_position_error_scenarios():
@@ -596,7 +596,7 @@ def test_position_print():
 
 
 def test_portfolio_print():
-    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
     ts = datetime.datetime(2023, 11, 1, 7, 23)
     portfolio.buy(
         Order(
@@ -646,7 +646,7 @@ Orders:
 
 
 def test_get_unrealized_pnl():
-    p = Portfolio(Balance(Dollars(10000)))
+    p = PortfolioHistory(Balance(Dollars(10000)))
     p.buy(
         Order(
             price=Price(10),
@@ -706,7 +706,7 @@ def test_get_unrealized_pnl():
 
 
 def test_place_order():
-    portfolio = Portfolio(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
     buy_o = Order(
         price=Price(10),
         quantity=Quantity(100),
