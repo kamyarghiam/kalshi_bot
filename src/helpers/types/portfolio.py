@@ -133,7 +133,7 @@ class PortfolioError(Exception):
     """Some issue with buying or selling"""
 
 
-class Portfolio:
+class PortfolioHistory:
     _pickle_file = Path("last_portfolio.pickle")
 
     def __init__(
@@ -205,7 +205,7 @@ class Portfolio:
         )
 
     def __eq__(self, other):
-        return isinstance(other, Portfolio) and (
+        return isinstance(other, PortfolioHistory) and (
             self._cash_balance == other._cash_balance
             and self._positions == other._positions
             and self.orders == other.orders
@@ -313,13 +313,13 @@ class Portfolio:
         return Cents(position_values)
 
     def save(self, root_path: Path):
-        (root_path / Portfolio._pickle_file).write_bytes(pickle.dumps(self))
+        (root_path / PortfolioHistory._pickle_file).write_bytes(pickle.dumps(self))
 
     @staticmethod
     def saved_portfolio_exists(root_path: Path):
         """Checks if there is a portfolio saved"""
-        return (root_path / Portfolio._pickle_file).exists()
+        return (root_path / PortfolioHistory._pickle_file).exists()
 
     @classmethod
-    def load(cls, root_path: Path) -> "Portfolio":
+    def load(cls, root_path: Path) -> "PortfolioHistory":
         return pickle.loads((root_path / cls._pickle_file).read_bytes())

@@ -10,7 +10,7 @@ version = "0.1.0"
 description = ""
 authors = ["kamyarghiam <kamyarghiam@gmail.com>"]
 readme = "README.md"
-packages = [{include = "data", from="src"}, {include = "exchange", from="src"}, {include = "helpers", from="src"}]
+packages = [{include = "data", from="src"}, {include = "exchange", from="src"}, {include = "helpers", from="src"}, {include = "strategy", from="src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"

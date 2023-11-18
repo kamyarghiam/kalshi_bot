@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 
 from exchange.interface import MarketTicker
-from exchange.sim import PassiveIOCStrategySimulator
 from helpers.types.money import Balance, Cents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from tests.utils import list_to_generator
+from strategy.predetermined_strategy import PredeterminedStrategy
+from strategy.sim.active_ioc import ActiveIOCStrategySimulator
+from tests.utils import list_to_cursor
 
 
 def test_passive_ioc_strategy_simulator_simple():
@@ -33,15 +34,15 @@ def test_passive_ioc_strategy_simulator_simple():
         Order(Price(10), Quantity(5), TradeType.SELL, ticker, Side.YES, ts2),
     ]
 
-    simulator = PassiveIOCStrategySimulator(
-        orders, list_to_generator(updates), portfolio_balance=Balance(Cents(100))
+    simulator = ActiveIOCStrategySimulator(
+        orderbook_updates=list_to_cursor(updates), starting_balance=Balance(Cents(100))
     )
-    simulator.run()
+    portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 
-    assert simulator.portfolio.fees_paid == 8
-    assert simulator.portfolio.pnl_after_fees == -18
-    assert simulator.portfolio._cash_balance == 82
-    assert simulator.portfolio.orders == orders
+    assert portfolio_history.fees_paid == 8
+    assert portfolio_history.pnl_after_fees == -18
+    assert portfolio_history._cash_balance == 82
+    assert portfolio_history.orders == orders
 
 
 def test_passive_ioc_strategy_simulator_bad_orders():
@@ -75,17 +76,17 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     orders = [
         Order(Price(5), Quantity(5), TradeType.BUY, ticker, Side.YES, ts1),
     ]
-    sim = PassiveIOCStrategySimulator(orders, list_to_generator(updates))
-    sim.run()
-    assert len(sim.portfolio.orders) == 0
+    sim = ActiveIOCStrategySimulator(orderbook_updates=list_to_cursor(updates))
+    portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
+    assert len(portfolio_history.orders) == 0
 
     #     No Side
     orders = [
         Order(Price(88), Quantity(5), TradeType.BUY, ticker, Side.NO, ts1),
     ]
-    sim = PassiveIOCStrategySimulator(orders, list_to_generator(updates))
-    sim.run()
-    assert len(sim.portfolio.orders) == 0
+    sim = ActiveIOCStrategySimulator(orderbook_updates=list_to_cursor(updates))
+    portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
+    assert len(portfolio_history.orders) == 0
 
     # Test that latency affects orders
     latency = timedelta(milliseconds=100)
@@ -95,11 +96,11 @@ def test_passive_ioc_strategy_simulator_bad_orders():
             Price(11), Quantity(5), TradeType.BUY, ticker, Side.YES, ts2 - 2 * latency
         ),
     ]
-    sim = PassiveIOCStrategySimulator(
-        orders, list_to_generator(updates), latency_to_exchange=latency
+    sim = ActiveIOCStrategySimulator(
+        orderbook_updates=list_to_cursor(updates), latency_to_exchange=latency
     )
-    sim.run()
-    assert len(sim.portfolio.orders) == 0
+    portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
+    assert len(portfolio_history.orders) == 0
 
     #     No side
     orders = [
@@ -108,11 +109,11 @@ def test_passive_ioc_strategy_simulator_bad_orders():
         ),
     ]
     # Should go through
-    sim = PassiveIOCStrategySimulator(
-        orders, list_to_generator(updates), latency_to_exchange=latency
+    sim = ActiveIOCStrategySimulator(
+        orderbook_updates=list_to_cursor(updates), latency_to_exchange=latency
     )
-    sim.run()
-    assert sim.portfolio.orders == orders
+    portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
+    assert portfolio_history.orders == orders
 
 
 def test_passive_ioc_strategy_simulator_ignore_price():
@@ -140,9 +141,11 @@ def test_passive_ioc_strategy_simulator_ignore_price():
         Order(Price(30), Quantity(1), TradeType.SELL, ticker, Side.NO, ts2),
     ]
 
-    simulator = PassiveIOCStrategySimulator(
-        orders, list_to_generator(updates), portfolio_balance=Balance(Cents(100))
+    simulator = ActiveIOCStrategySimulator(
+        ignore_price=True,
+        orderbook_updates=list_to_cursor(updates),
+        starting_balance=Balance(Cents(100)),
     )
-    simulator.run(ignore_price=True)
+    portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 
-    assert simulator.portfolio.pnl == -1
+    assert portfolio_history.pnl == -1

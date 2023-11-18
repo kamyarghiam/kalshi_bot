@@ -2,16 +2,19 @@
 against the exchange without actually sending orders"""
 
 
+import itertools
 from datetime import timedelta
-from typing import Generator, Iterable
 
+from data.coledb.coledb import OrderbookCursor
 from helpers.types.money import Balance, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
-from helpers.types.orders import Order, Side, TradeType
-from helpers.types.portfolio import Portfolio
+from helpers.types.orders import Side, TradeType
+from helpers.types.portfolio import PortfolioHistory
+from strategy.sim.sim import StrategySimulator
+from strategy.strategy import Strategy
 
 
-class PassiveIOCStrategySimulator:
+class ActiveIOCStrategySimulator(StrategySimulator):
     """This class takes in a generator of orders and orderbook updates
     and tells you how much your strategy would have made.
 
@@ -21,33 +24,39 @@ class PassiveIOCStrategySimulator:
 
     LIMITATION: this simulator only works with passive IOC strategies that
     pick orders up from the orderbook. We return true or false whether an
-    order has went through"""
+    order has went through
+
+    ignore_price: lets say you want to place market orders without
+    regard to what the price is at. This flag ignores the price you input
+    and rather just replaces it with the bbo.
+
+    """
 
     def __init__(
         self,
-        orders: Iterable[Order],
-        orderbook_updates: Generator[Orderbook, None, None],
-        portfolio_balance: Balance = Balance(Cents(100_000_000)),
+        orderbook_updates: OrderbookCursor,
+        ignore_price: bool = False,
+        starting_balance: Balance = Balance(Cents(100_000_000)),
         latency_to_exchange: timedelta = timedelta(milliseconds=100),
     ):
-        # These are orders that we requested to place in the exchange
-        self.orders_requested = orders
-        self.orderbook_updates = orderbook_updates
         # Get all results from the portfolio here
-        self.portfolio = Portfolio(portfolio_balance)
+        self.orderbook_updates = orderbook_updates
+        self.starting_balance = starting_balance
         self.latency_to_exchange = latency_to_exchange
+        self.ignore_price = ignore_price
 
-    def run(self, ignore_price=False):
-        """Runs the sim!
-
-        ignore_price: lets say you want to place market orders without
-        regard to what the price is at. This flag ignores the price you input
-        and rather just replaces it with the bbo.
-        """
-
-        last_orderbook: Orderbook = next(self.orderbook_updates)
-        for order in self.orders_requested:
-            for orderbook in self.orderbook_updates:
+    def run(self, strategy: Strategy) -> PortfolioHistory:
+        portfolio_history = PortfolioHistory(self.starting_balance)
+        ignore_price = self.ignore_price
+        # First, run the strategy from start to end to get all the orders it places.
+        orders_requested = itertools.chain.from_iterable(
+            strategy.consume_next_step(update)
+            for update in self.orderbook_updates.start()
+        )
+        orderbooks_generator = self.orderbook_updates.start()
+        last_orderbook: Orderbook = next(orderbooks_generator)
+        for order in orders_requested:
+            for orderbook in orderbooks_generator:
                 if order.time_placed + self.latency_to_exchange < orderbook.ts:
                     break
 
@@ -75,7 +84,7 @@ class PassiveIOCStrategySimulator:
                 buy_qty = order.quantity
                 # NOTE: we intentionally don't allow orders with prices not at bbo
                 if price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
-                    self.portfolio.place_order(order)
+                    portfolio_history.place_order(order)
                 else:
                     print("Cannot place order: ", order)
             else:
@@ -90,10 +99,10 @@ class PassiveIOCStrategySimulator:
 
                 sell_qty = order.quantity
                 if price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
-                    self.portfolio.place_order(order)
+                    portfolio_history.place_order(order)
                 else:
                     print("Cannot place order: ", order)
 
             last_orderbook = orderbook
-        print(self.portfolio)
+        return portfolio_history
         # NOTE: you may want to check whether the market settled
