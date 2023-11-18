@@ -74,7 +74,7 @@ class BaseFeatureSet:
     def from_basefeature(feature: BaseFeatures):
         return BaseFeatureSet.from_basefeatures([feature])
 
-    def observed_ts_of(self, feature_key: str) -> datetime.date:
+    def observed_ts_of(self, feature_key: str) -> datetime.datetime:
         return self.series[self.feature_observation_times[feature_key]]
 
     @cached_property
@@ -82,7 +82,7 @@ class BaseFeatureSet:
         return self.feature_observation_times.values()
 
     @cached_property
-    def latest_ts(self) -> datetime.date:
+    def latest_ts(self) -> datetime.datetime:
         return max(self.series[time_key] for time_key in self.observed_time_keys)
 
 
@@ -99,6 +99,31 @@ class BaseFeatureCursor(ABC):
 
 
 @dataclass
+class LiveFeatureCursor(BaseFeatureCursor):
+    """
+    A cursor that can take streams (generators) of BaseFeatures,
+      and aggregate/pool them together.
+    """
+    def from_(
+        featuresets: List[BaseFeatureSet],
+    ) -> "HistoricalFeatureCursor":
+        # Takes a list of featuresets over time and makes a cursor.
+        # Assumes that featuresets are sorted by latest_ts already.
+        df = pd.DataFrame([fs.series for fs in featuresets])
+
+        feature_observation_times = featuresets[0].feature_observation_times
+        return HistoricalFeatureCursor(
+            df=df, feature_observation_times=feature_observation_times
+        )
+
+    def start(self) -> Generator[BaseFeatureSet, None, None]:
+        for _, row in self.df.iterrows():
+            yield BaseFeatureSet(
+                series=row, feature_observation_times=self.feature_observation_times
+            )
+
+
+@dataclass
 class HistoricalFeatureCursor(BaseFeatureCursor):
     """
     Cursor for going through historical base features.
@@ -111,6 +136,19 @@ class HistoricalFeatureCursor(BaseFeatureCursor):
     @staticmethod
     def from_featuresets_over_time(
         featuresets: List[BaseFeatureSet],
+    ) -> "HistoricalFeatureCursor":
+        # Takes a list of featuresets over time and makes a cursor.
+        # Assumes that featuresets are sorted by latest_ts already.
+        df = pd.DataFrame([fs.series for fs in featuresets])
+
+        feature_observation_times = featuresets[0].feature_observation_times
+        return HistoricalFeatureCursor(
+            df=df, feature_observation_times=feature_observation_times
+        )
+
+    @staticmethod
+    def from_feature_lists(
+        features : List[List[BaseFeatures]]],
     ) -> "HistoricalFeatureCursor":
         # Takes a list of featuresets over time and makes a cursor.
         # Assumes that featuresets are sorted by latest_ts already.
