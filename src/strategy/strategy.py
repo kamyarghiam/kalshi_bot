@@ -2,7 +2,7 @@ import datetime
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Dict, Generator, Iterable, Iterator, List, Tuple
+from typing import Any, Generator, Iterable, Iterator, List, Tuple
 
 import pandas as pd
 
@@ -10,9 +10,13 @@ from helpers.types.orders import Order
 
 
 @dataclass(frozen=True)
-class BaseFeatures:
+class BaseFeature:
     """
-    This is a collection of base features that all are observed at the same time.
+    A BaseFeature is an atomic piece of information at a specific point in time.
+    A collection of BaseFeatures can form a series of information across time.
+    Note that the name of the BaseFeature is what connects a series of BaseFeatures
+    together.
+
     We make this type so that it's easier to change the underlying type in the future.
     Note that we call these "Base" features, ie they are raw data, such as orderbooks.
     'Derived' features such as depth-of-book,
@@ -23,33 +27,9 @@ class BaseFeatures:
       and then use the same ones on live markets without modification.
     """
 
-    series: pd.Series
-    observed_ts_key: str
-
-    @property
-    def observed_ts(self) -> datetime.datetime:
-        return self.series[self.observed_ts_key]
-
-    @staticmethod
-    def from_any(
-        feature_name: str,
-        feature: Any,
-        observed_ts: datetime.datetime,
-        observed_ts_key_suffix: str = "_observed_ts",
-    ) -> "BaseFeatures":
-        """
-        We can trivially turns any dict of python objects into a pd series.
-        Obviously this is inefficient, but it is easy and good for prototyping/testing.
-        """
-        ts_key = f"{feature_name}_{observed_ts_key_suffix}"
-        return BaseFeatures.from_series(
-            series=pd.Series(data={feature_name: feature, ts_key: observed_ts}),
-            observed_ts_key=ts_key,
-        )
-
-    @staticmethod
-    def from_series(series: pd.Series, observed_ts_key: str) -> "BaseFeatures":
-        return BaseFeatures(series=series, observed_ts_key=observed_ts_key)
+    name: str
+    data: Any
+    ts: datetime.datetime
 
 
 @dataclass(frozen=True)
@@ -59,31 +39,36 @@ class BaseFeatureSet:
     """
 
     series: pd.Series
-    # Mapping from feature keys to observed keys.
-    feature_observation_time_keys: Dict[str, str]
 
-    @staticmethod
-    def from_basefeatures(features: List[BaseFeatures]):
-        times = {key: f.observed_ts_key for f in features for key in f.series.index}
-        new_series = pd.concat(
-            [f.series for f in features], verify_integrity=True, axis="index"
-        )
-        return BaseFeatureSet(series=new_series, feature_observation_time_keys=times)
+    @classmethod
+    def from_basefeatures(cls, features: List[BaseFeature]):
+        """Combines features into a BaseFeature set.
 
-    @staticmethod
-    def from_basefeature(feature: BaseFeatures):
-        return BaseFeatureSet.from_basefeatures([feature])
+        All the base features must have the same name
+        """
 
-    def observed_ts_of(self, feature_key: str) -> datetime.datetime:
-        return self.series[self.feature_observation_time_keys[feature_key]]
+        if len(features) == 0:
+            return BaseFeatureSet(series=pd.Series())
 
-    @cached_property
-    def observed_time_keys(self) -> Iterable[str]:
-        return self.feature_observation_time_keys.values()
+        feature_name = features[0].name
+        if not all(feature.name == feature_name for feature in features):
+            raise ValueError("All the features must have the same name")
+
+        data_values = [feature.data for feature in features]
+        timestamps = [feature.ts for feature in features]
+
+        # Create a Pandas Series with timestamps as the index
+        series_data = pd.Series(data_values, index=timestamps, name=feature_name)
+
+        return cls(series=series_data)
+
+    @classmethod
+    def from_basefeature(cls, feature: BaseFeature):
+        return cls.from_basefeatures([feature])
 
     @cached_property
     def latest_ts(self) -> datetime.datetime:
-        return max(self.series[time_key] for time_key in self.observed_time_keys)
+        return self.series.index.max()
 
 
 class BaseFeatureCursor(ABC):
@@ -106,24 +91,18 @@ class HistoricalFeatureCursor(BaseFeatureCursor):
     """
 
     df: pd.DataFrame
-    feature_observation_time_keys: Dict[str, str]  # These don't change over time.
 
-    @staticmethod
+    @classmethod
     def from_featuresets_over_time(
+        cls,
         featuresets: List[BaseFeatureSet],
     ) -> "HistoricalFeatureCursor":
-        # Takes a list of featuresets over time and makes a cursor.
-        # Assumes that featuresets are sorted by latest_ts already.
-        df = pd.DataFrame([fs.series for fs in featuresets])
+        return cls(df=pd.concat([fs.series for fs in featuresets]))
 
-        feature_observation_times = featuresets[0].feature_observation_time_keys
-        return HistoricalFeatureCursor(
-            df=df, feature_observation_time_keys=feature_observation_times
-        )
-
-    @staticmethod
+    @classmethod
     def from_feature_streams(
-        feature_streams: List[Iterable[BaseFeatures]],
+        cls,
+        feature_streams: List[Iterable[BaseFeature]],
     ) -> "HistoricalFeatureCursor":
         """
         Takes a list of basefeature lists,
@@ -132,14 +111,14 @@ class HistoricalFeatureCursor(BaseFeatureCursor):
         feature_iters = [iter(s) for s in feature_streams]
 
         def next_or_done(
-            prev: BaseFeatures, iterator: Iterator[BaseFeatures]
-        ) -> Tuple[BaseFeatures, bool]:
+            prev: BaseFeature, iterator: Iterator[BaseFeature]
+        ) -> Tuple[BaseFeature, bool]:
             try:
                 return (next(iterator), False)
             except StopIteration:
                 return (prev, True)
 
-        heads: List[Tuple[BaseFeatures, bool]] = [
+        heads: List[Tuple[BaseFeature, bool]] = [
             (next(stream), False) for stream in feature_iters
         ]
         featuresets = []
@@ -152,7 +131,7 @@ class HistoricalFeatureCursor(BaseFeatureCursor):
                     idx for idx, tup in enumerate(heads) if not tup[1]
                 ]
                 next_feature_idx = min(
-                    remaining_head_idxs, key=lambda idx: heads[idx][0].observed_ts
+                    remaining_head_idxs, key=lambda idx: heads[idx][0].ts
                 )
                 next_feature, done = next_or_done(
                     prev=heads[next_feature_idx][0],
@@ -161,15 +140,12 @@ class HistoricalFeatureCursor(BaseFeatureCursor):
                 heads[next_feature_idx] = (next_feature, done)
                 if not done or all(done for _, done in heads):
                     break
-        return HistoricalFeatureCursor.from_featuresets_over_time(
-            featuresets=featuresets
-        )
+        return cls.from_featuresets_over_time(featuresets=featuresets)
 
     def start(self) -> Generator[BaseFeatureSet, None, None]:
         for _, row in self.df.iterrows():
             yield BaseFeatureSet(
                 series=row,
-                feature_observation_time_keys=self.feature_observation_time_keys,
             )
 
 

@@ -1,4 +1,6 @@
+import datetime
 import os
+from typing import List
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,6 +8,7 @@ from pytest import TempPathFactory
 
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
+from strategy.strategy import BaseFeature
 from tests.fake_exchange import kalshi_test_exchange_factory
 
 """This file contains configuration information for testing.
@@ -69,3 +72,77 @@ def exchange_interface(fastapi_test_client: TestClient | None):
 def temp_coledb_interface(tmp_path_factory: TempPathFactory):
     tmp_path = tmp_path_factory.mktemp("coledb")
     ColeDBInterface.cole_db_storage_path = tmp_path
+
+
+@pytest.fixture()
+def equities_base_features() -> List[BaseFeature]:
+    # Let's create some fake features from different sources
+    #   and with different input formats.
+    day = datetime.date.today()
+
+    # This source has keys "asset" and "price"
+    aapl_feature_1 = BaseFeature(
+        name="equities_price_changes",
+        data={
+            "asset": "AAPL",
+            "price": 200,
+        },
+        ts=datetime.datetime.combine(day, datetime.time(hour=1)),
+    )
+    aapl_feature_2 = BaseFeature(
+        name="equities_price_changes",
+        data={
+            "asset": "AAPL",
+            "price": 210,
+        },
+        ts=datetime.datetime.combine(day, datetime.time(hour=2)),
+    )
+    msft_feature_1 = BaseFeature(
+        name="equities_price_changes",
+        data={
+            "asset": "MSFT",
+            "price": 300,
+        },
+        ts=datetime.datetime.combine(day, datetime.time(hour=4)),
+    )
+    msft_feature_2 = BaseFeature(
+        name="equities_price_changes",
+        data={
+            "asset": "MSFT",
+            "price": 290,
+        },
+        ts=datetime.datetime.combine(day, datetime.time(hour=5)),
+    )
+    equities_price_changes = [
+        aapl_feature_1,
+        aapl_feature_2,
+        msft_feature_1,
+        msft_feature_2,
+    ]
+
+    return equities_price_changes
+
+
+@pytest.fixture()
+def weather_base_features() -> List[BaseFeature]:
+    day = datetime.date.today()
+
+    # This source has keys "asset" and "price"
+    weather1 = BaseFeature(
+        name="weather_changes",
+        data={
+            "temperature": 50,
+            "precipitation": 100,
+        },
+        ts=datetime.datetime.combine(day, datetime.time(hour=3)),
+    )
+    weather2 = BaseFeature(
+        name="weather_changes",
+        data={
+            "temperature": 55,
+            "precipitation": 10,
+        },
+        ts=datetime.datetime.combine(day, datetime.time(hour=6)),
+    )
+
+    return [weather1, weather2]
