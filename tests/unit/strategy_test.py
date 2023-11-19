@@ -6,7 +6,8 @@ from strategy.strategy import BaseFeatures, BaseFeatureSet, HistoricalFeatureCur
 
 
 def test_feature_collections():
-    # Let's create some fake features from different sources and with different input formats.
+    # Let's create some fake features from different sources
+    #   and with different input formats.
     day = datetime.date.today()
 
     # This source has keys "a_feature" and "a_num", and our observation ts key is "ts"
@@ -27,7 +28,8 @@ def test_feature_collections():
         ),
     ]
 
-    # This source gives us dictionaries, which we (for example) annotate with the time we got them.
+    # This source gives us dictionaries,
+    #   which we annotate with the time we got them.
     b_raw_features = [{"bbbb", "33"}, {"bbbb", "44"}]
     b_observation_times = [datetime.time(hour=2), datetime.time(hour=5)]
 
@@ -51,7 +53,8 @@ def test_feature_collections():
     for idx, f in enumerate(b_features):
         assert ((idx * 3) + 2) == f.observed_ts.hour
 
-    # Nice! Next, lets make a base feature set that combines a few combinations of these features.
+    # Next, lets make a base feature set
+    #   that combines a few combinations of these features.
     observed_0s = BaseFeatureSet.from_basefeatures([a_features[0], b_features[0]])
     assert observed_0s.observed_ts_of("a_feature").hour == 1
     assert observed_0s.observed_ts_of("a_num").hour == 1
@@ -67,30 +70,34 @@ def test_feature_collections():
     assert observed_b_before_a.observed_ts_of("b_features").hour == 2
     assert observed_b_before_a.latest_ts.hour == 4
 
-    # Cool. Now, let's try and make a full historical cursor that merges these features together.
-    hist_features = HistoricalFeatureCursor.from_featuresets_over_time(
+    # Now, let's try and make a full historical cursor
+    #  that merges these features together.
+    hist_features = HistoricalFeatureCursor.from_feature_streams(
         [a_features, b_features]
     )
     # Cursor through them and check that we get the features in the correct order.
+    # We check that the length is 3, not 4:
+    # There are 3 moments in time where every feature is present.
+    # We assume strategies will not run without all features present.
     all_featuresets = [fs for fs in hist_features.start()]
-    assert len(all_featuresets) == 4
+    assert len(all_featuresets) == 3
 
     # Check the latest timestamps are correct.
     all_latest_ts_hours = [fs.latest_ts.hour for fs in all_featuresets]
-    assert all_latest_ts_hours == [1, 2, 4, 5]
+    assert all_latest_ts_hours == [2, 4, 5]
 
     # Check the observed timestamps of a and b are correct.
     observed_a_ts_hours = [
         fs.observed_ts_of("a_feature").hour for fs in all_featuresets
     ]
-    assert observed_a_ts_hours == [1, 1, 4, 4]
+    assert observed_a_ts_hours == [1, 4, 4]
     observed_b_ts_hours = [
         fs.observed_ts_of("b_features").hour for fs in all_featuresets
     ]
-    assert observed_b_ts_hours == [None, 2, 2, 5]
+    assert observed_b_ts_hours == [2, 2, 5]
 
     # Check the features themselves.
     observed_a_num_features = [fs.series["a_num"] for fs in all_featuresets]
-    assert observed_a_num_features == [2, 2, 999, 999]
+    assert observed_a_num_features == [2, 999, 999]
     observed_b_features = [fs.series["b_features"] for fs in all_featuresets]
-    assert observed_b_features == [None, {"bbbb", "33"}, {"bbbb", "33"}, {"bbbb", "44"}]
+    assert observed_b_features == [{"bbbb", "33"}, {"bbbb", "33"}, {"bbbb", "44"}]
