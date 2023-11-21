@@ -11,7 +11,7 @@ from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from strategy.sim.sim import StrategySimulator
-from strategy.strategy import BaseFeature, BaseFeatureSet, Strategy
+from strategy.strategy import BaseFeatures, BaseFeatureSet, Strategy
 
 
 class ActiveIOCStrategySimulator(StrategySimulator):
@@ -52,10 +52,10 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         orders_requested = itertools.chain.from_iterable(
             strategy.consume_next_step(
                 update=BaseFeatureSet.from_basefeature(
-                    BaseFeature(
-                        name="kalshi_orderbook_updates",
-                        data=update,
-                        ts=update.ts,
+                    BaseFeatures.from_any(
+                        feature_name="kalshi_orderbook",
+                        feature=update,
+                        observed_ts=update.ts,
                     )
                 )
             )

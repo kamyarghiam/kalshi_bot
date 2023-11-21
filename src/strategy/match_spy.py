@@ -18,5 +18,13 @@ class MatchSPY(Strategy):
         self.buy_price = buy_price
         self.buy_qty = buy_qty
 
+    @abstractmethod
     def consume_next_step(self, update: Orderbook) -> Iterable[Order]:
-        raise NotImplementedError()
+        Order(
+            price=self.buy_price,
+            quantity=self.buy_qty,
+            trade=TradeType.BUY,
+            ticker=MarketTicker("SPYorsomething"),
+            side=Side.YES,
+            time_placed=update.ts,
+        )
