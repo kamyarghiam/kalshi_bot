@@ -1,11 +1,8 @@
-from abc import abstractmethod
 from typing import Iterable
 
-from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import Orderbook
-from helpers.types.orders import Order, Quantity, Side, TradeType
-from strategy.strategy import Strategy
+from helpers.types.orders import Order, Quantity
+from strategy.strategy import BaseFeatureSet, Strategy
 
 
 class MatchSPY(Strategy):
@@ -18,13 +15,5 @@ class MatchSPY(Strategy):
         self.buy_price = buy_price
         self.buy_qty = buy_qty
 
-    @abstractmethod
-    def consume_next_step(self, update: Orderbook) -> Iterable[Order]:
-        Order(
-            price=self.buy_price,
-            quantity=self.buy_qty,
-            trade=TradeType.BUY,
-            ticker=MarketTicker("SPYorsomething"),
-            side=Side.YES,
-            time_placed=update.ts,
-        )
+    def consume_next_step(self, update: BaseFeatureSet) -> Iterable[Order]:
+        raise NotImplementedError()

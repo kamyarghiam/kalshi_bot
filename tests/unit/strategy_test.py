@@ -2,7 +2,7 @@ import datetime
 
 import pandas as pd
 
-from strategy.strategy import BaseFeatures, BaseFeatureSet, HistoricalFeatureCursor
+from strategy.strategy import BaseFeature, BaseFeatureSet, HistoricalFeatureCursor
 
 
 def test_feature_collections():
@@ -35,10 +35,10 @@ def test_feature_collections():
 
     # Let's standardize them.
     a_features = [
-        BaseFeatures.from_series(series=s, observed_ts_key="ts") for s in a_raw_features
+        BaseFeature.from_series(series=s, observed_ts_key="ts") for s in a_raw_features
     ]
     b_features = [
-        BaseFeatures.from_any(
+        BaseFeature.from_any(
             feature_name="b_features",
             feature=d,
             observed_ts=datetime.datetime.combine(day, obs_time),
