@@ -11,7 +11,7 @@ from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from strategy.sim.sim import StrategySimulator
-from strategy.strategy import BaseFeature, BaseFeatureSet, Strategy
+from strategy.strategy import Observation, ObservationSet, Strategy
 
 
 class ActiveIOCStrategySimulator(StrategySimulator):
@@ -49,18 +49,21 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         portfolio_history = PortfolioHistory(self.starting_balance)
         ignore_price = self.ignore_price
         # First, run the strategy from start to end to get all the orders it places.
-        orders_requested = itertools.chain.from_iterable(
-            strategy.consume_next_step(
-                update=BaseFeatureSet.from_basefeature(
-                    BaseFeature.from_any(
-                        feature_name="kalshi_orderbook",
-                        feature=update,
-                        observed_ts=update.ts,
+        orders_requested = list(
+            itertools.chain.from_iterable(
+                strategy.consume_next_step(
+                    update=ObservationSet.from_basefeature(
+                        Observation.from_any(
+                            feature_name="kalshi_orderbook",
+                            feature=update,
+                            observed_ts=update.ts,
+                        )
                     )
                 )
+                for update in self.orderbook_updates.start()
             )
-            for update in self.orderbook_updates.start()
         )
+        orders_requested.sort(key=lambda order: order.time_placed)
         orderbooks_generator = self.orderbook_updates.start()
         last_orderbook: Orderbook = next(orderbooks_generator)
         for order in orders_requested:

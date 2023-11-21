@@ -2,7 +2,11 @@ import datetime
 
 import pandas as pd
 
-from strategy.strategy import BaseFeature, BaseFeatureSet, HistoricalFeatureCursor
+from strategy.strategy import (
+    HistoricalObservationSetCursor,
+    Observation,
+    ObservationSet,
+)
 
 
 def test_feature_collections():
@@ -35,10 +39,10 @@ def test_feature_collections():
 
     # Let's standardize them.
     a_features = [
-        BaseFeature.from_series(series=s, observed_ts_key="ts") for s in a_raw_features
+        Observation.from_series(series=s, observed_ts_key="ts") for s in a_raw_features
     ]
     b_features = [
-        BaseFeature.from_any(
+        Observation.from_any(
             feature_name="b_features",
             feature=d,
             observed_ts=datetime.datetime.combine(day, obs_time),
@@ -55,14 +59,14 @@ def test_feature_collections():
 
     # Next, lets make a base feature set
     #   that combines a few combinations of these features.
-    observed_0s = BaseFeatureSet.from_basefeatures([a_features[0], b_features[0]])
+    observed_0s = ObservationSet.from_basefeatures([a_features[0], b_features[0]])
     assert observed_0s.observed_ts_of("a_feature").hour == 1
     assert observed_0s.observed_ts_of("a_num").hour == 1
     assert observed_0s.observed_ts_of("b_features").hour == 2
     assert observed_0s.latest_ts.hour == 2
 
     # What if we observe a different set of them together?
-    observed_b_before_a = BaseFeatureSet.from_basefeatures(
+    observed_b_before_a = ObservationSet.from_basefeatures(
         [a_features[1], b_features[0]]
     )
     assert observed_b_before_a.observed_ts_of("a_feature").hour == 4
@@ -72,14 +76,14 @@ def test_feature_collections():
 
     # Now, let's try and make a full historical cursor
     #  that merges these features together.
-    hist_features = HistoricalFeatureCursor.from_feature_streams(
+    hist_features = HistoricalObservationSetCursor.from_observation_streams(
         [a_features, b_features]
     )
     # Cursor through them and check that we get the features in the correct order.
     # We check that the length is 3, not 4:
     # There are 3 moments in time where every feature is present.
     # We assume strategies will not run without all features present.
-    all_featuresets = [fs for fs in hist_features.start()]
+    all_featuresets = [fs for fs in hist_features]
     assert len(all_featuresets) == 3
 
     # Check the latest timestamps are correct.
