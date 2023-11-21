@@ -1,8 +1,7 @@
 from typing import Iterable, List
 
-from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
-from strategy.strategy import Strategy
+from strategy.strategy import BaseFeatureSet, Strategy
 
 
 class PredeterminedStrategy(Strategy):
@@ -12,7 +11,7 @@ class PredeterminedStrategy(Strategy):
         self.orders_to_place = orders_to_place
         self.has_emitted_order_decisions = False
 
-    def consume_next_step(self, update: Orderbook) -> Iterable[Order]:
+    def consume_next_step(self, update: BaseFeatureSet) -> Iterable[Order]:
         if not self.has_emitted_order_decisions:
             self.has_emitted_order_decisions = True
             return self.orders_to_place
