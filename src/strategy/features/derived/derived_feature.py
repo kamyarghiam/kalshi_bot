@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union
+from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
@@ -10,11 +10,12 @@ class DerivedFeature(ABC):
     """
     This is a feature that's dervied from other features
     Note that the features this is derived from must be known at initialization time.
-    You must also assign this feature a unique name, which will be it's key in the DB.
+    You must also say what unqieu feature names this makes,
+      which will be it's keys in the DFs.
     """
 
     def __init__(
-        self, dependent_feats: List["AnyFeature"], unique_names: List[str]
+        self, dependent_feats: Sequence["AnyFeature"], unique_names: List[str]
     ) -> None:
         self.dependent_feats = dependent_feats
         self.unique_names = unique_names
@@ -57,7 +58,7 @@ class DerivedFeature(ABC):
         return pd.DataFrame(new_rows)
 
 
-AnyFeature = Union["ObservationCursor", DerivedFeature]
+AnyFeature = Union[ObservationCursor, DerivedFeature]
 
 
 class TimeIndependentFeature(DerivedFeature):
@@ -67,11 +68,18 @@ class TimeIndependentFeature(DerivedFeature):
       in order to be calculated.
     """
 
+    def _empty_independent_return(
+        self, current_data: Union[pd.Series, pd.DataFrame]
+    ) -> Union[pd.Series, pd.DataFrame]:
+        if isinstance(current_data, pd.Series):
+            return pd.Series(index=self.unique_names)
+        else:
+            return pd.DataFrame(columns=self.unique_names)
+
     @abstractmethod
     def _apply_independent(
         self, current_data: Union[pd.Series, pd.DataFrame]
     ) -> Union[pd.Series, pd.DataFrame]:
-        """ """
         pass
 
     def _apply(self, prev_row: pd.Series, current_data: pd.Series) -> pd.Series:
