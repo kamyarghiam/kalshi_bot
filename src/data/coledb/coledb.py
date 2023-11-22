@@ -48,11 +48,10 @@ TODO: maybe we should parallelize the writes if it's too slow?
 
 import io
 import pickle
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
@@ -150,10 +149,7 @@ class ColeBytes:
         return bits
 
 
-class OrderbookCursor(ABC):
-    @abstractmethod
-    def start(self) -> Generator[Orderbook, None, None]:
-        pass
+OrderbookCursor = Iterable[Orderbook]
 
 
 @dataclass
@@ -163,7 +159,7 @@ class ColeDBCursor(OrderbookCursor):
     start_ts: datetime | None = None
     end_ts: datetime | None = None
 
-    def start(self) -> Generator[Orderbook, None, None]:
+    def __iter__(self) -> Generator[Orderbook, None, None]:
         return self.interface.read(
             ticker=self.ticker, start_ts=self.start_ts, end_ts=self.end_ts
         )
@@ -178,6 +174,40 @@ class ColeDBInterface:
     def __init__(self):
         # Metadata files that we opened up already
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
+
+    def ticker_exists(self, ticker: MarketTicker) -> bool:
+        """Returns if a market ticker is in the DB already."""
+        return self.ticker_to_metadata_path(ticker=ticker).exists()
+
+    def get_submarkets(
+        self, ticker_prefix: MarketTicker, recursive: bool = False
+    ) -> Iterable[MarketTicker]:
+        """
+        Gets all submarkets given a standardized series prefix.
+        If recursive is true,
+          only returns market tickers that are finalized/complete tickers.
+        Else, we'll just return more series with
+        """
+        submarket_paths = (
+            d for d in self.ticker_to_path(ticker=ticker_prefix).iterdir() if d.is_dir()
+        )
+
+        if not recursive:
+            return (MarketTicker(f"{ticker_prefix}-{p.name}") for p in submarket_paths)
+
+        # Chek all subdirs recursively.
+        final_markets: List[MarketTicker] = []
+        for p in submarket_paths:
+            current_ticker = MarketTicker(f"{ticker_prefix}-{p.name}")
+            # If the current ticker is in the DB, add it.
+            if self.ticker_exists(ticker=current_ticker):
+                final_markets.append(current_ticker)
+            else:
+                # Else check it for sub-tickers.
+                final_markets.extend(
+                    self.get_submarkets(ticker_prefix=current_ticker, recursive=True)
+                )
+        return final_markets
 
     def ticker_to_path(self, ticker: MarketTicker) -> Path:
         """Given a market ticker returns a path to where all its data should live"""

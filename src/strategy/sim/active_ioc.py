@@ -60,12 +60,12 @@ class ActiveIOCStrategySimulator(StrategySimulator):
                         )
                     )
                 )
-                for update in self.orderbook_updates.start()
+                for update in iter(self.orderbook_updates)
             )
         )
         orders_requested.sort(key=lambda order: order.time_placed)
-        orderbooks_generator = self.orderbook_updates.start()
-        last_orderbook: Orderbook = next(orderbooks_generator)
+        orderbooks_generator = self.orderbook_updates
+        last_orderbook: Orderbook = next(iter(orderbooks_generator))
         for order in orders_requested:
             for orderbook in orderbooks_generator:
                 if order.time_placed + self.latency_to_exchange < orderbook.ts:
