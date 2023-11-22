@@ -72,6 +72,10 @@ def daily_spy_range_kalshi_markets(
     return parsed_markets
 
 
+def kalshi_orderbook_feature_name(ticker: MarketTicker) -> str:
+    return f"kalshi_orderbook_{ticker}"
+
+
 def hist_kalshi_orderbook_feature(
     ticker: MarketTicker, start_ts: datetime.datetime, end_ts: datetime.datetime
 ) -> ObservationCursor:
@@ -79,7 +83,7 @@ def hist_kalshi_orderbook_feature(
         ticker=ticker, start_ts=start_ts, end_ts=end_ts
     ):
         yield Observation.from_any(
-            feature_name=f"kalshi_orderbook_{ticker}",
+            feature_name=kalshi_orderbook_feature_name(ticker=ticker),
             feature=orderbook,
             observed_ts=orderbook.ts,
         )
