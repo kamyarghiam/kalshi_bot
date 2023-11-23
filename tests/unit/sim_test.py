@@ -4,8 +4,8 @@ from exchange.interface import MarketTicker
 from helpers.types.money import Balance, Cents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from strategy.predetermined_strategy import PredeterminedStrategy
 from strategy.sim.active_ioc import ActiveIOCStrategySimulator
+from strategy.strategies.predetermined_strategy import PredeterminedStrategy
 from tests.utils import list_to_cursor
 
 

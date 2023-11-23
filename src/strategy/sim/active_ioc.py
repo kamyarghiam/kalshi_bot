@@ -11,7 +11,7 @@ from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from strategy.sim.sim import StrategySimulator
-from strategy.strategy import BaseFeature, BaseFeatureSet, Strategy
+from strategy.utils import BaseFeature, BaseFeatureSet, Strategy
 
 
 class ActiveIOCStrategySimulator(StrategySimulator):

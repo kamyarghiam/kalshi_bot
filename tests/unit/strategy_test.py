@@ -2,7 +2,7 @@ import datetime
 
 import pandas as pd
 
-from strategy.strategy import BaseFeature, BaseFeatureSet, HistoricalFeatureCursor
+from strategy.utils import BaseFeature, BaseFeatureSet, HistoricalFeatureCursor
 
 
 def test_feature_collections():
