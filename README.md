@@ -12,6 +12,7 @@ direction of the project.
 - Make sure you have python `3.11.2` or greater
 - Create a virtual environment and activate it
 - Install `poetry` then run `poetry install` to install the dependencies to your venv
+- Run `pre-commit install` to activate pre-commit hooks
 - Set up some default formatters in vs code. This will help keep your code clean. I'd recommend black and isort. Also set up autoformat on save (https://stackoverflow.com/questions/59433286/vs-code-prettier-format-on-save-doesnt-work). This is an example of what my user settings.json looks like in vs code:
 
 ```
