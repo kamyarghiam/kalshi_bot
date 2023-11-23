@@ -10,6 +10,10 @@ def spy_price_feature_name() -> str:
     return "es_price"
 
 
+def spy_price_feature_ts_name() -> str:
+    return "es_ts_recv"
+
+
 def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     # Clean and normalize es data. Normalize means to put it between 0 and 1
     utc_tz = zoneinfo.ZoneInfo("UTC")
@@ -23,6 +27,8 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     df["ts_recv"] = df["ts_recv"].apply(
         lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
     )
-    df.rename({"ts_recv": "es_ts_recv", "price": spy_price_feature_name()})
+    df.rename(
+        {"ts_recv": spy_price_feature_ts_name(), "price": spy_price_feature_name()}
+    )
     for idx, row in df.iterrows():
         yield Observation.from_series(row, observed_ts_key="spy_ts_recv")

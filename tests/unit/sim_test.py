@@ -1,12 +1,28 @@
 from datetime import datetime, timedelta
 
+from data.coledb.coledb import OrderbookCursor
 from exchange.interface import MarketTicker
 from helpers.types.money import Balance, Cents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from strategy.sim.active_ioc import ActiveIOCStrategySimulator
 from strategy.strategies.predetermined_strategy import PredeterminedStrategy
-from tests.utils import list_to_cursor
+from strategy.utils import HistoricalObservationSetCursor, Observation
+
+
+def mock_historical_from_orderbook_updates(
+    updates: OrderbookCursor,
+) -> HistoricalObservationSetCursor:
+    return HistoricalObservationSetCursor.from_observation_streams(
+        [
+            [
+                Observation.from_any(
+                    feature_name="kalshi_orderbook", feature=up, observed_ts=up.ts
+                )
+                for up in updates
+            ]
+        ]
+    )
 
 
 def test_passive_ioc_strategy_simulator_simple():
@@ -35,7 +51,9 @@ def test_passive_ioc_strategy_simulator_simple():
     ]
 
     simulator = ActiveIOCStrategySimulator(
-        orderbook_updates=list_to_cursor(updates), starting_balance=Balance(Cents(100))
+        historical_data=mock_historical_from_orderbook_updates(updates=updates),
+        kalshi_orderbook_updates=updates,
+        starting_balance=Balance(Cents(100)),
     )
     portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 
@@ -76,7 +94,10 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     orders = [
         Order(Price(5), Quantity(5), TradeType.BUY, ticker, Side.YES, ts1),
     ]
-    sim = ActiveIOCStrategySimulator(orderbook_updates=list_to_cursor(updates))
+    sim = ActiveIOCStrategySimulator(
+        historical_data=mock_historical_from_orderbook_updates(updates=updates),
+        kalshi_orderbook_updates=updates,
+    )
     portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
     assert len(portfolio_history.orders) == 0
 
@@ -84,7 +105,10 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     orders = [
         Order(Price(88), Quantity(5), TradeType.BUY, ticker, Side.NO, ts1),
     ]
-    sim = ActiveIOCStrategySimulator(orderbook_updates=list_to_cursor(updates))
+    sim = ActiveIOCStrategySimulator(
+        historical_data=mock_historical_from_orderbook_updates(updates=updates),
+        kalshi_orderbook_updates=updates,
+    )
     portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
     assert len(portfolio_history.orders) == 0
 
@@ -97,7 +121,9 @@ def test_passive_ioc_strategy_simulator_bad_orders():
         ),
     ]
     sim = ActiveIOCStrategySimulator(
-        orderbook_updates=list_to_cursor(updates), latency_to_exchange=latency
+        historical_data=mock_historical_from_orderbook_updates(updates=updates),
+        kalshi_orderbook_updates=updates,
+        latency_to_exchange=latency,
     )
     portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
     assert len(portfolio_history.orders) == 0
@@ -110,7 +136,9 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     ]
     # Should go through
     sim = ActiveIOCStrategySimulator(
-        orderbook_updates=list_to_cursor(updates), latency_to_exchange=latency
+        historical_data=mock_historical_from_orderbook_updates(updates=updates),
+        kalshi_orderbook_updates=updates,
+        latency_to_exchange=latency,
     )
     portfolio_history = sim.run(PredeterminedStrategy(orders_to_place=orders))
     assert portfolio_history.orders == orders
@@ -142,8 +170,9 @@ def test_passive_ioc_strategy_simulator_ignore_price():
     ]
 
     simulator = ActiveIOCStrategySimulator(
+        historical_data=mock_historical_from_orderbook_updates(updates=updates),
         ignore_price=True,
-        orderbook_updates=list_to_cursor(updates),
+        kalshi_orderbook_updates=updates,
         starting_balance=Balance(Cents(100)),
     )
     portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))

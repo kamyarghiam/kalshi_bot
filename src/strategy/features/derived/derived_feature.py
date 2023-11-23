@@ -3,7 +3,7 @@ from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
-from strategy.strategy import HistoricalObservationSetCursor, ObservationCursor
+from strategy.strategy import ObservationCursor, ObservationSet
 
 
 class DerivedFeature(ABC):
@@ -19,6 +19,61 @@ class DerivedFeature(ABC):
     ) -> None:
         self.dependent_feats = dependent_feats
         self.unique_names = unique_names
+        self._preload = None
+
+    def get_derived_dependents(self, recursive: bool = False) -> List["DerivedFeature"]:
+        feats = [f for f in self.dependent_feats if isinstance(f, DerivedFeature)]
+        if not recursive:
+            return feats
+        return list(
+            set(
+                subf for f in feats for subf in f.get_derived_dependents(recursive=True)
+            )
+        )
+
+    def get_observational_dependents(
+        self, recursive: bool = False
+    ) -> List[ObservationCursor]:
+        obs_feats = [
+            f for f in self.dependent_feats if not isinstance(f, DerivedFeature)
+        ]
+        if not recursive:
+            return obs_feats
+        return list(
+            set(
+                subf
+                for f in self.get_derived_dependents(recursive=True)
+                for subf in f.get_observational_dependents()
+            )
+        )
+
+    def precalculate_onto(self, df: pd.DataFrame):
+        """
+        Takes in a latest_ts indexed dataframe
+          that is expected to have all base features columns present.
+        We choose to mutate the df rather than return a new one
+          because we're worried about the memory usage/size of this thing,
+          and want to cut down on duplicate data.
+        """
+        for dep in self.get_derived_dependents():
+            dep.precalculate_onto(df=df)
+        new_columns = self._batch(df)
+        for name in self.unique_names:
+            df[name] = new_columns[name]
+
+    def preload(self, df: pd.DataFrame):
+        """
+        Pre-loads the dataframe into this object and it's deps.
+        We expect this dataframe to contain latest_ts as an index,
+          and all the unique_names columns filled and ready.
+        """
+        if __debug__:
+            for n in self.unique_names:
+                assert n in df.columns.values
+            assert df.index.name == "latest_ts"
+        for dep in self.get_derived_dependents():
+            dep.preload(df=df)
+        self._preload = df
 
     @abstractmethod
     def _apply(
@@ -31,18 +86,31 @@ class DerivedFeature(ABC):
         pass
 
     def apply(
-        self, prev_row: Optional[pd.Series], current_data: pd.Series, safe: bool = True
+        self, prev_row: Optional[pd.Series], current_data: pd.Series
     ) -> pd.Series:
         """
-        Applies this dervied feature and returns a new row with the appended columns.
+        Applies this derived feature and returns a new row with the appended columns.
         """
         new_columns = self._apply(prev_row=prev_row, current_data=current_data)
-        if safe:
-            if list(new_columns.index.values) != self.unique_names:
-                raise ValueError("New column does not have the unique names specified!")
-        return pd.concat(current_data, new_columns)
+        assert list(new_columns.index.values) == self.unique_names
+        return pd.concat([current_data, new_columns])
 
-    def _batch(self, hist: HistoricalObservationSetCursor) -> pd.DataFrame:
+    def at(self, prev_data: ObservationSet, current_data: ObservationSet) -> pd.Series:
+        """Returns the value of this derived feature for a specific observation set."""
+        if self._preload:
+            # If we can, get the cached/preloaded value.
+            return self._preload.loc[current_data.latest_ts]
+        return self.apply(prev_row=prev_data.series, current_data=current_data)
+
+    def batch(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Applies this derived feature and returns a new dataframe with the new columns.
+        """
+        new_columns = self._batch(df=df)
+        assert list(new_columns.columns.values) == self.unique_names
+        return pd.concat([df, new_columns], axis="columns")
+
+    def _batch(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Applies the operation in batch to a historical feature cursor.
         The default implementation must iterate through every row
@@ -50,7 +118,7 @@ class DerivedFeature(ABC):
         Optimized subclasses can override this and make it much faster.
         """
         new_rows: List[pd.Series] = []
-        for idx, row in hist.df.iterrows():
+        for idx, row in df.iterrows():
             if not new_rows:
                 new_rows.append(self.apply(prev_row=None, current_data=row))
             else:
@@ -69,21 +137,22 @@ class TimeIndependentFeature(DerivedFeature):
     """
 
     def _empty_independent_return(
-        self, current_data: Union[pd.Series, pd.DataFrame]
-    ) -> Union[pd.Series, pd.DataFrame]:
-        if isinstance(current_data, pd.Series):
-            return pd.Series(index=self.unique_names)
-        else:
-            return pd.DataFrame(columns=self.unique_names)
+        self,
+    ) -> pd.DataFrame:
+        """Creates a dataframe with empty columns."""
+        return pd.DataFrame(columns=self.unique_names)
 
     @abstractmethod
-    def _apply_independent(
-        self, current_data: Union[pd.Series, pd.DataFrame]
-    ) -> Union[pd.Series, pd.DataFrame]:
+    def _apply_independent(self, current_data: pd.DataFrame) -> pd.DataFrame:
+        """
+        This method takes IN a N-rowed dataframe and must output the same.
+        """
         pass
 
     def _apply(self, prev_row: pd.Series, current_data: pd.Series) -> pd.Series:
-        return self._apply_independent(current_data=current_data)
+        return self._apply_independent(current_data=pd.DataFrame([current_data])).iloc[
+            0
+        ]
 
-    def _batch(self, hist: HistoricalObservationSetCursor) -> pd.DataFrame:
-        return self._apply_independent(current_data=hist.df)
+    def _batch(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self._apply_independent(current_data=df)

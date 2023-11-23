@@ -170,10 +170,14 @@ class ColeDBInterface:
     """Public interface for ColeDB"""
 
     msgs_per_chunk = 5000
-    cole_db_storage_path = Path("src/data/coledb/storage")
 
-    def __init__(self):
+    default_cole_db_storage_path = Path("src/data/coledb/storage/")
+
+    def __init__(self, storage_path: Optional[Path] = None):
         # Metadata files that we opened up already
+        self.cole_db_storage_path = (
+            storage_path or ColeDBInterface.default_cole_db_storage_path
+        )
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
 
     def ticker_exists(self, ticker: MarketTicker) -> bool:
@@ -821,6 +825,14 @@ class ColeDBInterface:
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
                         orderbook = orderbook.apply_delta(msg)
+
+
+class ReadonlyColeDB(ColeDBInterface):
+    def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
+        raise NotImplementedError("Readonly DB!")
+
+    def create_metadata_file(self, ticker: MarketTicker) -> ColeDBMetadata:
+        raise NotImplementedError("Readonly DB!")
 
 
 def get_num_byte_sections_per_bits(num_bits: int, byte_section_size: int) -> int:
