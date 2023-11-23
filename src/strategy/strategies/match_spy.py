@@ -4,7 +4,7 @@ from helpers.types.money import Price
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from strategy.features.base.kalshi import SPYRangedKalshiMarket
 from strategy.features.derived.spy_kalshi import SPYInKalshiMarketRange
-from strategy.strategy import ObservationCursor, ObservationSet, Strategy
+from strategy.utils import ObservationCursor, ObservationSet, Strategy
 
 
 class MatchSpy(Strategy):

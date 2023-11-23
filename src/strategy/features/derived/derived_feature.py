@@ -3,7 +3,7 @@ from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
-from strategy.strategy import ObservationCursor, ObservationSet
+from strategy.utils import ObservationCursor, ObservationSet
 
 
 class DerivedFeature(ABC):

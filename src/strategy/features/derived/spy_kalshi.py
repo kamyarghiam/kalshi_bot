@@ -4,7 +4,7 @@ from helpers.types.markets import MarketTicker
 from strategy.features.base.kalshi import SPYRangedKalshiMarket
 from strategy.features.base.spy import spy_price_feature_name
 from strategy.features.derived.derived_feature import TimeIndependentFeature
-from strategy.strategy import ObservationCursor
+from strategy.utils import ObservationCursor
 
 
 class SPYInKalshiMarketRange(TimeIndependentFeature):

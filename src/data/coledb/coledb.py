@@ -16,7 +16,7 @@ Market Ticker folders
 ...
 
 Within the market ticker folders, we store data in files called chunks
-that contain a fixed numer of messages (defined as msgs_per_chunk). There is also a
+that contain a fixed number of messages (defined as msgs_per_chunk). There is also a
 metadata file that contains information about the start time of each chunk, the
 number of the last chunk, and the number of objects in the last chunk (ColeDBMetadata).
 
@@ -27,16 +27,17 @@ deltas, and find the starting point. In order to create a new chunk, we get the
 snapshot of the new chunk by reading the previous chunk from the start and
 applying all of the deltas. The name of the chunks are 1 indexed
 
-It takes about 206 microseocnds per messages. This is high.
+FUTURE RESEARCH AND DEVELOPMENT
+It takes about 206 microseconds per message to read. This is high.
 TODO: we need to speed up reads
 
 This DB interface supports the following operations:
 1. Query by start timestamp by market
 2. Query by start and and timestamp by market
-3. Query by timestamps for multiple markets (streamed together sorted by time)
+3. TODO: Query by timestamps for multiple markets (streamed together sorted by time)
 4. Write a snapshot or delta
-5. Market ticker discovery (TODO: maybe cli? Let you sort by duration/metadata)
-6. TODO: include settlemnt as a part of data because it's a profitable event
+5. TODO: Market ticker discovery (maybe cli? Let you sort by duration/metadata)
+6. TODO: include settlement as a part of data because it's a profitable event
 
 TODO: maybe we should also have a metadata file on the market (not chunk) level
 to define some of the market information (like expiration, settlement, settlement
@@ -67,7 +68,7 @@ class ColeDBMetadata:
     of deltas and snapshots.
 
     WARNING: be careful when editing this class because it is pickled
-    so your changes my not be backwards compatible.
+    so your changes may not be backwards compatible.
 
     path: path to the metadata file
     chunk_first_time_stamps: the starting timestamp of each chunk
@@ -488,7 +489,7 @@ class ColeDBInterface:
         01 -> No price only
         11 -> Both yes and no prices
 
-        Then, for each side: 3 bits to represnt the length of their
+        Then, for each side: 3 bits to represent the length of their
         quantities in half byte intervals (4 bits). Then the quantity.
 
         Reading from left to right, it should look like:
@@ -497,7 +498,7 @@ class ColeDBInterface:
             no quantity half bytes length (3 bits) optional
             no quantity (variable up to 4 bytes) optional
             yes quantity half byte length (3 bits) optional
-            yes quantity (variable up to 4 bytes) optioanl
+            yes quantity (variable up to 4 bytes) optional
 
         Timestamp (variable up to 4 bytes)
         Timestamp half bytes length (3 bits)

@@ -2,11 +2,7 @@ import datetime
 
 import pandas as pd
 
-from strategy.strategy import (
-    HistoricalObservationSetCursor,
-    Observation,
-    ObservationSet,
-)
+from strategy.utils import HistoricalObservationSetCursor, Observation, ObservationSet
 
 
 def test_feature_collections():

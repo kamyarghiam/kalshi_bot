@@ -10,11 +10,9 @@ direction of the project.
 ### SETUP
 
 - Make sure you have python `3.11.2` or greater
-- Install the virtual env library with `pip3.11 install virtualenv`. This is where we will host all your dependencies for this project.
-- Create a directory for your venv `mkdir venv`
-- Create a venv `cd venv && python3.11 -m venv . && cd ..` (note: if you're using VSCode, `venv` management is done automatically and this is not necessary)
-- Activate the venv with `source venv/bin/activate`. From now on, you will need to activate the venv before development. You can add this command to your zsh/bash profile so you don't have to do it everytime you log in
-- Install poetry with pipx. For mac: to install pipx do, `brew install pipx`, then do `pipx install poetry`. Run `pipx ensurepath` to add it to your path. Run `poetry install` to install the dependencies to your venv. If you're on a different OS: the purpose of pipx is to intall poetry, so just find a way to install poetry. Here are the docs: https://python-poetry.org/docs/
+- Create a virtual environment and activate it
+- Install `poetry` then run `poetry install` to install the dependencies to your venv
+- Run `pre-commit install` to activate pre-commit hooks
 - Set up some default formatters in vs code. This will help keep your code clean. I'd recommend black and isort. Also set up autoformat on save (https://stackoverflow.com/questions/59433286/vs-code-prettier-format-on-save-doesnt-work). This is an example of what my user settings.json looks like in vs code:
 
 ```
@@ -77,7 +75,7 @@ export TRADING_ENV = 'demo' or 'prod'
 ```
 
 And then adding the following to your bash / zsh profile: `source path/to/your/script.sh`.
-In order for functional tests to pass, your username and passowrd should coorespond to
+In order for functional tests to pass, your username and password should correspond to
 an actual username and password on Kalshi's demo website.
 
 ### RUNNING TESTS
@@ -88,7 +86,7 @@ connections between different parts of the code. Functional testing will be rese
 the Kalshi exchange. Functional testing basically runs unit and integration tests, but instead of hitting
 the local "fake" Kalshi exchange that we wrote, it hits the demo Kalshi exchange. Please use functional tests
 sparingly, since we don't want to hit the Kalshi exchange a lot. This is why we set up a local fake instance
-of Kalshi for most of our testing. If you want to run funtional tests against the demo env in Kalshi,
+of Kalshi for most of our testing. If you want to run functional tests against the demo env in Kalshi,
 run `pytest -n auto --functional`. You can also get a coverage report with missed lines by running:
 
 ```
@@ -104,7 +102,7 @@ Code coverage let's you know how much of your code you've tested. It also let's 
 - Create a new branch called something like `feature/rate_limit` or `bug_fix/README` etc.
 - Write all your code there, and make sure you add type hints where appropriate
 - Write unit and integration tests for your code
-- Add documentation in the README.md or anywhere appropriat
+- Add documentation in the README.md or anywhere appropriate
 - Run the tests with the command `pytest -n auto`
 - After tests are passing, check your code coverage report and make sure it's as close to 100% as possible (see `RUNNING TESTS` section above)
 - Use the following structure for your commits: first, run `git add .`. Then, run `git commit`. Note: we have pre-commits enabled. Pre-commits

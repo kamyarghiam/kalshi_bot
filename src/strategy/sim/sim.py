@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from helpers.types.portfolio import PortfolioHistory
-from strategy.strategy import Strategy
+from strategy.utils import Strategy
 
 
 class StrategySimulator(ABC):

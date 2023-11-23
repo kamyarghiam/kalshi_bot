@@ -1,7 +1,7 @@
 from typing import Iterable, List
 
 from helpers.types.orders import Order
-from strategy.strategy import ObservationSet, Strategy
+from strategy.utils import ObservationSet, Strategy
 
 
 class PredeterminedStrategy(Strategy):

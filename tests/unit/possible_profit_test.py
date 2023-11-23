@@ -1,12 +1,12 @@
 from typing import List
 
 from data.coledb.coledb import ColeDBInterface
-from data.research.possible_profit import get_possible_profit
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orders import Quantity, QuantityDelta, Side
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 from helpers.utils import compute_pnl
+from strategy.research.possible_profit import get_possible_profit
 
 
 def test_possible_profit():

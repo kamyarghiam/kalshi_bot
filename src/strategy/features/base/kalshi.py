@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from data.coledb.coledb import ColeDBInterface
 from helpers.types.markets import MarketTicker
-from strategy.strategy import Observation, ObservationCursor
+from strategy.utils import Observation, ObservationCursor
 
 
 @dataclass

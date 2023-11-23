@@ -9,7 +9,7 @@ from strategy.features.base.kalshi import (
 )
 from strategy.features.base.spy import spy_price_feature_name, spy_price_feature_ts_name
 from strategy.features.derived.spy_kalshi import SPYInKalshiMarketRange
-from strategy.strategy import (
+from strategy.utils import (
     HistoricalObservationSetCursor,
     Observation,
     ObservationCursor,

@@ -5,9 +5,9 @@ from exchange.interface import MarketTicker
 from helpers.types.money import Balance, Cents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from strategy.predetermined_strategy import PredeterminedStrategy
 from strategy.sim.active_ioc import ActiveIOCStrategySimulator
-from strategy.strategy import HistoricalObservationSetCursor, Observation
+from strategy.strategies.predetermined_strategy import PredeterminedStrategy
+from strategy.utils import HistoricalObservationSetCursor, Observation
 
 
 def mock_historical_from_orderbook_updates(

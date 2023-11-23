@@ -3,7 +3,7 @@ import zoneinfo
 
 import pandas as pd
 
-from strategy.strategy import Observation, ObservationCursor
+from strategy.utils import Observation, ObservationCursor
 
 
 def spy_price_feature_name() -> str:
