@@ -2,11 +2,14 @@ import datetime
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Dict, Generator, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Iterator, List, Tuple
 
 import pandas as pd
 
 from helpers.types.orders import Order
+
+if TYPE_CHECKING:
+    from strategy.features.derived.derived_feature import DerivedFeature
 
 
 @dataclass(frozen=True)
@@ -108,7 +111,12 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
     ) -> "HistoricalObservationSetCursor":
         # Takes a list of featuresets over time and makes a cursor.
         # Assumes that featuresets are sorted by latest_ts already.
-        df = pd.DataFrame([fs.series for fs in featuresets])
+        df = pd.DataFrame(
+            [
+                pd.concat([fs.series, pd.Series({"latest_ts": fs.latest_ts})])
+                for fs in featuresets
+            ]
+        ).set_index(keys="latest_ts", drop=False)
 
         feature_observation_times = featuresets[0].feature_observation_time_keys
         return HistoricalObservationSetCursor(
@@ -159,6 +167,15 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
             featuresets=featuresets
         )
 
+    def preload_strategy_features(self, strategy: "Strategy"):
+        # Do all the pre-calculating we can.
+        for feat in strategy.DERIVED_FEATURES:
+            feat.precalculate_onto(df=self.df)
+        # And then give each derived feature a pointer to the giant df,
+        #  which now functions as a cache for all the derived features.
+        for feat in strategy.DERIVED_FEATURES:
+            feat.preload(df=self.df)
+
     def __iter__(self) -> Generator[ObservationSet, None, None]:
         for _, row in self.df.iterrows():
             yield ObservationSet(
@@ -172,6 +189,8 @@ class Strategy(ABC):
     The most generic of strategies:
     Takes in features and the current time, outputs orders.
     """
+
+    DERIVED_FEATURES: List["DerivedFeature"] = []
 
     @abstractmethod
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:

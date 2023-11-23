@@ -38,7 +38,7 @@ def test_ticker_to_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
     db = ColeDBInterface()
     assert db.ticker_to_path(ticker) == Path(
-        ColeDBInterface.cole_db_storage_path / "SERIES/EVENT/MARKET/"
+        db.cole_db_storage_path / "SERIES/EVENT/MARKET/"
     )
 
 
@@ -46,7 +46,7 @@ def test_ticker_to_metadata_path():
     ticker = MarketTicker("SERIES-EVENT-MARKET")
     db = ColeDBInterface()
     assert db.ticker_to_metadata_path(ticker) == Path(
-        ColeDBInterface.cole_db_storage_path / "SERIES/EVENT/MARKET/metadata"
+        db.cole_db_storage_path / "SERIES/EVENT/MARKET/metadata"
     )
 
 
@@ -829,8 +829,7 @@ def test_backward_compatibility():
     the tests/data folder. Any changes to coledb should still allow
     us to open these files, or we need to convert all the old data"""
 
-    db = ColeDBInterface()
-    db.cole_db_storage_path = Path("tests/data/")
+    db = ColeDBInterface(storage_path=Path("tests/data/"))
     data = db.read(MarketTicker("INXD-23AUG31-B4512"))
 
     assert next(data) == Orderbook(

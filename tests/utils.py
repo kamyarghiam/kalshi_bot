@@ -3,8 +3,6 @@ import typing
 from polyfactory.factories import pydantic_factory
 from pydantic import BaseModel
 
-from data.coledb.coledb import OrderbookCursor
-
 BM = typing.TypeVar("BM", bound=BaseModel)
 
 T = typing.TypeVar("T")
@@ -29,7 +27,3 @@ def almost_equal(x: float, y: float):
 
 def list_to_generator(list_: typing.List) -> typing.Generator:
     return (x for x in list_)
-
-
-def list_to_cursor(list_: typing.List) -> OrderbookCursor:
-    return list_  # lol
