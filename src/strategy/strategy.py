@@ -169,11 +169,11 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
 
     def preload_strategy_features(self, strategy: "Strategy"):
         # Do all the pre-calculating we can.
-        for feat in strategy.DERIVED_FEATURES:
+        for feat in strategy.derived_features:
             feat.precalculate_onto(df=self.df)
         # And then give each derived feature a pointer to the giant df,
         #  which now functions as a cache for all the derived features.
-        for feat in strategy.DERIVED_FEATURES:
+        for feat in strategy.derived_features:
             feat.preload(df=self.df)
 
     def __iter__(self) -> Generator[ObservationSet, None, None]:
@@ -190,7 +190,8 @@ class Strategy(ABC):
     Takes in features and the current time, outputs orders.
     """
 
-    DERIVED_FEATURES: List["DerivedFeature"] = []
+    def __init__(self, derived_features: List["DerivedFeature"] = []):
+        self.derived_features = derived_features
 
     @abstractmethod
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:

@@ -1,5 +1,4 @@
 import datetime
-from typing import List
 
 import pandas as pd
 
@@ -124,48 +123,55 @@ def test_spy_derived():
         ),
     ]
 
-    derived = SPYInKalshiMarketRange(
-        spy_source=spy_prices_cursor, kalshi_spy_markets=kalshi_spy_markets
-    )
-    # Calculate the features from historical source:
-    derived_hist = derived.batch(
-        df=HistoricalObservationSetCursor.from_observation_streams(
-            [spy_prices_cursor]
-        ).df
-    )
+    # The 0th market was only correct at first.
+    # The 1st was inmarket twice.
+    # and so on.
+    was_in_market_ranges = [
+        [True, False, False, False, False, False],
+        [False, True, True, False, False, False],
+        [False, False, False, True, True, False],
+        [False, False, False, False, False, True],
+    ]
 
-    # Calculate the features as if from a live source
-    #  and compare them against historical.
-    for idx, spy_price in enumerate(spy_prices_cursor):
-        latest_ts = datetime.datetime.combine(date=today, time=datetime.time(hour=idx))
-        derived_hist_at_time = derived_hist.loc[latest_ts].drop("latest_ts")
-
-        live_hist_at_time = derived.apply(prev_row=None, current_data=spy_price.series)
-
-        assert spy_price.observed_ts == latest_ts
-        assert live_hist_at_time.equals(derived_hist_at_time)
-
-    # Also, create a new df and apply "precalculate/preload" on it
-    #  to make sure the mutated df is correct.
-    mutated_hist_df = HistoricalObservationSetCursor.from_observation_streams(
-        [spy_prices_cursor]
-    ).df
-    derived.precalculate_onto(df=mutated_hist_df)
-    assert mutated_hist_df.equals(derived_hist)
-
-    # Cool, live and hist are the same.
-    # Let's check the actual contents of the derived feature.
-    def was_in_market_range(ticker_idx: int) -> List[bool]:
-        return list(
-            derived_hist[
-                derived.is_spy_inrange_key(ticker=kalshi_spy_markets[ticker_idx].ticker)
-            ].values
+    for market_idx, kalshi_spy_market in enumerate(kalshi_spy_markets):
+        derived = SPYInKalshiMarketRange(
+            spy_source=spy_prices_cursor, kalshi_spy_market=kalshi_spy_market
+        )
+        # Calculate the features from historical source:
+        derived_hist = derived.batch(
+            df=HistoricalObservationSetCursor.from_observation_streams(
+                [spy_prices_cursor]
+            ).df
         )
 
-    # The 0th market was only correct at first.
-    assert was_in_market_range(0) == [True, False, False, False, False, False]
-    # The 1st was inmarket twice.
-    assert was_in_market_range(1) == [False, True, True, False, False, False]
-    # And so on.
-    assert was_in_market_range(2) == [False, False, False, True, True, False]
-    assert was_in_market_range(3) == [False, False, False, False, False, True]
+        # Calculate the features as if from a live source
+        #  and compare them against historical.
+        for idx, spy_price in enumerate(spy_prices_cursor):
+            latest_ts = datetime.datetime.combine(
+                date=today, time=datetime.time(hour=idx)
+            )
+            derived_hist_at_time = derived_hist.loc[latest_ts].drop("latest_ts")
+
+            live_hist_at_time = derived.apply(
+                prev_row=None, current_data=spy_price.series
+            )
+
+            assert spy_price.observed_ts == latest_ts
+            assert live_hist_at_time.equals(derived_hist_at_time)
+
+        # Also, create a new df and apply "precalculate" on it
+        #  to make sure the mutated df is correct.
+        mutated_hist_df = HistoricalObservationSetCursor.from_observation_streams(
+            [spy_prices_cursor]
+        ).df
+        derived.precalculate_onto(df=mutated_hist_df)
+        assert mutated_hist_df.equals(derived_hist)
+
+        # Cool, live and hist are the same.
+        # Let's check the actual contents of the derived feature.
+        was_in_market_range = list(
+            derived_hist[
+                derived.is_spy_inrange_key(ticker=kalshi_spy_market.ticker)
+            ].values
+        )
+        assert was_in_market_range == was_in_market_ranges[market_idx]

@@ -95,12 +95,18 @@ class DerivedFeature(ABC):
         assert list(new_columns.index.values) == self.unique_names
         return pd.concat([current_data, new_columns])
 
-    def at(self, prev_data: ObservationSet, current_data: ObservationSet) -> pd.Series:
+    def at(
+        self, prev_data: Optional[ObservationSet], current_data: ObservationSet
+    ) -> pd.Series:
         """Returns the value of this derived feature for a specific observation set."""
         if self._preload:
             # If we can, get the cached/preloaded value.
             return self._preload.loc[current_data.latest_ts]
-        return self.apply(prev_row=prev_data.series, current_data=current_data)
+        if prev_data:
+            prev_row = prev_data.series
+        else:
+            prev_row = None
+        return self.apply(prev_row=prev_row, current_data=current_data)
 
     def batch(self, df: pd.DataFrame) -> pd.DataFrame:
         """
