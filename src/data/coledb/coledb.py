@@ -49,13 +49,14 @@ TODO: maybe we should parallelize the writes if it's too slow?
 
 import io
 import pickle
-from abc import ABC, abstractmethod
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
-from helpers.types.markets import MarketTicker
+from helpers.constants import COLEDB_DEFAULT_STORAGE_PATH
+from helpers.types.markets import EventTicker, MarketTicker, Ticker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Quantity, QuantityDelta, Side
@@ -83,6 +84,8 @@ class ColeDBMetadata:
     num_msgs_in_last_file: int = field(default=0)
 
     def save(self):
+        # TODO: small legacy issue, the path saved may be incorrect.
+        # When we reload, we overwrite the path. Remove path when saving.
         self.path.write_bytes(pickle.dumps(self))
 
     @classmethod
@@ -151,10 +154,7 @@ class ColeBytes:
         return bits
 
 
-class OrderbookCursor(ABC):
-    @abstractmethod
-    def start(self) -> Generator[Orderbook, None, None]:
-        pass
+OrderbookCursor = Iterable[Orderbook]
 
 
 @dataclass
@@ -164,7 +164,7 @@ class ColeDBCursor(OrderbookCursor):
     start_ts: datetime | None = None
     end_ts: datetime | None = None
 
-    def start(self) -> Generator[Orderbook, None, None]:
+    def __iter__(self) -> Generator[Orderbook, None, None]:
         return self.interface.read(
             ticker=self.ticker, start_ts=self.start_ts, end_ts=self.end_ts
         )
@@ -174,13 +174,37 @@ class ColeDBInterface:
     """Public interface for ColeDB"""
 
     msgs_per_chunk = 5000
-    cole_db_storage_path = Path("src/data/coledb/storage")
 
-    def __init__(self):
+    def __init__(self, storage_path: Optional[Path] = None):
         # Metadata files that we opened up already
+        self.cole_db_storage_path = storage_path or COLEDB_DEFAULT_STORAGE_PATH
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
 
-    def ticker_to_path(self, ticker: MarketTicker) -> Path:
+    def ticker_exists(self, ticker: MarketTicker) -> bool:
+        """Returns if a market ticker is in the DB already."""
+        return self.ticker_to_metadata_path(ticker=ticker).exists()
+
+    def get_tickers_under_event(
+        self, event_ticker: EventTicker
+    ) -> Iterable[MarketTicker]:
+        """
+        Gets all submarkets given an event ticker.
+        """
+
+        submarket_paths = (
+            d for d in self.ticker_to_path(ticker=event_ticker).iterdir() if d.is_dir()
+        )
+
+        # Chek all subdirs recursively.
+        final_markets: List[MarketTicker] = []
+        for p in submarket_paths:
+            current_ticker = MarketTicker(f"{event_ticker}-{p.name}")
+            # If the current ticker is in the DB, add it.
+            if self.ticker_exists(ticker=current_ticker):
+                final_markets.append(current_ticker)
+        return final_markets
+
+    def ticker_to_path(self, ticker: Ticker) -> Path:
         """Given a market ticker returns a path to where all its data should live"""
         return self.cole_db_storage_path / Path(ticker.replace("-", "/"))
 
@@ -225,6 +249,13 @@ class ColeDBInterface:
 
     def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
         """Writes data to cole db"""
+        if (
+            "pytest" in sys.modules
+            and self.cole_db_storage_path == COLEDB_DEFAULT_STORAGE_PATH
+        ):
+            raise RuntimeError(
+                "Pytest is running, are you sure you want to write to ColeDB?"
+            )
         try:
             metadata = self.get_metadata(data.market_ticker)
         except FileNotFoundError:
@@ -791,6 +822,14 @@ class ColeDBInterface:
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
                         orderbook = orderbook.apply_delta(msg)
+
+
+class ReadonlyColeDB(ColeDBInterface):
+    def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
+        raise NotImplementedError("Readonly DB!")
+
+    def create_metadata_file(self, ticker: MarketTicker) -> ColeDBMetadata:
+        raise NotImplementedError("Readonly DB!")
 
 
 def get_num_byte_sections_per_bits(num_bits: int, byte_section_size: int) -> int:

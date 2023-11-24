@@ -1,3 +1,4 @@
+import pathlib
 from enum import Enum
 
 from helpers.types.common import URL
@@ -11,7 +12,7 @@ MARKETS_URL = URL("/markets")
 LOGOUT_URL = URL("/logout")
 TRADES_URL = URL("/markets/trades")
 
-# Env vars
+# ENV VARS
 USERNAME_ENV_VAR = "API_USERNAME"
 PASSWORD_ENV_VAR = "API_PASSWORD"
 URL_ENV_VAR = "API_URL"
@@ -31,3 +32,9 @@ class TradingEnv(str, Enum):
 
     # for testing
     TEST = "test"
+
+
+# DATA
+# Note: data stored under this path does not save to GitHUb
+LOCAL_STORAGE_FOLDER = pathlib.Path("src/data/local/")
+COLEDB_DEFAULT_STORAGE_PATH = LOCAL_STORAGE_FOLDER / "coledb_storage"

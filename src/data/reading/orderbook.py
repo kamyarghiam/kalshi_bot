@@ -144,7 +144,6 @@ def playback_orderbook(
                 if (best_ask_exists and price == best_ask)
                 else ""
             )
-
             table.add_row(
                 str(price),
                 str(bid_quantity),
@@ -166,5 +165,5 @@ def playback_orderbook(
             last_ts = msg.ts
 
 
-# ticker = MarketTicker("INXZ-23AUG31-T4514.87")
-# playback_orderbook(ticker, 100, 5, datetime(2023, 8, 31, 14, 49, 5))
+# ticker = MarketTicker("INXD-23OCT12-B4287")
+# playback_orderbook(ticker, 10000)

@@ -1,7 +1,7 @@
 from typing import Iterable, List
 
 from helpers.types.orders import Order
-from strategy.utils import BaseFeatureSet, Strategy
+from strategy.utils import ObservationSet, Strategy
 
 
 class PredeterminedStrategy(Strategy):
@@ -10,8 +10,9 @@ class PredeterminedStrategy(Strategy):
     def __init__(self, orders_to_place: List[Order]) -> None:
         self.orders_to_place = orders_to_place
         self.has_emitted_order_decisions = False
+        super().__init__()
 
-    def consume_next_step(self, update: BaseFeatureSet) -> Iterable[Order]:
+    def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
         if not self.has_emitted_order_decisions:
             self.has_emitted_order_decisions = True
             return self.orders_to_place

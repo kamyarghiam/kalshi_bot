@@ -25,7 +25,9 @@ def generate_table(num_snapshot_msgs: int, num_delta_msgs: int) -> Table:
     return table
 
 
-def collect_orderbook_data(exchange_interface: ExchangeInterface):
+def collect_orderbook_data(
+    exchange_interface: ExchangeInterface, cole: ColeDBInterface = ColeDBInterface()
+):
     """Writes live data to coledb
 
     We assume the influx databse is up already by the time you
@@ -35,7 +37,7 @@ def collect_orderbook_data(exchange_interface: ExchangeInterface):
     pages = 1 if is_test_run else None
     open_markets = exchange_interface.get_active_markets(pages=pages)
     market_tickers = [market.ticker for market in open_markets]
-    db = ColeDBInterface()
+    db = cole
     num_snapshot_msgs = 0
     num_delta_msgs = 0
 

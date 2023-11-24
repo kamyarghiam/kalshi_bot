@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Tuple
+from typing import DefaultDict, Generator, Tuple
 
 from data.reading.orderbook import OrderbookReader
 from helpers.types.markets import MarketTicker
@@ -72,7 +72,7 @@ class SideProfitMetadata:
     max_profit: Cents = Cents(0)
 
 
-def get_possible_profit(reader: OrderbookReader):
+def get_possible_profit(reader: OrderbookReader | Generator[Orderbook, None, None]):
     possible_profit = PossibleProfit()
     for msg in reader:
         possible_profit.add_msg(msg)
