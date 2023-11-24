@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import pytz
+
 from data.coledb.coledb import OrderbookCursor
 from exchange.interface import MarketTicker
 from helpers.types.money import Balance, Cents, Price
@@ -27,7 +29,7 @@ def mock_historical_from_orderbook_updates(
 
 def test_passive_ioc_strategy_simulator_simple():
     ticker = MarketTicker("some-ticker")
-    ts1 = datetime.now()
+    ts1 = datetime.now().astimezone(pytz.timezone("US/Eastern"))
     ts2 = ts1 + timedelta(seconds=10)
     updates = [
         Orderbook(
@@ -65,7 +67,7 @@ def test_passive_ioc_strategy_simulator_simple():
 
 def test_passive_ioc_strategy_simulator_bad_orders():
     ticker = MarketTicker("some-ticker")
-    ts1 = datetime.now()
+    ts1 = datetime.now().astimezone(pytz.timezone("US/Eastern"))
     ts2 = ts1 + timedelta(seconds=10)
     updates = [
         Orderbook(
@@ -146,7 +148,7 @@ def test_passive_ioc_strategy_simulator_bad_orders():
 
 def test_passive_ioc_strategy_simulator_ignore_price():
     ticker = MarketTicker("some-ticker")
-    ts1 = datetime.now()
+    ts1 = datetime.now().astimezone(pytz.timezone("US/Eastern"))
     ts2 = ts1 + timedelta(seconds=10)
     updates = [
         Orderbook(
