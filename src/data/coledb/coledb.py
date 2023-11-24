@@ -175,7 +175,7 @@ class ColeDBInterface:
 
     msgs_per_chunk = 5000
 
-    def __init__(self, storage_path: Optional[Path] = None):
+    def __init__(self, storage_path: Path | None = None):
         # Metadata files that we opened up already
         self.cole_db_storage_path = storage_path or COLEDB_DEFAULT_STORAGE_PATH
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
@@ -195,7 +195,7 @@ class ColeDBInterface:
             d for d in self.ticker_to_path(ticker=event_ticker).iterdir() if d.is_dir()
         )
 
-        # Chek all subdirs recursively.
+        # Check all subdirs recursively.
         final_markets: List[MarketTicker] = []
         for p in submarket_paths:
             current_ticker = MarketTicker(f"{event_ticker}-{p.name}")
