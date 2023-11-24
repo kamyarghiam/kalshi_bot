@@ -1,4 +1,6 @@
 import datetime
+import json
+import pathlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
@@ -105,6 +107,25 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
     df: pd.DataFrame
     feature_observation_time_keys: Dict[str, str]  # These don't change over time.
 
+    def save(self, path: pathlib.Path):
+        self.df.to_csv(path)
+        self.metadata_path(path=path).write_text(
+            json.dumps(self.feature_observation_time_keys)
+        )
+
+    @staticmethod
+    def metadata_path(path: pathlib.Path) -> pathlib.Path:
+        return path.parent / f"{path.name}.metadata"
+
+    @staticmethod
+    def load(path: pathlib.Path) -> "HistoricalObservationSetCursor":
+        df = pd.read_csv(path)
+        df.set_index("latest_ts", inplace=True)
+        md = json.loads(
+            HistoricalObservationSetCursor.metadata_path(path=path).read_text()
+        )
+        return HistoricalObservationSetCursor(df=df, feature_observation_time_keys=md)
+
     @staticmethod
     def from_featuresets_over_time(
         featuresets: List[ObservationSet],
@@ -119,6 +140,7 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
         ).set_index(keys="latest_ts", drop=False)
 
         feature_observation_times = featuresets[0].feature_observation_time_keys
+        df.sort_index(inplace=True, ascending=True)
         return HistoricalObservationSetCursor(
             df=df, feature_observation_time_keys=feature_observation_times
         )
@@ -156,10 +178,13 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                 next_feature_idx = min(
                     remaining_head_idxs, key=lambda idx: heads[idx][0].observed_ts
                 )
+                prev_feature = heads[next_feature_idx][0]
                 next_feature, done = next_or_done(
-                    prev=heads[next_feature_idx][0],
+                    prev=prev_feature,
                     iterator=feature_iters[next_feature_idx],
                 )
+
+                assert done or next_feature.observed_ts > prev_feature.observed_ts
                 heads[next_feature_idx] = (next_feature, done)
                 if not done or all(done for _, done in heads):
                     break
@@ -167,7 +192,7 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
             featuresets=featuresets
         )
 
-    def preload_strategy_features(self, strategy: "Strategy"):
+    def precalculate_strategy_features(self, strategy: "Strategy"):
         # Do all the pre-calculating we can.
         for feat in strategy.derived_features:
             feat.precalculate_onto(df=self.df)
@@ -182,6 +207,9 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                 series=row,
                 feature_observation_time_keys=self.feature_observation_time_keys,
             )
+
+    def __len__(self) -> int:
+        return len(self.df)
 
 
 class Strategy(ABC):

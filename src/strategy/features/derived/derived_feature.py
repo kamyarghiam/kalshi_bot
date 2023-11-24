@@ -19,7 +19,7 @@ class DerivedFeature(ABC):
     ) -> None:
         self.dependent_feats = dependent_feats
         self.unique_names = unique_names
-        self._preload = None
+        self._preload: Optional[pd.DataFrame] = None
 
     def get_derived_dependents(self, recursive: bool = False) -> List["DerivedFeature"]:
         feats = [f for f in self.dependent_feats if isinstance(f, DerivedFeature)]
@@ -99,14 +99,14 @@ class DerivedFeature(ABC):
         self, prev_data: Optional[ObservationSet], current_data: ObservationSet
     ) -> pd.Series:
         """Returns the value of this derived feature for a specific observation set."""
-        if self._preload:
+        if self._preload is not None:
             # If we can, get the cached/preloaded value.
-            return self._preload.loc[current_data.latest_ts]
+            return self._preload.loc[current_data.latest_ts][self.unique_names]
         if prev_data:
             prev_row = prev_data.series
         else:
             prev_row = None
-        return self.apply(prev_row=prev_row, current_data=current_data)
+        return self.apply(prev_row=prev_row, current_data=current_data.series)
 
     def batch(self, df: pd.DataFrame) -> pd.DataFrame:
         """

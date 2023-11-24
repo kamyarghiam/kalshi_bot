@@ -171,7 +171,7 @@ class ColeDBInterface:
 
     msgs_per_chunk = 5000
 
-    default_cole_db_storage_path = Path("src/data/coledb/storage/")
+    default_cole_db_storage_path = Path(__file__).parent / Path("storage")
 
     def __init__(self, storage_path: Optional[Path] = None):
         # Metadata files that we opened up already
@@ -188,11 +188,9 @@ class ColeDBInterface:
         self, event_ticker: EventTicker
     ) -> Iterable[MarketTicker]:
         """
-        Gets all submarkets given a standardized series prefix.
-        If recursive is true,
-          only returns market tickers that are finalized/complete tickers.
-        Else, we'll just return more series with
+        Gets all submarkets given an event ticker.
         """
+
         submarket_paths = (
             d for d in self.ticker_to_path(ticker=event_ticker).iterdir() if d.is_dir()
         )

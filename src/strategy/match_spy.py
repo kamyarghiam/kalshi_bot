@@ -34,7 +34,7 @@ class MatchSpy(Strategy):
         buy_this_ticker = inrange_series[
             self.spy_in_kalshi_market_feature.is_spy_inrange_key(ticker=ticker)
         ]
-        if buy_this_ticker:
+        if buy_this_ticker.item():
             return [
                 Order(
                     price=self.price,

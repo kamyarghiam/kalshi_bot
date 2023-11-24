@@ -23,61 +23,61 @@ def test_daily_spy_range_kalshi_markets(real_readonly_coledb):
             ticker=MarketTicker("INXD-23OCT18-T4250"),
             spy_min=None,
             spy_max=4250,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4262"),
             spy_min=4250,
             spy_max=4275,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4287"),
             spy_min=4275,
             spy_max=4300,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4312"),
             spy_min=4300,
             spy_max=4325,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4337"),
             spy_min=4325,
             spy_max=4350,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4362"),
             spy_min=4350,
             spy_max=4375,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4387"),
             spy_min=4375,
             spy_max=4400,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4412"),
             spy_min=4400,
             spy_max=4425,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-B4437"),
             spy_min=4425,
             spy_max=4450,
-            date=d,
+            end_date=d,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-T4449.99"),
             spy_min=4450,
             spy_max=None,
-            date=d,
+            end_date=d,
         ),
     ]
 
@@ -107,19 +107,25 @@ def test_spy_derived():
             ticker=MarketTicker("INXD-TODAY-T200"),
             spy_min=None,
             spy_max=200,
-            date=today,
+            end_date=today,
         ),
         SPYRangedKalshiMarket(
-            ticker=MarketTicker("INXD-TODAY-B300"), spy_min=200, spy_max=400, date=today
+            ticker=MarketTicker("INXD-TODAY-B300"),
+            spy_min=200,
+            spy_max=400,
+            end_date=today,
         ),
         SPYRangedKalshiMarket(
-            ticker=MarketTicker("INXD-TODAY-B500"), spy_min=400, spy_max=600, date=today
+            ticker=MarketTicker("INXD-TODAY-B500"),
+            spy_min=400,
+            spy_max=600,
+            end_date=today,
         ),
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-TODAY-T600"),
             spy_min=600,
             spy_max=None,
-            date=today,
+            end_date=today,
         ),
     ]
 

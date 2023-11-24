@@ -1,6 +1,6 @@
 import datetime
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from data.coledb.coledb import ColeDBInterface
 from helpers.types.markets import EventTicker, MarketTicker, market_specific_part
@@ -12,15 +12,13 @@ class SPYRangedKalshiMarket:
     ticker: MarketTicker
     spy_min: Optional[int]
     spy_max: Optional[int]
-    date: datetime.date
+    end_date: datetime.date
 
 
-def daily_spy_range_kalshi_markets(
-    date: datetime.date, cole: ColeDBInterface = ColeDBInterface()
+def _parse_kalshi_ranged_spy_tickers(
+    end_date: datetime.date, tickers: Iterable[MarketTicker]
 ) -> List[SPYRangedKalshiMarket]:
-    date_month_str = date.strftime("%b").upper()
-    event_ticker = EventTicker(f"INXD-{date.year - 2000}{date_month_str}{date.day}")
-    market_tickers = list(cole.get_tickers_under_event(event_ticker=event_ticker))
+    market_tickers = list(tickers)
     market_tickers.sort()
 
     tickers_and_suffixes = [
@@ -45,10 +43,10 @@ def daily_spy_range_kalshi_markets(
     min_ticker, min_cap = cap_tickers[0]
     max_ticker, max_cap = cap_tickers[1]
     # Make the final list: low cap + midpoints + high cap
-    parsed_markets = (
+    return (
         [
             SPYRangedKalshiMarket(
-                ticker=min_ticker, spy_min=None, spy_max=int(min_cap), date=date
+                ticker=min_ticker, spy_min=None, spy_max=int(min_cap), end_date=end_date
             )
         ]
         + [
@@ -60,7 +58,7 @@ def daily_spy_range_kalshi_markets(
                 # mp + 25/2 (round up) for the max.
                 spy_min=midpoint - (spy_step_size // 2),
                 spy_max=midpoint + (spy_step_size // 2) + 1,
-                date=date,
+                end_date=end_date,
             )
             for ticker, midpoint in midpoint_tickers
         ]
@@ -69,12 +67,31 @@ def daily_spy_range_kalshi_markets(
                 ticker=max_ticker,
                 spy_min=int(max_cap) + 1,  # Round up.
                 spy_max=None,
-                date=date,
+                end_date=end_date,
             ),
         ]
     )
 
-    return parsed_markets
+
+def weekly_spy_range_kalshi_markets(
+    date: datetime.date, cole: ColeDBInterface = ColeDBInterface()
+) -> List[SPYRangedKalshiMarket]:
+    # Assumes date is the EOW/end date.
+    date_month_str = date.strftime("%b").upper()
+    event_ticker = EventTicker(f"INXW-{date.year - 2000}{date_month_str}{date.day}")
+    return _parse_kalshi_ranged_spy_tickers(
+        end_date=date, tickers=cole.get_tickers_under_event(event_ticker=event_ticker)
+    )
+
+
+def daily_spy_range_kalshi_markets(
+    date: datetime.date, cole: ColeDBInterface = ColeDBInterface()
+) -> List[SPYRangedKalshiMarket]:
+    date_month_str = date.strftime("%b").upper()
+    event_ticker = EventTicker(f"INXD-{date.year - 2000}{date_month_str}{date.day}")
+    return _parse_kalshi_ranged_spy_tickers(
+        end_date=date, tickers=cole.get_tickers_under_event(event_ticker=event_ticker)
+    )
 
 
 def kalshi_orderbook_feature_name(ticker: MarketTicker) -> str:

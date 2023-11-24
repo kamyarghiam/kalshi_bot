@@ -26,8 +26,18 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     df["ts_recv"] = df["ts_recv"].apply(
         lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
     )
+    # Because the data is orders, not fills,
+    # But we filter to fill,
+    #   each fill can fill multiple orders
+    #   and therefore take up multiple rows
+    # Because we only care about the price, we can just drop the duplicates.
+    df.drop_duplicates(subset="ts_recv", inplace=True)
     df.rename(
-        {"ts_recv": spy_price_feature_ts_name(), "price": spy_price_feature_name()}
+        columns={
+            "ts_recv": spy_price_feature_ts_name(),
+            "price": spy_price_feature_name(),
+        },
+        inplace=True,
     )
     for idx, row in df.iterrows():
-        yield Observation.from_series(row, observed_ts_key="spy_ts_recv")
+        yield Observation.from_series(row, observed_ts_key=spy_price_feature_ts_name())

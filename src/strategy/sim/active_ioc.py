@@ -5,6 +5,8 @@ against the exchange without actually sending orders"""
 import itertools
 from datetime import timedelta
 
+import tqdm
+
 from data.coledb.coledb import OrderbookCursor
 from helpers.types.money import Balance, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
@@ -39,6 +41,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         ignore_price: bool = False,
         starting_balance: Balance = Balance(Cents(100_000_000)),
         latency_to_exchange: timedelta = timedelta(milliseconds=100),
+        pretty: bool = False,
     ):
         # Get all results from the portfolio here
         self.kalshi_orderbook_updates = kalshi_orderbook_updates
@@ -46,21 +49,28 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         self.starting_balance = starting_balance
         self.latency_to_exchange = latency_to_exchange
         self.ignore_price = ignore_price
+        self.pretty = pretty
 
     def run(self, strategy: Strategy) -> PortfolioHistory:
         portfolio_history = PortfolioHistory(self.starting_balance)
         ignore_price = self.ignore_price
-
         # First, run the strategy from start to end to get all the orders it places.
+        hist_iter = self.historical_data
+        if self.pretty:
+            hist_iter = tqdm.tqdm(hist_iter, desc="Calculating strategy orders")
         orders_requested = list(
             itertools.chain.from_iterable(
-                strategy.consume_next_step(update=update)
-                for update in iter(self.historical_data)
+                strategy.consume_next_step(update=update) for update in hist_iter
             )
         )
         orders_requested.sort(key=lambda order: order.time_placed)
         last_orderbook: Orderbook = next(iter(self.kalshi_orderbook_updates))
-        for order in orders_requested:
+        orders_requested_iter = orders_requested
+        if self.pretty:
+            orders_requested_iter = tqdm.tqdm(
+                orders_requested, desc="Running orders through simulation"
+            )
+        for order in orders_requested_iter:
             for orderbook in self.kalshi_orderbook_updates:
                 if order.time_placed + self.latency_to_exchange < orderbook.ts:
                     break
