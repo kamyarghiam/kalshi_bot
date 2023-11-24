@@ -9,7 +9,7 @@ from helpers.utils import compute_pnl
 from strategy.research.possible_profit import get_possible_profit
 
 
-def test_possible_profit():
+def test_possible_profit(cole_db: ColeDBInterface):
     ticker = MarketTicker("some-ticker-test_possible_profit")
     # Create historical orderbook dataset
     snapshot1 = OrderbookSnapshotRM(
@@ -43,10 +43,11 @@ def test_possible_profit():
         delta1,
         delta2,
     ]
-    db = ColeDBInterface()
     for msg in msgs:
-        db.write(msg)
+        cole_db.write(msg)
 
     no_profit = compute_pnl(Price(10), Price(50), Quantity(10))
     # A bit hacky, but gets us by
-    assert get_possible_profit(db.read(ticker)) == no_profit  # type:ignore[arg-type]
+    assert (
+        get_possible_profit(cole_db.read(ticker)) == no_profit
+    )  # type:ignore[arg-type]

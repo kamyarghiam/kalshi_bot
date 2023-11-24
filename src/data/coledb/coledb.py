@@ -49,11 +49,13 @@ TODO: maybe we should parallelize the writes if it's too slow?
 
 import io
 import pickle
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
+from helpers.constants import COLEDB_DEFAULT_STORAGE_PATH
 from helpers.types.markets import EventTicker, MarketTicker, Ticker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook
@@ -82,6 +84,8 @@ class ColeDBMetadata:
     num_msgs_in_last_file: int = field(default=0)
 
     def save(self):
+        # TODO: small legacy issue, the path saved may be incorrect.
+        # When we reload, we overwrite the path. Remove path when saving.
         self.path.write_bytes(pickle.dumps(self))
 
     @classmethod
@@ -171,13 +175,9 @@ class ColeDBInterface:
 
     msgs_per_chunk = 5000
 
-    default_cole_db_storage_path = Path(__file__).parent / Path("storage")
-
     def __init__(self, storage_path: Optional[Path] = None):
         # Metadata files that we opened up already
-        self.cole_db_storage_path = (
-            storage_path or ColeDBInterface.default_cole_db_storage_path
-        )
+        self.cole_db_storage_path = storage_path or COLEDB_DEFAULT_STORAGE_PATH
         self._open_metadata_files: Dict[MarketTicker, ColeDBMetadata] = {}
 
     def ticker_exists(self, ticker: MarketTicker) -> bool:
@@ -249,6 +249,13 @@ class ColeDBInterface:
 
     def write(self, data: OrderbookDeltaRM | OrderbookSnapshotRM):
         """Writes data to cole db"""
+        if (
+            "pytest" in sys.modules
+            and self.cole_db_storage_path == COLEDB_DEFAULT_STORAGE_PATH
+        ):
+            raise RuntimeError(
+                "Pytest is running, are you sure you want to write to ColeDB?"
+            )
         try:
             metadata = self.get_metadata(data.market_ticker)
         except FileNotFoundError:

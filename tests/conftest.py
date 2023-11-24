@@ -1,5 +1,4 @@
 import os
-import pathlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -66,13 +65,13 @@ def exchange_interface(fastapi_test_client: TestClient | None):
         yield exchange_interface
 
 
-@pytest.fixture(scope="session", autouse=True)
-def temp_coledb_interface(tmp_path_factory: TempPathFactory):
+@pytest.fixture(scope="session")
+def cole_db(tmp_path_factory: TempPathFactory):
     tmp_path = tmp_path_factory.mktemp("coledb")
-    ColeDBInterface.default_cole_db_storage_path = tmp_path
+    return ColeDBInterface(storage_path=tmp_path)
 
 
 @pytest.fixture(scope="session")
 def real_readonly_coledb():
-    db = ReadonlyColeDB(storage_path=pathlib.Path("./src/data/coledb/storage"))
+    db = ReadonlyColeDB()
     yield db

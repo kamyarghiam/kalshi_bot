@@ -7,7 +7,7 @@ from exchange.interface import MarketTicker
 from helpers.types.money import Balance, Cents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from strategy.sim.active_ioc import ActiveIOCStrategySimulator
+from strategy.sim.sim_types.active_ioc import ActiveIOCStrategySimulator
 from strategy.strategies.predetermined_strategy import PredeterminedStrategy
 from strategy.utils import HistoricalObservationSetCursor, Observation
 

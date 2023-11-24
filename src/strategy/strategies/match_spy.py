@@ -26,6 +26,7 @@ class MatchSpy(Strategy):
         )
         self.price = price
         self.qty = qty
+        self.count = 0
         super().__init__(derived_features=[self.spy_in_kalshi_market_feature])
 
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
@@ -34,25 +35,18 @@ class MatchSpy(Strategy):
         buy_this_ticker = inrange_series[
             self.spy_in_kalshi_market_feature.is_spy_inrange_key(ticker=ticker)
         ]
-        if buy_this_ticker:
-            return [
-                Order(
-                    price=self.price,
-                    quantity=self.qty,
-                    trade=TradeType.BUY,
-                    ticker=ticker,
-                    side=Side.YES,
-                    time_placed=update.latest_ts,
-                )
-            ]
-        else:
-            return [
-                Order(
-                    price=self.price,
-                    quantity=self.qty,
-                    trade=TradeType.SELL,
-                    ticker=ticker,
-                    side=Side.YES,
-                    time_placed=update.latest_ts,
-                )
-            ]
+        self.count += 1
+        if buy_this_ticker.item():
+            if self.count % 100:
+                return [
+                    Order(
+                        price=self.price,
+                        quantity=self.qty,
+                        trade=TradeType.BUY,
+                        ticker=ticker,
+                        side=Side.YES,
+                        time_placed=update.latest_ts,
+                    )
+                ]
+
+        return []

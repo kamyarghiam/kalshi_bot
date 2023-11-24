@@ -34,54 +34,51 @@ def test_read_write_metadata(tmp_path: Path):
     assert ColeDBMetadata.load(path) == ColeDBMetadata(path, [now], 5, 1000)
 
 
-def test_ticker_to_path():
+def test_ticker_to_path(cole_db: ColeDBInterface):
     ticker = MarketTicker("SERIES-EVENT-MARKET")
-    db = ColeDBInterface()
-    assert db.ticker_to_path(ticker) == Path(
-        db.cole_db_storage_path / "SERIES/EVENT/MARKET/"
+    assert cole_db.ticker_to_path(ticker) == Path(
+        cole_db.cole_db_storage_path / "SERIES/EVENT/MARKET/"
     )
 
 
-def test_ticker_to_metadata_path():
+def test_ticker_to_metadata_path(cole_db: ColeDBInterface):
     ticker = MarketTicker("SERIES-EVENT-MARKET")
-    db = ColeDBInterface()
-    assert db.ticker_to_metadata_path(ticker) == Path(
-        db.cole_db_storage_path / "SERIES/EVENT/MARKET/metadata"
+    assert cole_db.ticker_to_metadata_path(ticker) == Path(
+        cole_db.cole_db_storage_path / "SERIES/EVENT/MARKET/metadata"
     )
 
 
-def test_create_get_metadata_file(tmp_path: Path):
+def test_create_get_metadata_file(tmp_path: Path, cole_db: ColeDBInterface):
     path = tmp_path / "metadata"
-    cole = ColeDBInterface()
     assert not path.exists()
     with patch.object(
-        cole, "ticker_to_metadata_path", return_value=path
+        cole_db, "ticker_to_metadata_path", return_value=path
     ) as mock_ticker_to_metadata_path:
         ticker = MarketTicker("SERIES-EVENT-MARKET")
         with pytest.raises(FileNotFoundError) as e:
-            cole.get_metadata(ticker)
+            cole_db.get_metadata(ticker)
         assert e.match("Could not find metadata file for SERIES-EVENT-MARKET")
-        metadata_create = cole.create_metadata_file(ticker)
-        metadata = cole.get_metadata(ticker)
+        metadata_create = cole_db.create_metadata_file(ticker)
+        metadata = cole_db.get_metadata(ticker)
         assert metadata_create == metadata
         assert metadata.path == path
         assert path.exists()
-        assert ticker in cole._open_metadata_files
+        assert ticker in cole_db._open_metadata_files
         mock_ticker_to_metadata_path.assert_any_call(ticker)
 
     with patch.object(
-        cole,
+        cole_db,
         "ticker_to_metadata_path",
         return_value=path,
     ) as mock_ticker_to_metadata_path:
         # Gets the metadata file from the local cache dict
-        metadata_from_dict = cole.get_metadata(ticker)
+        metadata_from_dict = cole_db.get_metadata(ticker)
         assert metadata_from_dict == metadata
         mock_ticker_to_metadata_path.assert_not_called()
 
         # Delete from local dictionary and test that it can be loaded
-        cole._open_metadata_files = {}
-        metadata_from_loading = cole.get_metadata(ticker)
+        cole_db._open_metadata_files = {}
+        metadata_from_loading = cole_db.get_metadata(ticker)
         assert metadata_from_loading == metadata_from_dict
 
 
@@ -673,13 +670,12 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
         next(actual_orderbook_gen)
 
 
-def test_read_write_coledb():
+def test_read_write_coledb(cole_db: ColeDBInterface):
     ticker = MarketTicker("some_ticker")
-    db = ColeDBInterface()
-    reader = db.read(ticker)
+    reader = cole_db.read(ticker)
     # Reading a dataset that does not exist
     with pytest.raises(FileNotFoundError) as e:
-        next(db.read(MarketTicker("BAD-TICKER")))
+        next(cole_db.read(MarketTicker("BAD-TICKER")))
 
     assert e.match("Could not find metadata file for BAD-TICKER")
 
@@ -698,28 +694,27 @@ def test_read_write_coledb():
     )
     # Writing a delta first in a new dataset is bad
     with pytest.raises(TypeError) as e:  # type:ignore
-        db.write(delta)
+        cole_db.write(delta)
     assert e.match(
         "New dataset writes must start with a snapshot! Data: "
         + "market_ticker='some_ticker' price=31 delta=12345 "
         + "side=<Side.YES: 'yes'> ts=datetime.datetime"
     )
 
-    db.write(snapshot)
-    db.write(delta)
+    cole_db.write(snapshot)
+    cole_db.write(delta)
 
-    reader = db.read(ticker)
+    reader = cole_db.read(ticker)
     orderbook_snapshot = Orderbook.from_snapshot(snapshot)
     assert next(reader) == orderbook_snapshot
     orderbook_snapshot = orderbook_snapshot.apply_delta(delta)
     assert next(reader) == orderbook_snapshot
 
 
-def test_read_write_across_chunks():
+def test_read_write_across_chunks(cole_db: ColeDBInterface):
     ColeDBInterface.msgs_per_chunk = 2
     ticker = MarketTicker("TEST-READ-WRITEACROSSCHUNKS")
-    db = ColeDBInterface()
-    reader = db.read(ticker)
+    reader = cole_db.read(ticker)
     with pytest.raises(FileNotFoundError):
         next(reader)
 
@@ -757,13 +752,13 @@ def test_read_write_across_chunks():
         no=[[1, 20]],  # type:ignore[list-item]
         ts=datetime.now() - timedelta(seconds=2),
     )
-    db.write(snapshot1)
-    db.write(delta1)
-    db.write(delta2)
-    db.write(delta3)
-    db.write(snapshot2)
+    cole_db.write(snapshot1)
+    cole_db.write(delta1)
+    cole_db.write(delta2)
+    cole_db.write(delta3)
+    cole_db.write(snapshot2)
 
-    reader = db.read(ticker)
+    reader = cole_db.read(ticker)
     orderbook_snapshot = Orderbook.from_snapshot(snapshot1)
     next_msg = next(reader)
     assert next_msg == orderbook_snapshot
@@ -802,7 +797,7 @@ def test_read_write_across_chunks():
         next(reader)
 
     # Read range
-    reader = db.read(ticker, end_ts=delta3.ts + timedelta(seconds=1))
+    reader = cole_db.read(ticker, end_ts=delta3.ts + timedelta(seconds=1))
     assert next(reader) == orderbook_snapshot
     assert next(reader) == orderbook_snapshot_d1
     assert next(reader) == orderbook_snapshot_d2
@@ -810,7 +805,7 @@ def test_read_write_across_chunks():
     with pytest.raises(StopIteration):
         next(reader)
 
-    reader = db.read(
+    reader = cole_db.read(
         ticker,
         start_ts=delta1.ts - timedelta(seconds=1),
         end_ts=delta3.ts + timedelta(seconds=1),
@@ -825,12 +820,12 @@ def test_read_write_across_chunks():
 def test_backward_compatibility():
     """Tests that we can still open old data files
 
-    I took some data captured early on from the db and put it in
+    I took some data captured early on from the cole_db and put it in
     the tests/data folder. Any changes to coledb should still allow
     us to open these files, or we need to convert all the old data"""
 
-    db = ColeDBInterface(storage_path=Path("tests/data/"))
-    data = db.read(MarketTicker("INXD-23AUG31-B4512"))
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/"))
+    data = cole_db.read(MarketTicker("INXD-23AUG31-B4512"))
 
     assert next(data) == Orderbook(
         market_ticker=MarketTicker("INXD-23AUG31-B4512"),
@@ -845,3 +840,11 @@ def test_backward_compatibility():
         view=OrderbookView.BID,
         ts=datetime(2023, 8, 31, 9, 30, 11, 177187),
     )
+
+
+def test_coledb_write_guardrails():
+    # Intentionally connect to prod db
+    db = ColeDBInterface()
+    with pytest.raises(RuntimeError) as e:
+        db.write(MagicMock())
+    assert e.match("Pytest is running, are you sure you want to write to ColeDB?")

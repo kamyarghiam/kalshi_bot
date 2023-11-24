@@ -13,7 +13,7 @@ from helpers.types.money import Balance, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from strategy.sim.sim import StrategySimulator
+from strategy.sim.abstract import StrategySimulator
 from strategy.utils import HistoricalObservationSetCursor, Strategy
 
 
