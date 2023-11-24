@@ -192,6 +192,18 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
             featuresets=featuresets
         )
 
+    def between_times(
+        self, start_ts: datetime.datetime | None, end_ts: datetime.datetime | None
+    ) -> "HistoricalObservationSetCursor":
+        new_df = self.df
+        if start_ts is not None:
+            new_df = new_df[new_df["latest_ts"] <= start_ts]
+        if end_ts is not None:
+            new_df = new_df[new_df["latest_ts"] < end_ts]
+        return HistoricalObservationSetCursor(
+            df=new_df, feature_observation_time_keys=self.feature_observation_time_keys
+        )
+
     def precalculate_strategy_features(self, strategy: "Strategy"):
         # Do all the pre-calculating we can.
         for feat in strategy.derived_features:

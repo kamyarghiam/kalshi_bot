@@ -101,3 +101,15 @@ def test_feature_collections():
     assert observed_a_num_features == [2, 999, 999]
     observed_b_features = [fs.series["b_features"] for fs in all_featuresets]
     assert observed_b_features == [{"bbbb", "33"}, {"bbbb", "33"}, {"bbbb", "44"}]
+
+    # Check the __len__ feature.
+    assert len(hist_features) == 3
+
+    # Check the filtered version.
+    filter_start = datetime.datetime.combine(day, datetime.time(hour=2))
+    hist_filtered = hist_features.between_times(
+        start_ts=filter_start,
+        end_ts=datetime.datetime.combine(day, datetime.time(hour=4)),
+    )
+    assert len(hist_filtered) == 1
+    assert list(hist_filtered)[0].latest_ts == filter_start
