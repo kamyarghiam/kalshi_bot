@@ -31,7 +31,7 @@ class Quantity(int):
         """Takes the original quantity and applies the delta"""
         return Quantity(super().__add__(delta))
 
-    def __sub__(self, delta: QuantityDelta):  # type:ignore[override]
+    def __sub__(self, delta: Union[QuantityDelta, "Quantity"]):  # type:ignore[override]
         return Quantity(super().__sub__(delta))
 
 
