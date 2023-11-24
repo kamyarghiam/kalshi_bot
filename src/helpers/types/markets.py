@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List, Union
 
 from pydantic import BaseModel, Extra
 
@@ -23,6 +23,13 @@ class MarketTicker(str):
     """Full market tickers on the exchange.
 
     Example: CPICORE-23JUL-TN0.1"""
+
+
+Ticker = Union[MarketTicker, EventTicker, SeriesTicker]
+
+
+def market_specific_part(market_ticker: MarketTicker) -> str:
+    return market_ticker.split("-")[-1]
 
 
 def to_event_ticker(market_ticker: MarketTicker) -> EventTicker:

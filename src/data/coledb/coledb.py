@@ -54,7 +54,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
-from helpers.types.markets import MarketTicker
+from helpers.types.markets import EventTicker, MarketTicker, Ticker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Quantity, QuantityDelta, Side
@@ -184,8 +184,8 @@ class ColeDBInterface:
         """Returns if a market ticker is in the DB already."""
         return self.ticker_to_metadata_path(ticker=ticker).exists()
 
-    def get_submarkets(
-        self, ticker_prefix: MarketTicker, recursive: bool = False
+    def get_tickers_under_event(
+        self, event_ticker: EventTicker
     ) -> Iterable[MarketTicker]:
         """
         Gets all submarkets given a standardized series prefix.
@@ -194,27 +194,19 @@ class ColeDBInterface:
         Else, we'll just return more series with
         """
         submarket_paths = (
-            d for d in self.ticker_to_path(ticker=ticker_prefix).iterdir() if d.is_dir()
+            d for d in self.ticker_to_path(ticker=event_ticker).iterdir() if d.is_dir()
         )
-
-        if not recursive:
-            return (MarketTicker(f"{ticker_prefix}-{p.name}") for p in submarket_paths)
 
         # Chek all subdirs recursively.
         final_markets: List[MarketTicker] = []
         for p in submarket_paths:
-            current_ticker = MarketTicker(f"{ticker_prefix}-{p.name}")
+            current_ticker = MarketTicker(f"{event_ticker}-{p.name}")
             # If the current ticker is in the DB, add it.
             if self.ticker_exists(ticker=current_ticker):
                 final_markets.append(current_ticker)
-            else:
-                # Else check it for sub-tickers.
-                final_markets.extend(
-                    self.get_submarkets(ticker_prefix=current_ticker, recursive=True)
-                )
         return final_markets
 
-    def ticker_to_path(self, ticker: MarketTicker) -> Path:
+    def ticker_to_path(self, ticker: Ticker) -> Path:
         """Given a market ticker returns a path to where all its data should live"""
         return self.cole_db_storage_path / Path(ticker.replace("-", "/"))
 

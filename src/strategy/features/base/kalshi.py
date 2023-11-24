@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from data.coledb.coledb import ColeDBInterface
-from helpers.types.markets import MarketTicker
+from helpers.types.markets import EventTicker, MarketTicker, market_specific_part
 from strategy.utils import Observation, ObservationCursor
 
 
@@ -19,14 +19,12 @@ def daily_spy_range_kalshi_markets(
     date: datetime.date, cole: ColeDBInterface = ColeDBInterface()
 ) -> List[SPYRangedKalshiMarket]:
     date_month_str = date.strftime("%b").upper()
-    ticker_prefix = MarketTicker(f"INXD-{date.year - 2000}{date_month_str}{date.day}")
-    market_tickers = list(
-        cole.get_submarkets(ticker_prefix=ticker_prefix, recursive=True)
-    )
+    event_ticker = EventTicker(f"INXD-{date.year - 2000}{date_month_str}{date.day}")
+    market_tickers = list(cole.get_tickers_under_event(event_ticker=event_ticker))
     market_tickers.sort()
 
     tickers_and_suffixes = [
-        (t, t.removeprefix(ticker_prefix + "-")) for t in market_tickers
+        (t, market_specific_part(market_ticker=t)) for t in market_tickers
     ]
     # The "T"- tickers are cap tickers,
     #   ie their markets are at the caps of the possible range.

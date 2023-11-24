@@ -50,7 +50,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
     def run(self, strategy: Strategy) -> PortfolioHistory:
         portfolio_history = PortfolioHistory(self.starting_balance)
         ignore_price = self.ignore_price
-        self.historical_data.preload_strategy_features(strategy=strategy)
+
         # First, run the strategy from start to end to get all the orders it places.
         orders_requested = list(
             itertools.chain.from_iterable(

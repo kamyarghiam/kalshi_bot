@@ -15,7 +15,6 @@ def spy_price_feature_ts_name() -> str:
 
 
 def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
-    # Clean and normalize es data. Normalize means to put it between 0 and 1
     utc_tz = zoneinfo.ZoneInfo("UTC")
     eastern_tz = zoneinfo.ZoneInfo("US/Eastern")
     df = pd.read_csv(es_file)
