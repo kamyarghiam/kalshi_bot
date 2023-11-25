@@ -6,6 +6,11 @@ from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
 from helpers.utils import Side
+from strategy.features.base.kalshi import (
+    SPYRangedKalshiMarket,
+    kalshi_orderbook_feature_name,
+)
+from strategy.features.base.spy import spy_price_feature_name
 from strategy.utils import ObservationSet, Strategy
 
 
@@ -19,7 +24,8 @@ class SPYThetaDecay(Strategy):
     """
 
     def __init__(
-        self, market_lower_thresholds: List[Cents], market_tickers: List[MarketTicker]
+        self,
+        kalshi_spy_markets: List[SPYRangedKalshiMarket],
     ):
         """
         market_lower_thresholds:
@@ -39,11 +45,18 @@ class SPYThetaDecay(Strategy):
             with the market_lower_thresholds (the indices should line up the correct
             market from the other list)
         """
+
+        market_lower_thresholds = [
+            Cents(0) if m.spy_min is None else Cents(m.spy_min * 100)
+            for m in kalshi_spy_markets
+        ]
+        market_tickers = [m.ticker for m in kalshi_spy_markets]
         # Some pre-conditions
         assert len(market_lower_thresholds) == len(market_tickers)
         assert market_lower_thresholds == sorted(market_lower_thresholds)
         assert len(market_lower_thresholds) > 0
         assert market_lower_thresholds[0] == 0
+        self.market_tickers = market_tickers
 
         # We add zero in the front to represent the bottom bucket
         self.lower_mkt_thresholds: List[Cents] = market_lower_thresholds
@@ -51,12 +64,15 @@ class SPYThetaDecay(Strategy):
         # Defaults to the first one on the first go
         self.last_market_ticker: MarketTicker = market_tickers[0]
         self.last_order: Order | None = None
+        super().__init__()
 
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
-        curr_es_price: Cents = update.series["ES_price"]
+        curr_es_price: Cents = update.series[spy_price_feature_name()]
         market_ticker = self.get_market_from_es_price(curr_es_price)
         # Orderbook of the market ticker that the price falls into
-        ob: Orderbook = update.series["orderbook-%s" % market_ticker]
+        ob: Orderbook = update.series[
+            kalshi_orderbook_feature_name(ticker=market_ticker)
+        ]
 
         ################# Buy ########################
         if self.last_market_ticker != market_ticker:
@@ -91,4 +107,4 @@ class SPYThetaDecay(Strategy):
     def get_market_from_es_price(self, es_price: Cents):
         """Returns the market ticker that associates with this ES price"""
         mkt_ticker_index = bisect.bisect_left(self.lower_mkt_thresholds, es_price)
-        return self.last_market_ticker[mkt_ticker_index - 1]
+        return self.market_tickers[mkt_ticker_index - 1]

@@ -5,8 +5,7 @@ against the exchange without actually sending orders"""
 import itertools
 from datetime import timedelta
 
-import pytz
-import tqdm
+import tqdm.autonotebook as tqdm
 
 from data.coledb.coledb import OrderbookCursor
 from helpers.types.money import Balance, Cents, get_opposite_side_price
@@ -73,10 +72,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
             )
         for order in orders_requested_iter:
             for orderbook in self.kalshi_orderbook_updates:
-                if (
-                    order.time_placed + self.latency_to_exchange
-                    < orderbook.ts.astimezone(pytz.timezone("US/Eastern"))
-                ):
+                if order.time_placed + self.latency_to_exchange < orderbook.ts:
                     break
 
             bbo = last_orderbook.get_bbo()

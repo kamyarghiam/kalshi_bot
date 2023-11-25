@@ -36,5 +36,7 @@ class TradingEnv(str, Enum):
 
 # DATA
 # Note: data stored under this path does not save to GitHUb
-LOCAL_STORAGE_FOLDER = pathlib.Path("src/data/local/")
+LOCAL_STORAGE_FOLDER = pathlib.Path(__file__).parent.parent.parent / pathlib.Path(
+    "src/data/local/"
+)
 COLEDB_DEFAULT_STORAGE_PATH = LOCAL_STORAGE_FOLDER / "coledb_storage"

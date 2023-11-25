@@ -3,7 +3,7 @@ import zoneinfo
 
 import pandas as pd
 
-from strategy.utils import Observation, ObservationCursor
+from strategy.utils import ObservationCursor, observation_cursor_from_df
 
 
 def spy_price_feature_name() -> str:
@@ -15,17 +15,21 @@ def spy_price_feature_ts_name() -> str:
 
 
 def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
-    utc_tz = zoneinfo.ZoneInfo("UTC")
-    eastern_tz = zoneinfo.ZoneInfo("US/Eastern")
+    zoneinfo.ZoneInfo("UTC")
+    zoneinfo.ZoneInfo("US/Eastern")
     df = pd.read_csv(es_file)
 
     df = df[df["action"] == "F"]
     columns_to_keep = ["ts_recv", "price"]
     df = df[columns_to_keep]
     df["ts_recv"] = pd.to_datetime(df["ts_recv"], unit="ns")
-    df["ts_recv"] = df["ts_recv"].apply(
-        lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
-    )
+    # Note: coledb has no timezones :(
+    # So all other features must be tz-naive in order to be compared/ordered
+    #   with the coledb/kalshi orderbook updates.
+    # df["ts_recv"] = df["ts_recv"].apply(
+    #     lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
+    # )
+
     # Because the data is orders, not fills,
     # But we filter to fill,
     #   each fill can fill multiple orders
@@ -39,5 +43,6 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
         },
         inplace=True,
     )
-    for idx, row in df.iterrows():
-        yield Observation.from_series(row, observed_ts_key=spy_price_feature_ts_name())
+    return observation_cursor_from_df(
+        df=df, observed_ts_key=spy_price_feature_ts_name()
+    )
