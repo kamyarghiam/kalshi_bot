@@ -46,23 +46,22 @@ class SPYThetaDecay(Strategy):
             market from the other list)
         """
 
-        market_lower_thresholds = [
+        self.markets: List[SPYRangedKalshiMarket] = kalshi_spy_markets
+        self.market_lower_thresholds = [
             Cents(0) if m.spy_min is None else Cents(m.spy_min * 100)
             for m in kalshi_spy_markets
         ]
-        market_tickers = [m.ticker for m in kalshi_spy_markets]
         # Some pre-conditions
-        assert len(market_lower_thresholds) == len(market_tickers)
-        assert market_lower_thresholds == sorted(market_lower_thresholds)
-        assert len(market_lower_thresholds) > 0
-        assert market_lower_thresholds[0] == 0
-        self.market_tickers = market_tickers
+        assert self.market_lower_thresholds == sorted(self.market_lower_thresholds)
+        assert len(self.market_lower_thresholds) > 0
+        assert self.market_lower_thresholds[0] == 0
 
-        self.lower_mkt_thresholds: List[Cents] = market_lower_thresholds
         # Represents the market_ticker of the last market the ES price fell into
         # Defaults to the first one on the first go
-        self.last_market_ticker: MarketTicker = market_tickers[0]
+        self.last_market_ticker: MarketTicker = kalshi_spy_markets[0].ticker
+        # Last order we placed
         self.last_order: Order | None = None
+
         super().__init__()
 
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
@@ -105,5 +104,5 @@ class SPYThetaDecay(Strategy):
 
     def get_market_from_es_price(self, es_price: Cents):
         """Returns the market ticker that associates with this ES price"""
-        mkt_ticker_index = bisect.bisect_left(self.lower_mkt_thresholds, es_price)
-        return self.market_tickers[mkt_ticker_index - 1]
+        mkt_ticker_index = bisect.bisect_left(self.market_lower_thresholds, es_price)
+        return self.markets[mkt_ticker_index - 1].ticker
