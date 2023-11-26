@@ -58,7 +58,6 @@ class SPYThetaDecay(Strategy):
         assert market_lower_thresholds[0] == 0
         self.market_tickers = market_tickers
 
-        # We add zero in the front to represent the bottom bucket
         self.lower_mkt_thresholds: List[Cents] = market_lower_thresholds
         # Represents the market_ticker of the last market the ES price fell into
         # Defaults to the first one on the first go
