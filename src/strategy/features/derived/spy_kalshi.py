@@ -22,27 +22,27 @@ class SPYInKalshiMarketRange(TimeIndependentFeature):
         )
 
         super().__init__(
-            dependent_feats=[spy_source],
-            unique_names=[output_feature_name],
+            input_feats=[spy_source],
+            output_feat_names=[output_feature_name],
         )
 
     @staticmethod
     def is_spy_inrange_key(ticker: MarketTicker):
         return f"{ticker}-spy-inrange"
 
-    def _apply_independent(self, current_data: pd.DataFrame) -> pd.DataFrame:
+    def _apply_independent(self, all_input_data: pd.DataFrame) -> pd.DataFrame:
         to_return = self._empty_independent_return()
         m = self.kalshi_spy_market
         if m.spy_min and m.spy_max:
-            to_return[self.is_spy_inrange_key(m.ticker)] = current_data[
+            to_return[self.is_spy_inrange_key(m.ticker)] = all_input_data[
                 spy_price_feature_name()
             ].between(m.spy_min, m.spy_max, inclusive="left")
         elif m.spy_min is None:
-            to_return[self.is_spy_inrange_key(m.ticker)] = current_data[
+            to_return[self.is_spy_inrange_key(m.ticker)] = all_input_data[
                 spy_price_feature_name()
             ].lt(m.spy_max)
         elif m.spy_max is None:
-            to_return[self.is_spy_inrange_key(m.ticker)] = current_data[
+            to_return[self.is_spy_inrange_key(m.ticker)] = all_input_data[
                 spy_price_feature_name()
             ].ge(m.spy_min)
         else:
