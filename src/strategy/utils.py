@@ -4,9 +4,21 @@ import pathlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Iterator, List, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Sized,
+    Tuple,
+)
 
 import pandas as pd
+import tqdm.autonotebook as tqdm
 
 from helpers.types.orders import Order
 
@@ -98,6 +110,56 @@ ObservationCursor = Iterable[Observation]
 
 
 @dataclass
+class LengthedObservationCursor(ObservationCursor, Sized):
+    """
+    Helper class that exposes a length and a cursor.
+    """
+
+    length: int
+    cursor: ObservationCursor
+
+    def __len__(self) -> int:
+        return self.length
+
+    def __iter__(self):
+        return self.cursor
+
+
+def observation_cursor_from_df(
+    df: pd.DataFrame, observed_ts_key: str
+) -> ObservationCursor:
+    """
+    Turns a DF into a lengthed cursor,
+      so we know how long we have to iterate through it.
+    """
+
+    def cursor():
+        for _, row in df.iterrows():
+            yield Observation.from_series(row, observed_ts_key=observed_ts_key)
+
+    return LengthedObservationCursor(length=len(df), cursor=cursor())
+
+
+def duplicate_time_pick_latest(cursor: ObservationCursor) -> ObservationCursor:
+    """
+    Given a cursor that emits multiple things at the same timestamp,
+      (which I think should never happen by the time it hits the strategy)
+    Return a cursor that will choose the latest thing when presented with multiple
+      items with the same observed timestamp.
+    """
+    last_obs = None
+    for obs in cursor:
+        if last_obs is None:
+            last_obs = obs
+            continue
+        if obs.observed_ts > last_obs.observed_ts:
+            yield last_obs
+            last_obs = obs
+    if last_obs is not None:
+        yield last_obs
+
+
+@dataclass
 class HistoricalObservationSetCursor(ObservationSetCursor):
     """
     Cursor for going through historical base features.
@@ -108,7 +170,7 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
     feature_observation_time_keys: Dict[str, str]  # These don't change over time.
 
     def save(self, path: pathlib.Path):
-        self.df.to_csv(path)
+        self.df.to_pickle(path)
         self.metadata_path(path=path).write_text(
             json.dumps(self.feature_observation_time_keys)
         )
@@ -119,7 +181,7 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
 
     @staticmethod
     def load(path: pathlib.Path) -> "HistoricalObservationSetCursor":
-        df = pd.read_csv(path)
+        df = pd.read_pickle(path)
         df.set_index("latest_ts", inplace=True)
         md = json.loads(
             HistoricalObservationSetCursor.metadata_path(path=path).read_text()
@@ -147,7 +209,7 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
 
     @staticmethod
     def from_observation_streams(
-        feature_streams: List[ObservationCursor],
+        feature_streams: List[ObservationCursor], pretty: bool = False
     ) -> "HistoricalObservationSetCursor":
         """
         Takes a list of basefeature lists,
@@ -167,6 +229,16 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
             (next(stream), False) for stream in feature_iters
         ]
         featuresets = []
+        tqdms: List[tqdm.tqdm] = []
+        if pretty:
+            lengths = [
+                len(stream) if isinstance(stream, Sized) else None
+                for stream in feature_streams
+            ]
+            tqdms = [
+                tqdm.tqdm(desc=f"stream_{idx}", total=lengths[idx], position=idx)
+                for idx, stream in enumerate(feature_streams)
+            ]
         while any(not done for _, done in heads):
             featuresets.append(ObservationSet.from_basefeatures([f for f, _ in heads]))
             while True:
@@ -175,17 +247,25 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                 remaining_head_idxs = [
                     idx for idx, tup in enumerate(heads) if not tup[1]
                 ]
-                next_feature_idx = min(
-                    remaining_head_idxs, key=lambda idx: heads[idx][0].observed_ts
-                )
-                prev_feature = heads[next_feature_idx][0]
-                next_feature, done = next_or_done(
-                    prev=prev_feature,
-                    iterator=feature_iters[next_feature_idx],
-                )
-
-                assert done or next_feature.observed_ts > prev_feature.observed_ts
-                heads[next_feature_idx] = (next_feature, done)
+                next_ts = min(heads[idx][0].observed_ts for idx in remaining_head_idxs)
+                next_feature_idxs = [
+                    idx
+                    for idx in remaining_head_idxs
+                    if heads[idx][0].observed_ts == next_ts
+                ]
+                for next_feature_idx in next_feature_idxs:
+                    prev_feature = heads[next_feature_idx][0]
+                    next_feature, done = next_or_done(
+                        prev=prev_feature,
+                        iterator=feature_iters[next_feature_idx],
+                    )
+                    if __debug__ and not done:
+                        assert (
+                            next_feature.observed_ts > prev_feature.observed_ts
+                        ), "Features occured out-of-order or at the same time!"
+                    heads[next_feature_idx] = (next_feature, done)
+                    if pretty:
+                        tqdms[next_feature_idx].update(n=1)
                 if not done or all(done for _, done in heads):
                     break
         return HistoricalObservationSetCursor.from_featuresets_over_time(
@@ -230,8 +310,8 @@ class Strategy(ABC):
     Takes in features and the current time, outputs orders.
     """
 
-    def __init__(self, derived_features: List["DerivedFeature"] = []):
-        self.derived_features = derived_features
+    def __init__(self, derived_features: Optional[List["DerivedFeature"]] = None):
+        self.derived_features = derived_features or []
 
     @abstractmethod
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
