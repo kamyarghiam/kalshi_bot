@@ -10,8 +10,8 @@ from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
     kalshi_orderbook_feature_name,
 )
-from strategy.features.base.spy import spy_price_feature_name
-from strategy.utils import ObservationSet, Strategy
+from strategy.features.derived.spy_kalshi import SPYInKalshiMarketRangeReturnTicker
+from strategy.utils import ObservationCursor, ObservationSet, Strategy
 
 
 class SPYThetaDecay(Strategy):
@@ -25,6 +25,7 @@ class SPYThetaDecay(Strategy):
 
     def __init__(
         self,
+        spy_cursor: ObservationCursor,
         kalshi_spy_markets: List[SPYRangedKalshiMarket],
     ):
         """
@@ -61,12 +62,17 @@ class SPYThetaDecay(Strategy):
         self.last_market_ticker: MarketTicker = kalshi_spy_markets[0].ticker
         # Last order we placed
         self.last_order: Order | None = None
+        self.spy_in_kalshi_market_feature = SPYInKalshiMarketRangeReturnTicker(
+            spy_cursor, kalshi_spy_markets
+        )
 
         super().__init__()
 
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
-        curr_es_price: Cents = update.series[spy_price_feature_name()]
-        market_ticker = self.get_market_from_es_price(curr_es_price)
+        inrange_series = self.spy_in_kalshi_market_feature.at(None, update)
+        market_ticker = inrange_series[
+            self.spy_in_kalshi_market_feature.is_spy_inrange_key()
+        ]
         # Orderbook of the market ticker that the price falls into
         ob: Orderbook = update.series[
             kalshi_orderbook_feature_name(ticker=market_ticker)

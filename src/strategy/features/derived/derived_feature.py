@@ -110,7 +110,10 @@ class DerivedFeature(ABC):
           will have both inputs AND output columns.
         """
         new_columns = self._apply(prev_row=prev_row, current_data=current_data)
-        assert list(new_columns.index.values) == self.output_feat_names
+        assert list(new_columns.index.values) == self.output_feat_names, (
+            list(new_columns.index.values),
+            self.output_feat_names,
+        )
         return pd.concat([current_data, new_columns])
 
     def at(
