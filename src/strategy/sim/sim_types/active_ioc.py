@@ -4,6 +4,7 @@ against the exchange without actually sending orders"""
 
 import itertools
 from datetime import timedelta
+from logging import Logger, getLogger
 
 import tqdm.autonotebook as tqdm
 
@@ -42,6 +43,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         starting_balance: Balance = Balance(Cents(100_000_000)),
         latency_to_exchange: timedelta = timedelta(milliseconds=100),
         pretty: bool = False,
+        logger: Logger = getLogger(__file__),
     ):
         # Get all results from the portfolio here
         self.kalshi_orderbook_updates = kalshi_orderbook_updates
@@ -50,6 +52,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         self.latency_to_exchange = latency_to_exchange
         self.ignore_price = ignore_price
         self.pretty = pretty
+        self.logger = logger
 
     def run(self, strategy: Strategy) -> PortfolioHistory:
         portfolio_history = PortfolioHistory(self.starting_balance)
@@ -87,8 +90,9 @@ class ActiveIOCStrategySimulator(StrategySimulator):
             ):
                 # We are trying to obtain a yes contract
                 if bbo.ask is None:
-                    print("Cannot place order: ", order)
-                    # Cannot place order
+                    self.logger.debug(
+                        "Cannot place order. Bbo ask emtpy: %s" % str(order)
+                    )
                     continue
                 if ignore_price:
                     price = bbo.ask.price
@@ -101,10 +105,16 @@ class ActiveIOCStrategySimulator(StrategySimulator):
                 if price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
                     portfolio_history.place_order(order)
                 else:
-                    print("Cannot place order: ", order)
+                    self.logger.debug(
+                        "Cannot place order. Price or quantity not valid at bbo ask %s"
+                        % str(order)
+                    )
+                    continue
             else:
                 if bbo.bid is None:
-                    print("Cannot place order: ", order)
+                    self.logger.debug(
+                        "Cannot place order. bbo bid emtpy: %s" % str(order)
+                    )
                     continue
                 if ignore_price:
                     price = bbo.bid.price
@@ -116,7 +126,11 @@ class ActiveIOCStrategySimulator(StrategySimulator):
                 if price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
                     portfolio_history.place_order(order)
                 else:
-                    print("Cannot place order: ", order)
+                    self.logger.debug(
+                        "Cannot place order. Price or quantity not valid at bbo bid %s"
+                        % str(order)
+                    )
+                    continue
 
             last_orderbook = orderbook
         return portfolio_history

@@ -65,7 +65,7 @@ class SPYThetaDecay(Strategy):
         super().__init__()
 
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
-        curr_es_price: Cents = update.series[spy_price_feature_name()]
+        curr_es_price: Cents = update.series[spy_price_feature_name()] // 10000000
         market_ticker = self.get_market_from_es_price(curr_es_price)
         # Orderbook of the market ticker that the price falls into
         ob: Orderbook = update.series[
@@ -88,7 +88,7 @@ class SPYThetaDecay(Strategy):
             # We are in the same bucket as before and bought an order here.
             # Check if the price has increased
             order = ob.sell_order(Side.YES)
-            if order and order.get_predicted_pnl(order.price) > 0:
+            if order and self.last_order.get_predicted_pnl(order.price) > 0:
                 qty_to_sell = min(self.last_order.quantity, order.quantity)
                 order.quantity = qty_to_sell
 
