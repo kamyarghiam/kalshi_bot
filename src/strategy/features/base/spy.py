@@ -22,7 +22,9 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     df = df[df["action"] == "F"]
     columns_to_keep = ["ts_recv", "price"]
     df = df[columns_to_keep]
-    df["ts_recv"] = pd.to_datetime(df["ts_recv"], unit="ns")
+    df["ts_recv"] = pd.to_datetime(df["ts_recv"], unit="ns", utc=True).dt.tz_convert(
+        "US/Eastern"
+    )
     # Note: coledb has no timezones :(
     # So all other features must be tz-naive in order to be compared/ordered
     #   with the coledb/kalshi orderbook updates.

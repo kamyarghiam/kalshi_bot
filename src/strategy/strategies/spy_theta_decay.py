@@ -10,7 +10,7 @@ from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
     kalshi_orderbook_feature_name,
 )
-from strategy.features.base.spy import spy_price_feature_name
+from strategy.features.base.spy import spy_price_feature_name, spy_price_feature_ts_name
 from strategy.utils import ObservationSet, Strategy
 
 
@@ -65,6 +65,11 @@ class SPYThetaDecay(Strategy):
         super().__init__()
 
     def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
+        # We only want to start working when the ES updates catch up to OB updates
+        # TODO: potential issue is if there's a late OB update on a market
+        # other issue is it resolves is that we only trigger on ES updates
+        if update.series[spy_price_feature_ts_name()] != update.latest_ts:
+            return []
         curr_es_price: Cents = update.series[spy_price_feature_name()] // 10000000
         market_ticker = self.get_market_from_es_price(curr_es_price)
         # Orderbook of the market ticker that the price falls into
@@ -79,6 +84,7 @@ class SPYThetaDecay(Strategy):
             self.last_order = None
             if order := ob.buy_order(Side.YES):
                 self.last_order = order
+                order.time_placed = update.latest_ts
                 # TODO: check quantity?
                 return [order]
         ################## Sell #####################
@@ -98,6 +104,7 @@ class SPYThetaDecay(Strategy):
                 self.last_order.quantity = self.last_order.quantity - qty_to_sell
                 if self.last_order.quantity == 0:
                     self.last_order = None
+                order.time_placed = update.latest_ts
                 return [order]
 
         return []

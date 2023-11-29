@@ -50,4 +50,4 @@ for m in kalshi_spy_markets:
     )
     result = sim.run(strategy=strategy)
     histories.append(result)
-    print(result.pnl)
+    print(result)
