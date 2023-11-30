@@ -36,9 +36,9 @@ if reload:
 else:
     historical_features = HistoricalObservationSetCursor.load(path=path_to_cache)
 histories = []
+
 for m in kalshi_spy_markets:
     strategy = SPYThetaDecay(kalshi_spy_markets)
-
     historical_features.precalculate_strategy_features(strategy=strategy)
     kalshi_orderbook_updates = ColeDBInterface().read_cursor(
         ticker=m.ticker, start_ts=day_start, end_ts=day_end

@@ -68,12 +68,15 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         )
         orders_requested.sort(key=lambda order: order.time_placed)
         last_orderbook: Orderbook = next(iter(self.kalshi_orderbook_updates))
+        ticker = last_orderbook.market_ticker
         orders_requested_iter = orders_requested
         if self.pretty:
             orders_requested_iter = tqdm.tqdm(
                 orders_requested, desc="Running orders through simulation"
             )
         for order in orders_requested_iter:
+            if order.ticker != ticker:
+                raise ValueError("Placing an order on the wrong market")
             for orderbook in self.kalshi_orderbook_updates:
                 if order.time_placed + self.latency_to_exchange < orderbook.ts:
                     break
