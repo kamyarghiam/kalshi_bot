@@ -26,6 +26,7 @@ class SPYThetaDecay(Strategy):
     def __init__(
         self,
         kalshi_spy_markets: List[SPYRangedKalshiMarket],
+        current_market_ticker: MarketTicker,
     ):
         """
         market_lower_thresholds:
@@ -45,7 +46,7 @@ class SPYThetaDecay(Strategy):
             with the market_lower_thresholds (the indices should line up the correct
             market from the other list)
         """
-
+        self.current_market_ticker = current_market_ticker
         self.markets: List[SPYRangedKalshiMarket] = kalshi_spy_markets
         self.market_lower_thresholds = [
             Cents(0) if m.spy_min is None else Cents(m.spy_min * 100)
@@ -72,6 +73,8 @@ class SPYThetaDecay(Strategy):
             return []
         curr_es_price: Cents = update.series[spy_price_feature_name()] // 10000000
         market_ticker = self.get_market_from_es_price(curr_es_price)
+        if market_ticker != self.current_market_ticker:
+            return []
         # Orderbook of the market ticker that the price falls into
         ob: Orderbook = update.series[
             kalshi_orderbook_feature_name(ticker=market_ticker)

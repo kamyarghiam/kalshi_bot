@@ -14,7 +14,7 @@ def spy_price_feature_ts_name() -> str:
     return "es_ts_recv"
 
 
-def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
+def es_data_file_to_clean_df(es_file: pathlib.Path) -> pd.DataFrame:
     zoneinfo.ZoneInfo("UTC")
     zoneinfo.ZoneInfo("US/Eastern")
     df = pd.read_csv(es_file)
@@ -25,6 +25,15 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     df["ts_recv"] = pd.to_datetime(df["ts_recv"], unit="ns", utc=True).dt.tz_convert(
         "US/Eastern"
     )
+    # Removes outliers
+    high = df["price"].quantile(0.95)
+    low = df["price"].quantile(0.5)
+    df = df[(df["price"] < high) & (df["price"] > low)]
+    return df
+
+
+def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
+    df = es_data_file_to_clean_df(es_file)
     # Note: coledb has no timezones :(
     # So all other features must be tz-naive in order to be compared/ordered
     #   with the coledb/kalshi orderbook updates.

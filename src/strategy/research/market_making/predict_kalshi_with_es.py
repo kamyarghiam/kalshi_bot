@@ -12,6 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface, MarketTicker
+from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.trades import Trade
@@ -58,7 +59,7 @@ def read_es_data(normalize=True, filename="aug31.csv"):
     # Clean and normalize es data. Normalize means to put it between 0 and 1
     utc_tz = pytz.timezone("UTC")
     eastern_tz = pytz.timezone("US/Eastern")
-    df = pd.read_csv(f"/Users/kamyarghiam/Desktop/es_data/{filename}")
+    df = pd.read_csv(LOCAL_STORAGE_FOLDER / f"es_data/{filename}")
     day_of_data = (
         pd.to_datetime(df.iloc[0]["ts_recv"], unit="ns")
         .tz_localize(utc_tz)

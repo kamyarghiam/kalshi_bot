@@ -37,17 +37,20 @@ else:
     historical_features = HistoricalObservationSetCursor.load(path=path_to_cache)
 histories = []
 
-for m in kalshi_spy_markets:
-    strategy = SPYThetaDecay(kalshi_spy_markets)
-    historical_features.precalculate_strategy_features(strategy=strategy)
-    kalshi_orderbook_updates = ColeDBInterface().read_cursor(
-        ticker=m.ticker, start_ts=day_start, end_ts=day_end
-    )
-    sim = ActiveIOCStrategySimulator(
-        kalshi_orderbook_updates=kalshi_orderbook_updates,
-        historical_data=historical_features,
-        pretty=True,
-    )
-    result = sim.run(strategy=strategy)
-    histories.append(result)
-    print(result)
+# for m in kalshi_spy_markets:
+# DEBUGGING WITH ONLY ONE MARKET
+m = kalshi_spy_markets[3]
+print(m.ticker)
+strategy = SPYThetaDecay(kalshi_spy_markets, m.ticker)
+historical_features.precalculate_strategy_features(strategy=strategy)
+kalshi_orderbook_updates = ColeDBInterface().read_cursor(
+    ticker=m.ticker, start_ts=day_start, end_ts=day_end
+)
+sim = ActiveIOCStrategySimulator(
+    kalshi_orderbook_updates=kalshi_orderbook_updates,
+    historical_data=historical_features,
+    pretty=True,
+)
+result = sim.run(strategy=strategy)
+histories.append(result)
+print(result)
