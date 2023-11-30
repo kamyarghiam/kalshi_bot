@@ -1,7 +1,9 @@
 import pathlib
-import zoneinfo
+from datetime import datetime
+from datetime import time as datetime_time
 
 import pandas as pd
+import pytz
 
 from strategy.utils import ObservationCursor, observation_cursor_from_df
 
@@ -15,21 +17,43 @@ def spy_price_feature_ts_name() -> str:
 
 
 def es_data_file_to_clean_df(es_file: pathlib.Path) -> pd.DataFrame:
-    zoneinfo.ZoneInfo("UTC")
-    zoneinfo.ZoneInfo("US/Eastern")
+    utc_tz = pytz.timezone("UTC")
+    eastern_tz = pytz.timezone("US/Eastern")
     df = pd.read_csv(es_file)
+    day_of_data = (
+        pd.to_datetime(df.iloc[0]["ts_recv"], unit="ns")
+        .tz_localize(utc_tz)
+        .tz_convert(eastern_tz)
+    )
 
-    df = df[df["action"] == "F"]
+    market_open = datetime_time(9, 30)
+    market_open_full_datetime_ns = (
+        datetime.combine(day_of_data.date(), market_open)
+        .astimezone(pytz.timezone("US/Eastern"))
+        .timestamp()
+    ) * 1e9
+    market_close = datetime_time(16, 0)
+    market_close_full_datetime_ns = (
+        datetime.combine(day_of_data.date(), market_close)
+        .astimezone(pytz.timezone("US/Eastern"))
+        .timestamp()
+    ) * 1e9
+
+    df1 = df[
+        (market_open_full_datetime_ns <= df["ts_recv"])
+        & (df["ts_recv"] <= market_close_full_datetime_ns)
+    ]
+    df2 = df1[df1["action"] == "T"]
     columns_to_keep = ["ts_recv", "price"]
-    df = df[columns_to_keep]
-    df["ts_recv"] = pd.to_datetime(df["ts_recv"], unit="ns", utc=True).dt.tz_convert(
+    df3 = df2[columns_to_keep]
+    df3["ts_recv"] = pd.to_datetime(df3["ts_recv"], unit="ns")
+    high = df3["price"].quantile(0.99)
+    low = df3["price"].quantile(0.01)
+    df4 = df3[(df3["price"] < high) & (df3["price"] > low)]
+    df4["ts_recv"] = pd.to_datetime(df4["ts_recv"], unit="ns", utc=True).dt.tz_convert(
         "US/Eastern"
     )
-    # Removes outliers
-    high = df["price"].quantile(0.95)
-    low = df["price"].quantile(0.5)
-    df = df[(df["price"] < high) & (df["price"] > low)]
-    return df
+    return df4
 
 
 def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:

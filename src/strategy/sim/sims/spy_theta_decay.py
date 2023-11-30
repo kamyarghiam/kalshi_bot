@@ -11,15 +11,15 @@ from strategy.sim.sim_types.active_ioc import ActiveIOCStrategySimulator
 from strategy.strategies.spy_theta_decay import SPYThetaDecay
 from strategy.utils import HistoricalObservationSetCursor, duplicate_time_pick_latest
 
-es_file = LOCAL_STORAGE_FOLDER / "es_data/sep12.csv"
-date = datetime.date(year=2023, month=9, day=12)
+es_file = LOCAL_STORAGE_FOLDER / "spy_data/sep14.csv"
+date = datetime.date(year=2023, month=9, day=14)
 day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
 day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
 
 spy_cursor = hist_spy_feature(es_file=es_file)
 kalshi_spy_markets = daily_spy_range_kalshi_markets(date=date)
 reload = False
-path_to_cache = LOCAL_STORAGE_FOLDER / "historical_features/ES_sep12.csv"
+path_to_cache = LOCAL_STORAGE_FOLDER / "historical_features/SPY_sep14.csv"
 if reload:
     historical_features = HistoricalObservationSetCursor.from_observation_streams(
         feature_streams=[spy_cursor]
@@ -37,20 +37,18 @@ else:
     historical_features = HistoricalObservationSetCursor.load(path=path_to_cache)
 histories = []
 
-# for m in kalshi_spy_markets:
-# DEBUGGING WITH ONLY ONE MARKET
-m = kalshi_spy_markets[3]
-print(m.ticker)
-strategy = SPYThetaDecay(kalshi_spy_markets, m.ticker)
-historical_features.precalculate_strategy_features(strategy=strategy)
-kalshi_orderbook_updates = ColeDBInterface().read_cursor(
-    ticker=m.ticker, start_ts=day_start, end_ts=day_end
-)
-sim = ActiveIOCStrategySimulator(
-    kalshi_orderbook_updates=kalshi_orderbook_updates,
-    historical_data=historical_features,
-    pretty=True,
-)
-result = sim.run(strategy=strategy)
-histories.append(result)
-print(result)
+for m in kalshi_spy_markets:
+    print(m.ticker)
+    strategy = SPYThetaDecay(kalshi_spy_markets, m.ticker)
+    historical_features.precalculate_strategy_features(strategy=strategy)
+    kalshi_orderbook_updates = ColeDBInterface().read_cursor(
+        ticker=m.ticker, start_ts=day_start, end_ts=day_end
+    )
+    sim = ActiveIOCStrategySimulator(
+        kalshi_orderbook_updates=kalshi_orderbook_updates,
+        historical_data=historical_features,
+        pretty=True,
+    )
+    result = sim.run(strategy=strategy)
+    histories.append(result)
+    print(result)
