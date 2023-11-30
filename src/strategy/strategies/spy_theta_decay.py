@@ -46,6 +46,7 @@ class SPYThetaDecay(Strategy):
             with the market_lower_thresholds (the indices should line up the correct
             market from the other list)
         """
+        # The market ticker we're currently analyzing
         self.current_market_ticker = current_market_ticker
         self.markets: List[SPYRangedKalshiMarket] = kalshi_spy_markets
         self.market_lower_thresholds = [
@@ -71,8 +72,13 @@ class SPYThetaDecay(Strategy):
         # other issue is it resolves is that we only trigger on ES updates
         if update.series[spy_price_feature_ts_name()] != update.latest_ts:
             return []
-        curr_es_price: Cents = update.series[spy_price_feature_name()] // 10000000
-        market_ticker = self.get_market_from_es_price(curr_es_price)
+        # Skip messages before 9:30 am
+        if update.latest_ts.hour < 9 or (
+            update.latest_ts.hour == 9 and update.latest_ts.minute < 30
+        ):
+            return []
+        curr_spy_price: Cents = update.series[spy_price_feature_name()] // 1000000
+        market_ticker = self.get_market_from_stock_price(curr_spy_price)
         if market_ticker != self.current_market_ticker:
             return []
         # Orderbook of the market ticker that the price falls into
@@ -112,7 +118,7 @@ class SPYThetaDecay(Strategy):
 
         return []
 
-    def get_market_from_es_price(self, es_price: Cents):
+    def get_market_from_stock_price(self, stock_price: Cents):
         """Returns the market ticker that associates with this ES price"""
-        mkt_ticker_index = bisect.bisect_left(self.market_lower_thresholds, es_price)
+        mkt_ticker_index = bisect.bisect_left(self.market_lower_thresholds, stock_price)
         return self.markets[mkt_ticker_index - 1].ticker
