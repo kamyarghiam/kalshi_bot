@@ -2,8 +2,6 @@ import datetime
 from dataclasses import dataclass
 from typing import Iterable, List, Optional
 
-import pytz
-
 from data.coledb.coledb import ColeDBInterface
 from helpers.types.markets import EventTicker, MarketTicker, market_specific_part
 from strategy.utils import Observation, ObservationCursor
@@ -103,12 +101,11 @@ def kalshi_orderbook_feature_name(ticker: MarketTicker) -> str:
 def hist_kalshi_orderbook_feature(
     ticker: MarketTicker, start_ts: datetime.datetime, end_ts: datetime.datetime
 ) -> ObservationCursor:
-    coledb_tz = pytz.timezone("US/Eastern")
     for orderbook in ColeDBInterface().read_cursor(
         ticker=ticker, start_ts=start_ts, end_ts=end_ts
     ):
         yield Observation.from_any(
             feature_name=kalshi_orderbook_feature_name(ticker=ticker),
             feature=orderbook,
-            observed_ts=coledb_tz.localize(orderbook.ts),
+            observed_ts=orderbook.ts,
         )
