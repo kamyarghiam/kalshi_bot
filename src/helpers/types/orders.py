@@ -1,8 +1,6 @@
 import copy
 import math
-from dataclasses import dataclass
-from dataclasses import field
-from dataclasses import field as dataclass_field
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Union
@@ -69,31 +67,22 @@ class Order:
     ticker: MarketTicker
     side: Side
     time_placed: datetime = field(default_factory=datetime.now, compare=False)
-    # Cached items
-    _price_times_quantity: Cents | None = dataclass_field(default=None, compare=False)
-    _fee: Cents | None = dataclass_field(default=None, compare=False)
 
     @property
     def fee(self) -> Cents:
-        if self._fee is None:
-            self._fee = compute_fee(self.price, self.quantity)
-        return self._fee
+        return compute_fee(self.price, self.quantity)
 
     @property
     def cost(self) -> Cents:
         if self.trade != TradeType.BUY:
             raise ValueError("Cost only applies on buys")
-        if self._price_times_quantity is None:
-            self._price_times_quantity = Cents(self.price * self.quantity)
-        return self._price_times_quantity
+        return Cents(self.price * self.quantity)
 
     @property
     def revenue(self) -> Cents:
         if self.trade != TradeType.SELL:
             raise ValueError("Revenue only applies on sells")
-        if self._price_times_quantity is None:
-            self._price_times_quantity = Cents(self.price * self.quantity)
-        return self._price_times_quantity
+        return Cents(self.price * self.quantity)
 
     def get_predicted_pnl(self, sell_price: Price) -> Cents:
         """Given the sell price, gets you the pnl after fees"""

@@ -110,9 +110,7 @@ class SPYThetaDecay(Strategy):
                 # TODO: PROBLEM HERE WITH UPDATING STATE
                 # We don't know if the order actually went
                 # through, so my state may be incorrect
-                self.last_order.quantity = self.last_order.quantity - qty_to_sell
-                if self.last_order.quantity == 0:
-                    self.last_order = None
+                self.last_order = None
                 order.time_placed = update.latest_ts
                 return [order]
 

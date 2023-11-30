@@ -40,6 +40,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         kalshi_orderbook_updates: OrderbookCursor,
         historical_data: HistoricalObservationSetCursor,
         ignore_price: bool = False,
+        ignore_qty: bool = False,
         starting_balance: Balance = Balance(Cents(100_000_000)),
         latency_to_exchange: timedelta = timedelta(milliseconds=100),
         pretty: bool = False,
@@ -50,13 +51,15 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         self.historical_data = historical_data
         self.starting_balance = starting_balance
         self.latency_to_exchange = latency_to_exchange
+        # Just takes the bbo price and qty
         self.ignore_price = ignore_price
+        self.ignore_qty = ignore_qty
+
         self.pretty = pretty
         self.logger = logger
 
     def run(self, strategy: Strategy) -> PortfolioHistory:
         portfolio_history = PortfolioHistory(self.starting_balance)
-        ignore_price = self.ignore_price
         # First, run the strategy from start to end to get all the orders it places.
         hist_iter = self.historical_data
         if self.pretty:
@@ -97,13 +100,15 @@ class ActiveIOCStrategySimulator(StrategySimulator):
                         "Cannot place order. Bbo ask emtpy: %s" % str(order)
                     )
                     continue
-                if ignore_price:
+                if self.ignore_price:
                     price = bbo.ask.price
                     order.price = price
                     if order.side == Side.NO:
                         order.price = get_opposite_side_price(order.price)
-
-                buy_qty = order.quantity
+                if self.ignore_qty:
+                    buy_qty = bbo.ask.quantity
+                else:
+                    buy_qty = order.quantity
                 # NOTE: we intentionally don't allow orders with prices not at bbo
                 if price == bbo.ask.price and buy_qty <= bbo.ask.quantity:
                     portfolio_history.place_order(order)
@@ -119,13 +124,15 @@ class ActiveIOCStrategySimulator(StrategySimulator):
                         "Cannot place order. bbo bid emtpy: %s" % str(order)
                     )
                     continue
-                if ignore_price:
+                if self.ignore_price:
                     price = bbo.bid.price
                     order.price = price
                     if order.side == Side.NO:
                         order.price = get_opposite_side_price(order.price)
-
-                sell_qty = order.quantity
+                if self.ignore_qty:
+                    sell_qty = bbo.bid.quantity
+                else:
+                    sell_qty = order.quantity
                 if price == bbo.bid.price and sell_qty <= bbo.bid.quantity:
                     portfolio_history.place_order(order)
                 else:

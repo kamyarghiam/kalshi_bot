@@ -47,6 +47,9 @@ for m in kalshi_spy_markets:
     sim = ActiveIOCStrategySimulator(
         kalshi_orderbook_updates=kalshi_orderbook_updates,
         historical_data=historical_features,
+        # TODO: eventually we don't want to ignore these
+        ignore_price=True,
+        ignore_qty=True,
         pretty=True,
     )
     result = sim.run(strategy=strategy)
