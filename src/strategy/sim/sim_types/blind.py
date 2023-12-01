@@ -1,4 +1,4 @@
-import itertools
+import datetime
 
 import tqdm
 
@@ -27,15 +27,16 @@ class BlindOrderSim(StrategySimulator):
     def run(self, strategy: Strategy) -> PortfolioHistory:
         portfolio_history = PortfolioHistory(self.starting_balance)
         # First, run the strategy from start to end to get all the orders it places.
-        hist_iter = self.hist
-        hist_iter = tqdm.tqdm(hist_iter, desc="Calculating strategy orders")
-        orders_requested = list(
-            itertools.chain.from_iterable(
-                strategy.consume_next_step(update, portfolio_history.positions)
-                for update in hist_iter
-            )
-        )
-        orders_requested.sort(key=lambda order: order.time_placed)
-        for order in orders_requested:
-            portfolio_history.place_order(order)
+        hist_iter = tqdm.tqdm(self.hist, desc="Running sim")
+        last_order_ts: datetime.datetime | None = None
+        for update in hist_iter:
+            orders_requested = strategy.consume_next_step(update, portfolio_history)
+            for order in orders_requested:
+                if last_order_ts and order.time_placed < last_order_ts:
+                    raise RuntimeError(
+                        "Orders are out of order (lol). "
+                        + "Your orders are not sorted by time loser"
+                    )
+                portfolio_history.place_order(order)
+                last_order_ts = order.time_placed
         return portfolio_history

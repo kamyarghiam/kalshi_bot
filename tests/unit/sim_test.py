@@ -27,7 +27,7 @@ def mock_historical_from_orderbook_updates(
     )
 
 
-def test_passive_ioc_strategy_simulator_simple():
+def test_active_ioc_strategy_simulator_simple():
     ticker = MarketTicker("some-ticker")
     ts1 = datetime.now().astimezone(pytz.timezone("US/Eastern"))
     ts2 = ts1 + timedelta(seconds=10)
@@ -53,6 +53,7 @@ def test_passive_ioc_strategy_simulator_simple():
     ]
 
     simulator = ActiveIOCStrategySimulator(
+        ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         kalshi_orderbook_updates=updates,
         starting_balance=Balance(Cents(100)),
@@ -97,6 +98,7 @@ def test_passive_ioc_strategy_simulator_bad_orders():
         Order(Price(5), Quantity(5), TradeType.BUY, ticker, Side.YES, ts1),
     ]
     sim = ActiveIOCStrategySimulator(
+        ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         kalshi_orderbook_updates=updates,
     )
@@ -108,6 +110,7 @@ def test_passive_ioc_strategy_simulator_bad_orders():
         Order(Price(88), Quantity(5), TradeType.BUY, ticker, Side.NO, ts1),
     ]
     sim = ActiveIOCStrategySimulator(
+        ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         kalshi_orderbook_updates=updates,
     )
@@ -123,6 +126,7 @@ def test_passive_ioc_strategy_simulator_bad_orders():
         ),
     ]
     sim = ActiveIOCStrategySimulator(
+        ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         kalshi_orderbook_updates=updates,
         latency_to_exchange=latency,
@@ -138,6 +142,7 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     ]
     # Should go through
     sim = ActiveIOCStrategySimulator(
+        ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         kalshi_orderbook_updates=updates,
         latency_to_exchange=latency,
@@ -146,7 +151,7 @@ def test_passive_ioc_strategy_simulator_bad_orders():
     assert portfolio_history.orders == orders
 
 
-def test_passive_ioc_strategy_simulator_ignore_price():
+def test_active_ioc_strategy_simulator_ignore_price():
     ticker = MarketTicker("some-ticker")
     ts1 = datetime.now().astimezone(pytz.timezone("US/Eastern"))
     ts2 = ts1 + timedelta(seconds=10)
@@ -172,6 +177,7 @@ def test_passive_ioc_strategy_simulator_ignore_price():
     ]
 
     simulator = ActiveIOCStrategySimulator(
+        ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         ignore_price=True,
         kalshi_orderbook_updates=updates,

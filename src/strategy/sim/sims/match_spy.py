@@ -42,6 +42,7 @@ for m in kalshi_spy_markets:
         ticker=m.ticker, start_ts=day_start, end_ts=day_end
     )
     sim = ActiveIOCStrategySimulator(
+        m.ticker,
         kalshi_orderbook_updates=kalshi_orderbook_updates,
         historical_data=historical_features,
         pretty=True,

@@ -1,11 +1,11 @@
 import bisect
-from typing import Dict, Iterable, List
+from typing import Iterable, List
 
 from exchange.interface import MarketTicker
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
-from helpers.types.portfolio import Position
+from helpers.types.portfolio import PortfolioHistory
 from helpers.utils import Side
 from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
@@ -64,13 +64,11 @@ class SPYThetaDecay(Strategy):
         # Represents the market_ticker of the last market the ES price fell into
         # Defaults to the first one on the first go
         self.last_market_ticker: MarketTicker = kalshi_spy_markets[0].ticker
-        # Last order we placed
-        self.last_order: Order | None = None
 
         super().__init__()
 
     def consume_next_step(
-        self, update: ObservationSet, portfolio: Dict[MarketTicker, Position]
+        self, update: ObservationSet, portfolio: PortfolioHistory
     ) -> Iterable[Order]:
         # We only want to start working when the ES updates catch up to OB updates
         # TODO: potential issue is if there's a late OB update on a market
@@ -95,29 +93,29 @@ class SPYThetaDecay(Strategy):
         if self.last_market_ticker != market_ticker:
             # We have fallen into a new bucket!
             self.last_market_ticker = market_ticker
-            self.last_order = None
             if order := ob.buy_order(Side.YES):
-                self.last_order = order
                 order.time_placed = update.latest_ts
                 # TODO: check quantity?
                 return [order]
         ################## Sell #####################
         # TODO: if we move out of a bucket, and we're still holding a position
         # from a previous bucket, we should manage that and eventually sell?
-        elif self.last_order:
+        elif market_ticker in portfolio.positions:
             # We are in the same bucket as before and bought an order here.
-            # Check if the price has increased
+            # And we're holding a position in this bucket. Try to sell
             order = ob.sell_order(Side.YES)
-            if order and self.last_order.get_predicted_pnl(order.price) > 0:
-                qty_to_sell = min(self.last_order.quantity, order.quantity)
-                order.quantity = qty_to_sell
-
-                # TODO: PROBLEM HERE WITH UPDATING STATE
-                # We don't know if the order actually went
-                # through, so my state may be incorrect
-                self.last_order = None
-                order.time_placed = update.latest_ts
-                return [order]
+            if order:
+                order.quantity = min(
+                    portfolio.positions[market_ticker].total_quantity,
+                    order.quantity,
+                )
+                pnl, fees = portfolio.potential_pnl(order)
+                if pnl - fees > 0:
+                    # TODO: PROBLEM HERE WITH UPDATING STATE
+                    # We don't know if the order actually went
+                    # through, so my state may be incorrect
+                    order.time_placed = update.latest_ts
+                    return [order]
 
         return []
 
