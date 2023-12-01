@@ -80,8 +80,10 @@ def run_spy_theta_decay_strat_with_active_ioc_simulator():
 
 def run_spy_theta_decay_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
-    # dates = [datetime.date(year=2023, month=9, day=14)]
-    dates = [datetime.date(year=2023, month=11, day=27)]
+    dates = [
+        datetime.date(year=2023, month=9, day=14),
+        datetime.date(year=2023, month=11, day=27),
+    ]
     for date in dates:
         day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
         day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
