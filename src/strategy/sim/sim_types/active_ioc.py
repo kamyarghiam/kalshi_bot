@@ -66,7 +66,8 @@ class ActiveIOCStrategySimulator(StrategySimulator):
             hist_iter = tqdm.tqdm(hist_iter, desc="Calculating strategy orders")
         orders_requested = list(
             itertools.chain.from_iterable(
-                strategy.consume_next_step(update=update) for update in hist_iter
+                strategy.consume_next_step(update, portfolio_history.positions)
+                for update in hist_iter
             )
         )
         orders_requested.sort(key=lambda order: order.time_placed)

@@ -1,10 +1,11 @@
 import bisect
-from typing import Iterable, List
+from typing import Dict, Iterable, List
 
 from exchange.interface import MarketTicker
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
+from helpers.types.portfolio import Position
 from helpers.utils import Side
 from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
@@ -68,7 +69,9 @@ class SPYThetaDecay(Strategy):
 
         super().__init__()
 
-    def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
+    def consume_next_step(
+        self, update: ObservationSet, portfolio: Dict[MarketTicker, Position]
+    ) -> Iterable[Order]:
         # We only want to start working when the ES updates catch up to OB updates
         # TODO: potential issue is if there's a late OB update on a market
         # other issue is it resolves is that we only trigger on ES updates

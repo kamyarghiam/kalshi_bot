@@ -29,7 +29,7 @@ class MatchSpy(Strategy):
         self.count = 0
         super().__init__(derived_features=[self.spy_in_kalshi_market_feature])
 
-    def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
+    def consume_next_step(self, update: ObservationSet, _) -> Iterable[Order]:
         inrange_series = self.spy_in_kalshi_market_feature.at(None, update)
         ticker = self.kalshi_spy_market.ticker
         buy_this_ticker = inrange_series[

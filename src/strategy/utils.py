@@ -4,6 +4,7 @@ import pathlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
+from test.test_typing import Position
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -20,6 +21,7 @@ from typing import (
 import pandas as pd
 import tqdm.autonotebook as tqdm
 
+from helpers.types.markets import MarketTicker
 from helpers.types.orders import Order
 
 if TYPE_CHECKING:
@@ -314,5 +316,7 @@ class Strategy(ABC):
         self.derived_features = derived_features or []
 
     @abstractmethod
-    def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
+    def consume_next_step(
+        self, update: ObservationSet, portfolio: Dict[MarketTicker, Position]
+    ) -> Iterable[Order]:
         pass

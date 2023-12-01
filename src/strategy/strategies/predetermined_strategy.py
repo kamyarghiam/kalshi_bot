@@ -12,7 +12,7 @@ class PredeterminedStrategy(Strategy):
         self.has_emitted_order_decisions = False
         super().__init__()
 
-    def consume_next_step(self, update: ObservationSet) -> Iterable[Order]:
+    def consume_next_step(self, update: ObservationSet, _) -> Iterable[Order]:
         if not self.has_emitted_order_decisions:
             self.has_emitted_order_decisions = True
             return self.orders_to_place

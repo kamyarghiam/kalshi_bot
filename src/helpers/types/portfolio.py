@@ -162,6 +162,10 @@ class PortfolioHistory:
     def realized_pnl_after_fees(self):
         return self.realized_pnl - self.fees_paid
 
+    @property
+    def positions(self):
+        return self._positions
+
     def has_open_positions(self):
         return len(self._positions) > 0
 
