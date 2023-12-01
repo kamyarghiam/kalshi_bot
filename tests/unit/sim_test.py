@@ -60,7 +60,7 @@ def test_passive_ioc_strategy_simulator_simple():
     portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 
     assert portfolio_history.fees_paid == 8
-    assert portfolio_history.pnl_after_fees == -18
+    assert portfolio_history.realized_pnl_after_fees == -18
     assert portfolio_history._cash_balance == 82
     assert portfolio_history.orders == orders
 
@@ -179,4 +179,4 @@ def test_passive_ioc_strategy_simulator_ignore_price():
     )
     portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 
-    assert portfolio_history.pnl == -1
+    assert portfolio_history.realized_pnl == -1

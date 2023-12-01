@@ -1,8 +1,8 @@
 import datetime
-from pathlib import Path
 from typing import List
 
 from data.coledb.coledb import ColeDBInterface
+from exchange.interface import ExchangeInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
@@ -17,16 +17,21 @@ from strategy.utils import HistoricalObservationSetCursor, duplicate_time_pick_l
 
 
 def compute_historical_features(
-    es_file: Path,
+    date: datetime.date,
     kalshi_spy_markets: List[SPYRangedKalshiMarket],
     day_start: datetime.datetime,
     day_end: datetime.datetime,
+    reload: bool,
 ) -> HistoricalObservationSetCursor:
+    # Format is like sep12.csv
+    date_abbreviated = date.strftime("%b%d").lower()
+    es_file = LOCAL_STORAGE_FOLDER / f"spy_data/{date_abbreviated}.csv"
     spy_cursor = hist_spy_feature(es_file=es_file)
 
-    reload = False
-    path_to_cache = LOCAL_STORAGE_FOLDER / "historical_features/SPY_sep14.csv"
-    if reload:
+    path_to_cache = (
+        LOCAL_STORAGE_FOLDER / f"historical_features/SPY_{date_abbreviated}.csv"
+    )
+    if not path_to_cache.exists() or reload:
         historical_features = HistoricalObservationSetCursor.from_observation_streams(
             feature_streams=[spy_cursor]
             + [
@@ -45,14 +50,13 @@ def compute_historical_features(
 
 
 def run_spy_theta_decay_strat_with_active_ioc_simulator():
-    es_file = LOCAL_STORAGE_FOLDER / "spy_data/sep14.csv"
     date = datetime.date(year=2023, month=9, day=14)
     day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
     day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
 
     kalshi_spy_markets = daily_spy_range_kalshi_markets(date=date)
     historical_features: HistoricalObservationSetCursor = compute_historical_features(
-        es_file, kalshi_spy_markets, day_start, day_end
+        date, kalshi_spy_markets, day_start, day_end, reload=False
     )
     for m in kalshi_spy_markets:
         print(m.ticker)
@@ -74,22 +78,29 @@ def run_spy_theta_decay_strat_with_active_ioc_simulator():
 
 
 def run_spy_theta_decay_strat_with_blind_simulator():
-    es_file = LOCAL_STORAGE_FOLDER / "spy_data/sep14.csv"
-    date = datetime.date(year=2023, month=9, day=14)
-    day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
-    day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
+    """Runs on blind simulator across several days"""
+    # dates = [datetime.date(year=2023, month=9, day=14)]
+    dates = [datetime.date(year=2023, month=11, day=27)]
+    for date in dates:
+        day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
+        day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
 
-    kalshi_spy_markets = daily_spy_range_kalshi_markets(date=date)
-    historical_features: HistoricalObservationSetCursor = compute_historical_features(
-        es_file, kalshi_spy_markets, day_start, day_end
-    )
-    strategy = SPYThetaDecay(kalshi_spy_markets)
-    historical_features.precalculate_strategy_features(strategy=strategy)
-    sim = BlindOrderSim(
-        historical_data=historical_features,
-    )
-    result = sim.run(strategy=strategy)
-    print(result)
+        kalshi_spy_markets = daily_spy_range_kalshi_markets(date=date)
+        historical_features: HistoricalObservationSetCursor = (
+            compute_historical_features(
+                date, kalshi_spy_markets, day_start, day_end, reload=False
+            )
+        )
+        strategy = SPYThetaDecay(kalshi_spy_markets)
+        historical_features.precalculate_strategy_features(strategy=strategy)
+        sim = BlindOrderSim(
+            historical_data=historical_features,
+        )
+        result = sim.run(strategy=strategy)
+        print(result)
+        if result.has_open_positions():
+            with ExchangeInterface(is_test_run=False) as e:
+                print("Unrealized pnl: ", result.get_unrealized_pnl(e))
 
 
 run_spy_theta_decay_strat_with_blind_simulator()

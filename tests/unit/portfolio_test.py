@@ -100,7 +100,8 @@ def test_add_remove_get_value_positions():
 
     sell_order.quantity = Quantity(200)  # put normal quantity
     # Does not actually sell position
-    buy_cost, buy_fees = position.sell(sell_order, for_info=True)
+    buy_cost, buy_fees, sell_fees = position.sell(sell_order, for_info=True)
+    assert sell_fees == compute_fee(Price(30), Quantity(200))
     assert buy_cost == 5 * 100 + 10 * 100
     assert position.prices == [Price(5), Price(10), Price(15), Price(20)]
     assert position.quantities == [
@@ -114,7 +115,8 @@ def test_add_remove_get_value_positions():
         Cents(100 / 150) * (compute_fee(Price(10), Quantity(150)))
     )
 
-    buy_cost, buy_fees = position.sell(sell_order)
+    buy_cost, buy_fees, sell_fees = position.sell(sell_order)
+    assert sell_fees == compute_fee(Price(30), Quantity(200))
     assert buy_cost == 5 * 100 + 10 * 100
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
@@ -127,7 +129,8 @@ def test_add_remove_get_value_positions():
         (100 / 150) * (compute_fee(Price(10), Quantity(150)))
     )
     sell_order.quantity = Quantity(20)
-    buy_cost, buy_fees = position.sell(sell_order)
+    buy_cost, buy_fees, sell_fees = position.sell(sell_order)
+    assert sell_fees == compute_fee(Price(30), Quantity(20))
     assert buy_cost == 10 * 20
     assert position.prices == [Price(10), Price(15), Price(20)]
     assert position.quantities == [
@@ -139,7 +142,8 @@ def test_add_remove_get_value_positions():
     assert almost_equal(buy_fees, (20 / 150) * compute_fee(Price(10), Quantity(150)))
 
     sell_order.quantity = Quantity(30)
-    buy_cost, buy_fees = position.sell(sell_order)
+    buy_cost, buy_fees, sell_fees = position.sell(sell_order)
+    assert sell_fees == compute_fee(Price(30), Quantity(30))
     assert buy_cost == 10 * 30
     assert position.prices == [Price(15), Price(20)]
     assert position.quantities == [
@@ -150,7 +154,8 @@ def test_add_remove_get_value_positions():
     assert almost_equal(buy_fees, (30 / 150) * compute_fee(Price(10), Quantity(150)))
 
     sell_order.quantity = Quantity(500)
-    buy_cost, buy_fees = position.sell(sell_order)
+    buy_cost, buy_fees, sell_fees = position.sell(sell_order)
+    assert sell_fees == compute_fee(Price(30), Quantity(500))
     assert buy_cost == 15 * 200 + 20 * 300
     assert position.prices == []
     assert position.quantities == []
@@ -628,13 +633,13 @@ def test_portfolio_print():
             time_placed=ts,
         )
     )
-
     assert (
         str(portfolio)
-        == """PnL (no fees): $-1.50
+        == """Realized PnL (no fees): $-1.50
 Fees paid: $1.63
-PnL (with fees): $-3.13
+Realized PnL (with fees): $-3.13
 Cash left: $38.87
+Max exposure: $17.00
 Current positions ($8.00):
   Ticker1: NO | 100 @ 5¢
   Ticker2: NO | 50 @ 6¢
@@ -700,8 +705,9 @@ def test_get_unrealized_pnl():
 
     profit1 = get_opposite_side_price(Price(10)) * Quantity(100)
     profit2 = -1 * Price(5) * Quantity(1000)
-    profit3 = (Price(95) - Price(10)) * Quantity(1000)
-
+    profit3 = (Price(95) - Price(10)) * Quantity(1000) - compute_fee(
+        Price(95), Quantity(1000)
+    )
     assert p.get_unrealized_pnl(mock_exchange) == profit1 + profit2 + profit3
 
 

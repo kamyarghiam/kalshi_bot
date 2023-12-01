@@ -57,10 +57,11 @@ class Position:
             self.quantities.append(order.quantity)
             self.fees.append(order.fee)
 
-    def sell(self, order: Order, for_info: bool = False) -> Tuple[Cents, Cents]:
+    def sell(self, order: Order, for_info: bool = False) -> Tuple[Cents, Cents, Cents]:
         assert len(self.prices) == len(self.quantities)
-        """Using fifo, sell the quantity and return how much you paid
-        in total for those contracts and the fees
+        """Using fifo, sell the quantity and return: how much you paid
+        in total for those contracts, the fees paid paid for buying the contracts,
+        and the fees paid for selling the contracts
 
         :param bool for_info: if true, does not actually sell the position. Only
         provides info about what the position would do
@@ -82,7 +83,7 @@ class Position:
                 + f"but you want to sell {quantity_to_sell}"
             )
         remaining_prices: List[Price] = []
-        remaining_quantitites: List[Quantity] = []
+        remaining_quantities: List[Quantity] = []
         remaining_fees: List[Cents] = []
 
         total_purchase_amount_cents: Cents = Cents(0)
@@ -100,16 +101,20 @@ class Position:
                 quantity_holding -= QuantityDelta(quantity_to_sell)
                 total_purchase_amount_cents += Cents(price * quantity_to_sell)
                 remaining_prices.append(price)
-                remaining_quantitites.append(quantity_holding)
+                remaining_quantities.append(quantity_holding)
                 remaining_fees.append(fees - fees_paid)
                 quantity_to_sell = Quantity(0)
-
+        total_sell_fees_paid = order.fee
         if not for_info:
             # If it's not just for information, we lock in sell
             self.prices = remaining_prices
-            self.quantities = remaining_quantitites
+            self.quantities = remaining_quantities
             self.fees = remaining_fees
-        return total_purchase_amount_cents, total_purchase_fees_paid
+        return (
+            total_purchase_amount_cents,
+            total_purchase_fees_paid,
+            total_sell_fees_paid,
+        )
 
     def is_empty(self):
         return (
@@ -143,7 +148,8 @@ class PortfolioHistory:
         self._cash_balance: Balance = balance
         self._positions: Dict[MarketTicker, Position] = {}
         self.orders: List[Order] = []
-        self.pnl: Cents = Cents(0)
+        self.realized_pnl: Cents = Cents(0)
+        self.max_exposure: Cents = Cents(0)
 
     @property
     def fees_paid(self):
@@ -153,18 +159,22 @@ class PortfolioHistory:
         return fees
 
     @property
-    def pnl_after_fees(self):
-        return self.pnl - self.fees_paid
+    def realized_pnl_after_fees(self):
+        return self.realized_pnl - self.fees_paid
+
+    def has_open_positions(self):
+        return len(self._positions) > 0
 
     def get_unrealized_pnl(self, e: ExchangeInterface):
-        """Gets you the unrealized pnl without fees"""
+        """Gets you the unrealized pnl without fees.
+        Does not include realized portion of pnl"""
         unrealized_pnl: Cents = Cents(0)
         for position in self._positions.values():
             market = e.get_market(position.ticker)
             if market.result == MarketResult.NOT_DETERMINED:
                 # If has not been determined yet, we will use the last price
                 revenue = market.last_price * position.total_quantity
-                cost, _ = position.sell(
+                cost, _, sell_fees = position.sell(
                     Order(
                         ticker=market.ticker,
                         price=market.last_price,
@@ -174,7 +184,11 @@ class PortfolioHistory:
                     ),
                     for_info=True,
                 )
-                unrealized_pnl += revenue - cost
+                # We don't include the fees from the revenue because
+                # it's already realized in the portfolio history computation
+                # of "fees_paid". But we include include the fee from the cost
+                # because that has not been realized yet
+                unrealized_pnl += revenue - cost - sell_fees
             else:
                 # If the result equals what we expected, we get money
                 if (position.side == Side.NO and market.result == MarketResult.NO) or (
@@ -196,10 +210,11 @@ class PortfolioHistory:
         )
         orders_str = "\n".join(["  " + str(order) for order in self.orders])
         return (
-            f"PnL (no fees): {self.pnl}\n"
+            f"Realized PnL (no fees): {self.realized_pnl}\n"
             + f"Fees paid: {self.fees_paid}\n"
-            + f"PnL (with fees): {self.pnl_after_fees}\n"
+            + f"Realized PnL (with fees): {self.realized_pnl_after_fees}\n"
             + f"Cash left: {self._cash_balance}\n"
+            + f"Max exposure: {self.max_exposure}\n"
             + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
             + f"Orders:\n{orders_str}"
         )
@@ -248,6 +263,8 @@ class PortfolioHistory:
         else:
             self._positions[order.ticker] = Position(order)
         self.orders.append(order)
+        # TODO: optimize a little?
+        self.max_exposure = max(self.get_positions_value(), self.max_exposure)
 
     def potential_pnl(
         self,
@@ -271,16 +288,16 @@ class PortfolioHistory:
             )
         position = self._positions[order.ticker]
 
-        amount_paid, buy_fees = position.sell(order, for_info)
+        amount_paid, buy_fees, sell_fees = position.sell(order, for_info)
         pnl = Cents(order.revenue - amount_paid)
 
         if not for_info:
-            self._cash_balance += order.revenue - order.fee
+            self._cash_balance += order.revenue - sell_fees
             if position.is_empty():
                 del self._positions[order.ticker]
-            self.pnl += pnl
+            self.realized_pnl += pnl
             self.orders.append(order)
-        return pnl, order.fee + buy_fees
+        return pnl, buy_fees + sell_fees
 
     def find_sell_opportunities(self, orderbook: Orderbook) -> Cents | None:
         """Finds a selling opportunity from an orderbook if there is one"""
@@ -300,8 +317,8 @@ class PortfolioHistory:
             )
             sell_order.quantity = quantity
 
-            pnl, fee = self.potential_pnl(sell_order)
-            if pnl - fee > 0:
+            pnl, fees = self.potential_pnl(sell_order)
+            if pnl - fees > 0:
                 actual_pnl, _ = self.sell(sell_order)
                 return actual_pnl
         return None
