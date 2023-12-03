@@ -4,7 +4,9 @@ from time import sleep
 from rich.live import Live
 from rich.table import Table
 
+from data.backends.s3 import S3Path
 from data.coledb.coledb import ColeDBInterface
+from data.coledb.remote import sync_to_remote
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
@@ -26,7 +28,7 @@ def generate_table(num_snapshot_msgs: int, num_delta_msgs: int) -> Table:
 
 
 def collect_orderbook_data(
-    exchange_interface: ExchangeInterface, cole: ColeDBInterface = ColeDBInterface()
+    exchange_interface: ExchangeInterface, cole: ColeDBInterface
 ):
     """Writes live data to coledb
 
@@ -77,14 +79,20 @@ def collect_orderbook_data(
                     last_update_time = now
 
 
-def retry_collect_orderbook_data(exchange_interface: ExchangeInterface):
+def retry_collect_orderbook_data(
+    exchange_interface: ExchangeInterface,
+    cole: ColeDBInterface = ColeDBInterface(),
+    remote: S3Path | None = None,
+):
     """Adds retries to collect_orderbook_data"""
     time_between_emails = timedelta(days=1)
     # We send the last email sent in the past so we trigger send on the first alert
     last_email_sent_ts = datetime.now() - time_between_emails
     while True:
         try:
-            collect_orderbook_data(exchange_interface)
+            collect_orderbook_data(exchange_interface=exchange_interface, cole=cole)
+            if remote:
+                sync_to_remote(cole=cole, remote=remote)
         except Exception as e:
             error_msg = f"Received error: {str(e)}. Re-running collect orderbook algo"
             print(error_msg)
@@ -96,5 +104,7 @@ def retry_collect_orderbook_data(exchange_interface: ExchangeInterface):
 
 if __name__ == "__main__":
     retry_collect_orderbook_data(
-        ExchangeInterface(is_test_run=False)  # pragma: no cover
+        # pragma: no cover
+        ExchangeInterface(is_test_run=False),
+        remote=S3Path(bucket="dead-gecco-prod-features-raw", path_components=("cole",)),
     )

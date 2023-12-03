@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import pathlib
 from dataclasses import dataclass
@@ -28,6 +29,13 @@ class S3Path:
             raise ValueError('S3Paths must not end in "/"!')
         if any(not p for p in self.path_components):
             raise ValueError("No empty/falsey path components!")
+        if any("/" in p for p in self.path_components):
+            raise ValueError("/ cannot appear in any path components!")
+
+    def checksum_sha256(self):
+        return s3_client.head_object(
+            Bucket=self.bucket, Key=self.path, ChecksumMode="ENABLED"
+        ).get("ChecksumSHA256")
 
     @property
     def s3_object(self):
@@ -58,18 +66,27 @@ class S3Path:
         return True
 
 
-def _sync_local_to_remote_file(local: pathlib.Path, remote: S3Path):
-    local_checksum = hashlib.sha256(local.read_bytes()).hexdigest()
+def sync_local_to_remote_file(local: pathlib.Path, remote: S3Path):
+    local_b = local.read_bytes()
+    local_checksum = (
+        base64.encodebytes(hashlib.sha256(local_b).digest()).decode().strip()
+    )
     if remote.exists():
-        remote_checksum = remote.s3_object.checksum_sha256
+        remote_checksum = remote.checksum_sha256()
         if local_checksum == remote_checksum:
             return  # No need to upload.
-    remote.s3_object.upload_file(local.absolute().as_posix())
+    s3_client.put_object(
+        Bucket=remote.bucket,
+        Key=remote.path,
+        ChecksumAlgorithm="SHA256",
+        ChecksumSHA256=local_checksum,
+        Body=local_b,
+    )
 
 
 def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = False):
     if local.is_file():
-        _sync_local_to_remote_file(local=local, remote=remote)
+        sync_local_to_remote_file(local=local, remote=remote)
     elif local.is_dir():
         local_files = [f for f in local.rglob("*") if f.is_file()]
         # Sort from biggest to smallest.
@@ -77,7 +94,14 @@ def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = Fal
         # TODO: Upload in parallel.
         already_remote = remote.children(recursive=True)
         local_and_remote_paths = [
-            (f, f"{remote.path}/{f.relative_to(local).as_posix()}") for f in local_files
+            (
+                f,
+                S3Path.from_path_str(
+                    bucket=remote.bucket,
+                    path=f"{remote.path}/{f.relative_to(local).as_posix()}",
+                ),
+            )
+            for f in local_files
         ]
         wanted_remote_paths = (p for _, p in local_and_remote_paths)
         to_delete = set(already_remote).difference(wanted_remote_paths)
@@ -91,9 +115,9 @@ def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = Fal
                 to_delete_iter, desc="Deleting remote files not present on local."
             )
         for local_p, remote_p in local_files_iter:
-            _sync_local_to_remote_file(
+            sync_local_to_remote_file(
                 local=local_p,
-                remote=S3Path.from_path_str(bucket=remote.bucket, path=remote_p),
+                remote=remote_p,
             )
         for f in to_delete_iter:
             f.s3_object.delete()
@@ -101,10 +125,14 @@ def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = Fal
         raise ValueError(f"Not a valid file type: {local}")
 
 
-def _sync_remote_to_local_file(remote: S3Path, local: pathlib.Path):
+def sync_remote_to_local_file(remote: S3Path, local: pathlib.Path):
     if local.exists():
-        local_checksum = hashlib.sha256(local.read_bytes()).hexdigest()
-        remote_checksum = remote.s3_object.checksum_sha256
+        local_checksum = (
+            base64.encodebytes(hashlib.sha256(local.read_bytes()).digest())
+            .decode()
+            .strip()
+        )
+        remote_checksum = remote.checksum_sha256()
         if local_checksum == remote_checksum:
             return  # No need to upload.
     remote.s3_object.download_file(local.absolute().as_posix())
@@ -112,7 +140,7 @@ def _sync_remote_to_local_file(remote: S3Path, local: pathlib.Path):
 
 def sync_remote_to_local(remote: S3Path, local: pathlib.Path, pretty: bool = False):
     if remote.exists():
-        _sync_remote_to_local_file(remote=remote, local=local)
+        sync_remote_to_local_file(remote=remote, local=local)
         return
     remote_and_local_paths = [
         (f.path, local / f.path.removeprefix(remote.path + "/"))
@@ -124,14 +152,14 @@ def sync_remote_to_local(remote: S3Path, local: pathlib.Path, pretty: bool = Fal
     to_delete_iter = to_delete
     if pretty:
         remote_files_iter = tqdm.tqdm(
-            remote_files_iter, desc="Sync local to remote files"
+            remote_files_iter, desc="Sync remote to local files"
         )
         to_delete_iter = tqdm.tqdm(
-            to_delete_iter, desc="Deleting remote files not present on local."
+            to_delete_iter, desc="Deleting local files not present on remote."
         )
 
     for remote_p, local_p in remote_files_iter:
-        _sync_remote_to_local_file(
+        sync_remote_to_local_file(
             remote=S3Path.from_path_str(bucket=remote.bucket, path=remote_p),
             local=local_p,
         )
