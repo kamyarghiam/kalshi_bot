@@ -1,11 +1,12 @@
 import pytest
 from mock import MagicMock, call, patch
 
+from data.coledb.coledb import ColeDBInterface
 from data.collection.orderbook import retry_collect_orderbook_data
 from exchange.interface import ExchangeInterface
 
 
-def test_retry_collect_orderbook_data():
+def test_retry_collect_orderbook_data(real_readonly_coledb: ColeDBInterface):
     mock_exchange_interface = MagicMock(spec=ExchangeInterface)
 
     with patch(
@@ -23,10 +24,21 @@ def test_retry_collect_orderbook_data():
                     ValueError("Error to make while loop stop"),
                 ]
                 with pytest.raises(ValueError) as e:
-                    retry_collect_orderbook_data(mock_exchange_interface)
+                    retry_collect_orderbook_data(
+                        mock_exchange_interface, cole=real_readonly_coledb
+                    )
                 assert e.match("Error to make while loop stop")
                 mock_collect_orderbook_data.assert_has_calls(
-                    [call(mock_exchange_interface), call(mock_exchange_interface)]
+                    [
+                        call(
+                            exchange_interface=mock_exchange_interface,
+                            cole=real_readonly_coledb,
+                        ),
+                        call(
+                            exchange_interface=mock_exchange_interface,
+                            cole=real_readonly_coledb,
+                        ),
+                    ]
                 )
                 # Email only sent once the first round
                 mock_send_alert_email.assert_called_once_with(
