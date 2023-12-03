@@ -4,7 +4,7 @@ from typing import Iterable, List
 from exchange.interface import MarketTicker
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
-from helpers.types.orders import Order
+from helpers.types.orders import Order, Quantity
 from helpers.types.portfolio import PortfolioHistory
 from helpers.utils import Side
 from strategy.features.base.kalshi import (
@@ -28,6 +28,8 @@ class SPYThetaDecay(Strategy):
         self,
         kalshi_spy_markets: List[SPYRangedKalshiMarket],
         current_market_ticker: MarketTicker | None = None,
+        max_contracts_per_trade: Quantity = Quantity(10),
+        max_exposure: Cents = Cents(10000),
     ):
         """
         market_lower_thresholds:
@@ -64,6 +66,8 @@ class SPYThetaDecay(Strategy):
         # Represents the market_ticker of the last market the ES price fell into
         # Defaults to the first one on the first go
         self.last_market_ticker: MarketTicker = kalshi_spy_markets[0].ticker
+        self.max_contracts_per_trade = max_contracts_per_trade
+        self.max_exposure = max_exposure
 
         super().__init__()
 
@@ -95,7 +99,9 @@ class SPYThetaDecay(Strategy):
             self.last_market_ticker = market_ticker
             if order := ob.buy_order(Side.YES):
                 order.time_placed = update.latest_ts
-                # TODO: check quantity?
+                order.quantity = min(order.quantity, self.max_contracts_per_trade)
+                if portfolio.max_exposure + order.cost > self.max_exposure:
+                    return []
                 return [order]
         ################## Sell #####################
         # TODO: if we move out of a bucket, and we're still holding a position

@@ -364,8 +364,7 @@ class PortfolioHistory:
         only_graph_if_orders: only graphs a chart if there were orders on that market
 
         TODO:
-        • maybe cache the orderbook data in local so you
-        don't have to recompute it every time you run the chart
+        • maybe integrate with jupyter notebook
         • some of the quantities overlap and I can't read them.
         So you might need to move around the text a bit more.
         • Create a higher level function that takes in an event
@@ -395,13 +394,18 @@ class PortfolioHistory:
                 midpoints.append(((bbo.bid.price + bbo.ask.price) / 2))
                 times.append(orderbook.ts)
 
-        plt.scatter(times, bids, color="black")
-        plt.scatter(times, asks, color="black")
-        plt.plot(times, midpoints, color="blue")
-
         for order in orders:
             color = "red" if order.trade == TradeType.BUY else "green"
             plt.scatter(order.time_placed, order.price, color=color, s=200)
-            plt.text(order.time_placed, order.price * 1.005, order.quantity, fontsize=9)
+            plt.text(
+                order.time_placed,
+                order.price * 1.005,
+                f"{order.quantity} @ {order.price}",
+                fontsize=9,
+            )
+
+        plt.scatter(times, bids, color="purple")
+        plt.scatter(times, asks, color="orange")
+        plt.plot(times, midpoints, color="blue")
 
         plt.show()

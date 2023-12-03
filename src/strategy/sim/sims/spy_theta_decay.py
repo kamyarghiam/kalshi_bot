@@ -82,7 +82,7 @@ def run_spy_theta_decay_strat_with_active_ioc_simulator():
 def run_spy_theta_decay_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
     dates = [
-        # datetime.date(year=2023, month=9, day=14),
+        datetime.date(year=2023, month=9, day=14),
         datetime.date(year=2023, month=11, day=27),
     ]
     for date in dates:
@@ -107,4 +107,4 @@ def run_spy_theta_decay_strat_with_blind_simulator():
                 print("Unrealized pnl: ", result.get_unrealized_pnl(e))
         for market in kalshi_spy_markets:
             print(f"Creating graph for {market.ticker}")
-            result.pta_analysis_chart(market.ticker)
+            result.pta_analysis_chart(market.ticker, day_start, day_end)
