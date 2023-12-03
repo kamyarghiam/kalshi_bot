@@ -156,14 +156,18 @@ class PortfolioHistory:
         self.max_exposure: Cents = Cents(0)
 
     @property
-    def fees_paid(self):
+    def current_exposure(self) -> Cents:
+        return self.get_positions_value()
+
+    @property
+    def fees_paid(self) -> Cents:
         fees = Cents(0)
         for order in self.orders:
             fees += order.fee
         return fees
 
     @property
-    def realized_pnl_after_fees(self):
+    def realized_pnl_after_fees(self) -> Cents:
         return self.realized_pnl - self.fees_paid
 
     @property
