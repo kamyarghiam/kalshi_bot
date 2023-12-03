@@ -108,6 +108,3 @@ def run_spy_theta_decay_strat_with_blind_simulator():
         for market in kalshi_spy_markets:
             print(f"Creating graph for {market.ticker}")
             result.pta_analysis_chart(market.ticker, day_start, day_end)
-
-
-run_spy_theta_decay_strat_with_blind_simulator()
