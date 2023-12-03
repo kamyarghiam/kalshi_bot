@@ -2,6 +2,7 @@ import base64
 import hashlib
 import pathlib
 from dataclasses import dataclass
+from multiprocessing.pool import ThreadPool
 
 import boto3
 import botocore.exceptions
@@ -105,22 +106,29 @@ def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = Fal
         ]
         wanted_remote_paths = (p for _, p in local_and_remote_paths)
         to_delete = set(already_remote).difference(wanted_remote_paths)
-        local_files_iter = local_and_remote_paths
-        to_delete_iter = to_delete
-        if pretty:
-            local_files_iter = tqdm.tqdm(
-                local_files_iter, desc="Sync local to remote files"
+        with ThreadPool() as p:
+            local_files_iter = p.imap_unordered(
+                iterable=local_and_remote_paths,
+                func=lambda t: sync_local_to_remote_file(
+                    local=t[0],
+                    remote=t[1],
+                ),
             )
-            to_delete_iter = tqdm.tqdm(
-                to_delete_iter, desc="Deleting remote files not present on local."
-            )
-        for local_p, remote_p in local_files_iter:
-            sync_local_to_remote_file(
-                local=local_p,
-                remote=remote_p,
-            )
-        for f in to_delete_iter:
-            f.s3_object.delete()
+            to_delete_iter = to_delete
+            if pretty:
+                local_files_iter = tqdm.tqdm(
+                    local_files_iter,
+                    desc="Sync local to remote files",
+                    total=len(local_and_remote_paths),
+                )
+                to_delete_iter = tqdm.tqdm(
+                    to_delete_iter,
+                    desc="Deleting remote files not present on local.",
+                    total=len(to_delete),
+                )
+            list(local_files_iter)  # Iterate through it.
+            for f in to_delete_iter:
+                f.s3_object.delete()
     else:
         raise ValueError(f"Not a valid file type: {local}")
 
@@ -148,21 +156,28 @@ def sync_remote_to_local(remote: S3Path, local: pathlib.Path, pretty: bool = Fal
     ]
     wanted_local_paths = (lpath for _, lpath in remote_and_local_paths)
     to_delete = set(local.rglob("*")).difference(wanted_local_paths)
-    remote_files_iter = remote_and_local_paths
-    to_delete_iter = to_delete
-    if pretty:
-        remote_files_iter = tqdm.tqdm(
-            remote_files_iter, desc="Sync remote to local files"
-        )
-        to_delete_iter = tqdm.tqdm(
-            to_delete_iter, desc="Deleting local files not present on remote."
+    with ThreadPool() as p:
+        remote_files_iter = p.imap_unordered(
+            iterable=remote_and_local_paths,
+            func=lambda t: sync_remote_to_local_file(
+                remote=S3Path.from_path_str(bucket=remote.bucket, path=t[0]),
+                local=t[1],
+            ),
         )
 
-    for remote_p, local_p in remote_files_iter:
-        sync_remote_to_local_file(
-            remote=S3Path.from_path_str(bucket=remote.bucket, path=remote_p),
-            local=local_p,
-        )
-    for f in to_delete_iter:
-        if f.is_file():
-            f.unlink()
+        to_delete_iter = to_delete
+        if pretty:
+            remote_files_iter = tqdm.tqdm(
+                remote_files_iter,
+                desc="Sync remote to local files",
+                total=len(remote_and_local_paths),
+            )
+            to_delete_iter = tqdm.tqdm(
+                to_delete_iter, desc="Deleting local files not present on remote."
+            )
+
+        list(remote_files_iter)  # Iterate through it.
+
+        for f in to_delete_iter:
+            if f.is_file():
+                f.unlink()

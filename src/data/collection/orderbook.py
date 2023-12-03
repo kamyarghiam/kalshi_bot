@@ -6,7 +6,7 @@ from rich.table import Table
 
 from data.backends.s3 import S3Path
 from data.coledb.coledb import ColeDBInterface
-from data.coledb.remote import sync_to_remote
+from data.coledb.remote import _DEFAULT_COLEDB_S3_PATH, sync_to_remote
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
@@ -106,5 +106,5 @@ if __name__ == "__main__":
     retry_collect_orderbook_data(
         # pragma: no cover
         ExchangeInterface(is_test_run=False),
-        remote=S3Path(bucket="dead-gecco-prod-features-raw", path_components=("cole",)),
+        remote=_DEFAULT_COLEDB_S3_PATH,
     )
