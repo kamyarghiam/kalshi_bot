@@ -359,7 +359,7 @@ class PortfolioHistory:
         """Post Trade Analysis: Charts buys and sells against market history
 
         Red means buy
-        Yellow means sell
+        Green means sell
 
         only_graph_if_orders: only graphs a chart if there were orders on that market
 
@@ -400,7 +400,7 @@ class PortfolioHistory:
         plt.plot(times, midpoints, color="blue")
 
         for order in orders:
-            color = "red" if order.trade == TradeType.BUY else "yellow"
+            color = "red" if order.trade == TradeType.BUY else "green"
             plt.scatter(order.time_placed, order.price, color=color, s=200)
             plt.text(order.time_placed, order.price * 1.005, order.quantity, fontsize=9)
 
