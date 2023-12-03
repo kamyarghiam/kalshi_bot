@@ -1,7 +1,11 @@
 import pickle
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from matplotlib import pyplot as plt
+
+from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price
@@ -344,3 +348,60 @@ class PortfolioHistory:
     @classmethod
     def load(cls, root_path: Path) -> "PortfolioHistory":
         return pickle.loads((root_path / cls._pickle_file).read_bytes())
+
+    def pta_analysis_chart(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+        only_graph_if_orders: bool = True,
+    ):
+        """Post Trade Analysis: Charts buys and sells against market history
+
+        Red means buy
+        Yellow means sell
+
+        only_graph_if_orders: only graphs a chart if there were orders on that market
+
+        TODO:
+        • maybe cache the orderbook data in local so you
+        don't have to recompute it every time you run the chart
+        • some of the quantities overlap and I can't read them.
+        So you might need to move around the text a bit more.
+        • Create a higher level function that takes in an event
+        ticker and graphs orders for all markets in that event
+        """
+        # Extract orders from this market
+        orders: List[Order] = list(
+            filter(lambda order: order.ticker == ticker, self.orders)
+        )
+
+        if len(orders) == 0:
+            print(f"No orders on {ticker}")
+            if only_graph_if_orders:
+                return
+
+        bids = []
+        asks = []
+        midpoints = []
+        times = []
+        for orderbook in ColeDBInterface().read_cursor(
+            ticker=ticker, start_ts=start_ts, end_ts=end_ts
+        ):
+            bbo = orderbook.get_bbo()
+            if bbo.bid and bbo.ask:
+                bids.append(bbo.bid.price)
+                asks.append(bbo.ask.price)
+                midpoints.append(((bbo.bid.price + bbo.ask.price) / 2))
+                times.append(orderbook.ts)
+
+        plt.scatter(times, bids, color="black")
+        plt.scatter(times, asks, color="black")
+        plt.plot(times, midpoints, color="blue")
+
+        for order in orders:
+            color = "red" if order.trade == TradeType.BUY else "yellow"
+            plt.scatter(order.time_placed, order.price, color=color, s=200)
+            plt.text(order.time_placed, order.price * 1.005, order.quantity, fontsize=9)
+
+        plt.show()

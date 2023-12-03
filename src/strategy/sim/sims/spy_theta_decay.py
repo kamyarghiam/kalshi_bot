@@ -4,6 +4,7 @@ from typing import List
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
+from helpers.types.portfolio import PortfolioHistory
 from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
     daily_spy_range_kalshi_markets,
@@ -81,7 +82,7 @@ def run_spy_theta_decay_strat_with_active_ioc_simulator():
 def run_spy_theta_decay_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
     dates = [
-        datetime.date(year=2023, month=9, day=14),
+        # datetime.date(year=2023, month=9, day=14),
         datetime.date(year=2023, month=11, day=27),
     ]
     for date in dates:
@@ -99,11 +100,11 @@ def run_spy_theta_decay_strat_with_blind_simulator():
         sim = BlindOrderSim(
             historical_data=historical_features,
         )
-        result = sim.run(strategy=strategy)
+        result: PortfolioHistory = sim.run(strategy=strategy)
         print(result)
         if result.has_open_positions():
             with ExchangeInterface(is_test_run=False) as e:
                 print("Unrealized pnl: ", result.get_unrealized_pnl(e))
-
-
-run_spy_theta_decay_strat_with_blind_simulator()
+        for market in kalshi_spy_markets:
+            print(f"Creating graph for {market.ticker}")
+            result.pta_analysis_chart(market.ticker)
