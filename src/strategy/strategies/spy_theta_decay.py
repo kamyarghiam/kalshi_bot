@@ -100,7 +100,7 @@ class SPYThetaDecay(Strategy):
             if order := ob.buy_order(Side.YES):
                 order.time_placed = update.latest_ts
                 order.quantity = min(order.quantity, self.max_contracts_per_trade)
-                if portfolio.max_exposure + order.cost > self.max_exposure:
+                if not portfolio.can_afford(order):
                     return []
                 return [order]
         ################## Sell #####################
