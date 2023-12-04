@@ -28,7 +28,7 @@ class SPYThetaDecay(Strategy):
         self,
         kalshi_spy_markets: List[SPYRangedKalshiMarket],
         current_market_ticker: MarketTicker | None = None,
-        max_contracts_per_trade: Quantity = Quantity(10),
+        max_contracts_per_trade: Quantity = Quantity(20),
         max_exposure: Cents = Cents(10000),
     ):
         """

@@ -13,7 +13,7 @@ direction of the project.
 - Create a virtual environment and activate it
 - Install `poetry` then run `poetry install` to install the dependencies to your venv
 - Run `pre-commit install` to activate pre-commit hooks
-- Set up some default formatters in vs code. This will help keep your code clean. I'd recommend black and isort. Also set up autoformat on save (https://stackoverflow.com/questions/59433286/vs-code-prettier-format-on-save-doesnt-work). This is an example of what my user settings.json looks like in vs code:
+- Set up some default formatters in vs code. This will help keep your code clean. I'd recommend black and isort. Also set up autoformat on save (https://stackoverflow.com/questions/59433286/vs-code-prettier-format-on-save-doesnt-work). This is an example of what my user settings.json looks like in vscode:
 
 ```
 {
@@ -77,6 +77,19 @@ export TRADING_ENV = 'demo' or 'prod'
 And then adding the following to your bash / zsh profile: `source path/to/your/script.sh`.
 In order for functional tests to pass, your username and password should correspond to
 an actual username and password on Kalshi's demo website.
+
+### AWS Access
+
+In order to run tests, we need to give you access to AWS. Someone needs to create an AWS account for you, and you will need to create an access key and a secret access key. Then, in the
+`~/.aws/credentials` file locally, you need to paste the following:
+
+```
+[default]
+aws_access_key_id=XXXXXXXXXXXXXX
+aws_secret_access_key=YYYYYYYYYYYYYYYYYYYYYYYYYYY
+```
+
+Note for admins, the users need permissions to run `ListObjectsV2`.
 
 ### RUNNING TESTS
 
