@@ -88,7 +88,7 @@ def daily_spy_range_kalshi_markets(
     date: datetime.date, cole: ColeDBInterface = ColeDBInterface()
 ) -> List[SPYRangedKalshiMarket]:
     date_month_str = date.strftime("%b").upper()
-    event_ticker = EventTicker(f"INXD-{date.year - 2000}{date_month_str}{date.day}")
+    event_ticker = EventTicker(f"INXD-{date.year - 2000}{date_month_str}{date.day:02d}")
     return _parse_kalshi_ranged_spy_tickers(
         end_date=date, tickers=cole.get_tickers_under_event(event_ticker=event_ticker)
     )

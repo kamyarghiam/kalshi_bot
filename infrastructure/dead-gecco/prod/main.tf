@@ -44,3 +44,42 @@ resource "aws_s3_bucket_public_access_block" "features_raw" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+resource "aws_iam_policy" "features_raw_source_rw" {
+  for_each = toset([ "cole", "test", "databento" ])
+  name        = "features_raw_${local.env}_${each.key}_rw"
+  path        = "/"
+  description = "Read and write to the raw ${local.env} ${each.key} features."
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject",
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.features_raw.arn}/${each.key}/*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_policy" "features_raw_all_rw" {
+  name        = "features_raw_${local.env}_all_rw"
+  path        = "/"
+  description = "Read and write to the ${local.env} raw features."
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject",
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.features_raw.arn}/*"
+      },
+    ]
+  })
+}

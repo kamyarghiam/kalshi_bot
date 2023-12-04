@@ -1,10 +1,11 @@
+import datetime
 import pathlib
-from datetime import datetime
-from datetime import time as datetime_time
+import zoneinfo
 
 import pandas as pd
-import pytz
 
+from data.backends.s3 import S3Path, sync_remote_to_local
+from helpers.constants import LOCAL_STORAGE_FOLDER, RAW_FEATURES_BUCKET
 from strategy.utils import ObservationCursor, observation_cursor_from_df
 
 
@@ -16,9 +17,24 @@ def spy_price_feature_ts_name() -> str:
     return "es_ts_recv"
 
 
+_DATA_PATH_COMPONENTS = ("databento", "xnas-itch", "spy")
+_DATA_LOCAL_PATH = LOCAL_STORAGE_FOLDER
+for c in _DATA_PATH_COMPONENTS:
+    _DATA_LOCAL_PATH /= c
+
+
+def sync_to_local():
+    sync_remote_to_local(
+        remote=S3Path(
+            bucket=RAW_FEATURES_BUCKET, path_components=_DATA_PATH_COMPONENTS
+        ),
+        local=_DATA_LOCAL_PATH,
+    )
+
+
 def es_data_file_to_clean_df(es_file: pathlib.Path) -> pd.DataFrame:
-    utc_tz = pytz.timezone("UTC")
-    eastern_tz = pytz.timezone("US/Eastern")
+    utc_tz = zoneinfo.ZoneInfo("UTC")
+    eastern_tz = zoneinfo.ZoneInfo("US/Eastern")
     df = pd.read_csv(es_file)
     day_of_data = (
         pd.to_datetime(df.iloc[0]["ts_recv"], unit="ns")
@@ -26,16 +42,16 @@ def es_data_file_to_clean_df(es_file: pathlib.Path) -> pd.DataFrame:
         .tz_convert(eastern_tz)
     )
 
-    market_open = datetime_time(9, 30)
+    market_open = datetime.time(9, 30)
     market_open_full_datetime_ns = (
-        datetime.combine(day_of_data.date(), market_open)
-        .astimezone(pytz.timezone("US/Eastern"))
+        datetime.datetime.combine(day_of_data.date(), market_open)
+        .astimezone(zoneinfo.ZoneInfo("US/Eastern"))
         .timestamp()
     ) * 1e9
-    market_close = datetime_time(16, 0)
+    market_close = datetime.time(16, 0)
     market_close_full_datetime_ns = (
-        datetime.combine(day_of_data.date(), market_close)
-        .astimezone(pytz.timezone("US/Eastern"))
+        datetime.datetime.combine(day_of_data.date(), market_close)
+        .astimezone(zoneinfo.ZoneInfo("US/Eastern"))
         .timestamp()
     ) * 1e9
 
@@ -81,3 +97,7 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     return observation_cursor_from_df(
         df=df, observed_ts_key=spy_price_feature_ts_name()
     )
+
+
+def hist_spy_local_path(date: datetime.date) -> pathlib.Path:
+    return _DATA_LOCAL_PATH / f"xnas-itch-{date.strftime('%Y%m%d')}.mbo.csv"

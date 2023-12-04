@@ -40,3 +40,5 @@ LOCAL_STORAGE_FOLDER = pathlib.Path(__file__).parent.parent.parent / pathlib.Pat
     "src/data/local/"
 )
 COLEDB_DEFAULT_STORAGE_PATH = LOCAL_STORAGE_FOLDER / "coledb_storage"
+
+RAW_FEATURES_BUCKET = "dead-gecco-prod-features-raw"

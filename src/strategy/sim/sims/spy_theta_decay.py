@@ -10,7 +10,11 @@ from strategy.features.base.kalshi import (
     daily_spy_range_kalshi_markets,
     hist_kalshi_orderbook_feature,
 )
-from strategy.features.base.spy import hist_spy_feature
+from strategy.features.base.spy import (
+    hist_spy_feature,
+    hist_spy_local_path,
+    sync_to_local,
+)
 from strategy.sim.sim_types.active_ioc import ActiveIOCStrategySimulator
 from strategy.sim.sim_types.blind import BlindOrderSim
 from strategy.strategies.spy_theta_decay import SPYThetaDecay
@@ -26,7 +30,9 @@ def compute_historical_features(
 ) -> HistoricalObservationSetCursor:
     # Format is like sep12.csv
     date_abbreviated = date.strftime("%b%d").lower()
-    es_file = LOCAL_STORAGE_FOLDER / f"spy_data/{date_abbreviated}.csv"
+    es_file = hist_spy_local_path(date=date)
+    if not es_file.exists() or reload:
+        sync_to_local()
     spy_cursor = hist_spy_feature(es_file=es_file)
 
     path_to_cache = (
@@ -82,8 +88,8 @@ def run_spy_theta_decay_strat_with_active_ioc_simulator():
 def run_spy_theta_decay_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
     dates = [
-        datetime.date(year=2023, month=9, day=14),
-        datetime.date(year=2023, month=11, day=27),
+        datetime.date(year=2023, month=10, day=i)
+        for i in [2, 3, 4, 5, 9, 10, 11, 12, 16, 17, 18, 19]
     ]
     for date in dates:
         day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
@@ -108,3 +114,6 @@ def run_spy_theta_decay_strat_with_blind_simulator():
         for market in kalshi_spy_markets:
             print(f"Creating graph for {market.ticker}")
             result.pta_analysis_chart(market.ticker, day_start, day_end)
+
+
+run_spy_theta_decay_strat_with_blind_simulator()

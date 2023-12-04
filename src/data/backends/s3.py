@@ -7,6 +7,7 @@ from multiprocessing.pool import ThreadPool
 import boto3
 import botocore.exceptions
 import tqdm.autonotebook as tqdm
+import typer
 
 s3_resource = boto3.resource("s3")
 s3_client = boto3.client("s3")
@@ -181,3 +182,23 @@ def sync_remote_to_local(remote: S3Path, local: pathlib.Path, pretty: bool = Fal
         for f in to_delete_iter:
             if f.is_file():
                 f.unlink()
+
+
+"""
+A manual little cli tool while we're here.
+"""
+
+
+app = typer.Typer()
+
+
+@app.command()
+def up(local: pathlib.Path, bucket: str, key: str):
+    sync_local_to_remote(
+        local=local, remote=S3Path.from_path_str(bucket=bucket, path=key), pretty=True
+    )
+
+
+if __name__ == "__main__":
+    # Little manual tool here.
+    app()
