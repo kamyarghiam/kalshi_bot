@@ -100,9 +100,9 @@ def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = Fal
         sync_local_to_remote_file(local=local, remote=remote)
     elif local.is_dir():
         local_files = [f for f in local.rglob("*") if f.is_file()]
-        # Sort from biggest to smallest.
+        # Sort from biggest to smallest
         local_files.sort(reverse=True, key=lambda f: f.stat().st_size)
-        # TODO: Upload in parallel.
+
         already_remote = remote.children(recursive=True)
         local_and_remote_paths = [
             (

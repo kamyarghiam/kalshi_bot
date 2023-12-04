@@ -56,7 +56,7 @@ resource "aws_iam_policy" "features_raw_source_rw" {
     Statement = [
       {
         Action = [
-          "s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject",
+          "s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject", "s3:ListObjectsV2", "s3:ListObjects"
         ]
         Effect   = "Allow"
         Resource = "${aws_s3_bucket.features_raw.arn}/${each.key}/*"
@@ -75,7 +75,7 @@ resource "aws_iam_policy" "features_raw_all_rw" {
     Statement = [
       {
         Action = [
-          "s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject",
+          "s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject", "s3:ListObjectsV2", "s3:ListObjects"
         ]
         Effect   = "Allow"
         Resource = "${aws_s3_bucket.features_raw.arn}/*"
