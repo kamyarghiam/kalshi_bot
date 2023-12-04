@@ -68,22 +68,31 @@ class S3Path:
         return True
 
 
+def _streaming_local_hash(p: pathlib.Path) -> bytes:
+    h = hashlib.sha256()
+    with p.open("rb") as f:
+        while True:
+            next_bytes = f.read(8192)
+            h.update(next_bytes)
+            if len(next_bytes) < 8192:
+                break
+    return h.digest()
+
+
 def sync_local_to_remote_file(local: pathlib.Path, remote: S3Path):
-    local_b = local.read_bytes()
-    local_checksum = (
-        base64.encodebytes(hashlib.sha256(local_b).digest()).decode().strip()
-    )
+    local_checksum = base64.encodebytes(_streaming_local_hash(local)).decode().strip()
     if remote.exists():
         remote_checksum = remote.checksum_sha256()
         if local_checksum == remote_checksum:
             return  # No need to upload.
-    s3_client.put_object(
-        Bucket=remote.bucket,
-        Key=remote.path,
-        ChecksumAlgorithm="SHA256",
-        ChecksumSHA256=local_checksum,
-        Body=local_b,
-    )
+    with local.open("rb") as local_f:
+        s3_client.put_object(
+            Bucket=remote.bucket,
+            Key=remote.path,
+            ChecksumAlgorithm="SHA256",
+            ChecksumSHA256=local_checksum,
+            Body=local_f,
+        )
 
 
 def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = False):
@@ -137,9 +146,7 @@ def sync_local_to_remote(local: pathlib.Path, remote: S3Path, pretty: bool = Fal
 def sync_remote_to_local_file(remote: S3Path, local: pathlib.Path):
     if local.exists():
         local_checksum = (
-            base64.encodebytes(hashlib.sha256(local.read_bytes()).digest())
-            .decode()
-            .strip()
+            base64.encodebytes(_streaming_local_hash(p=local)).decode().strip()
         )
         remote_checksum = remote.checksum_sha256()
         if local_checksum == remote_checksum:
