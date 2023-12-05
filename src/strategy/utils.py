@@ -4,6 +4,7 @@ import json
 import pathlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -163,6 +164,24 @@ def duplicate_time_pick_latest(cursor: ObservationCursor) -> ObservationCursor:
         yield last_obs
 
 
+class StreamStatus(Enum):
+    # Hit stop iteration
+    DONE = "DONE"
+    # On the last elem
+    LAST = "LAST"
+    # Still looping through
+    IN_PROGRESS = "IN_PROGRESS"
+
+    def next_status(self) -> "StreamStatus":
+        """Return the next stage of the stream status"""
+        if self == StreamStatus.IN_PROGRESS:
+            return StreamStatus.LAST
+        return StreamStatus.DONE
+
+    def done(self):
+        return self == StreamStatus.DONE
+
+
 @dataclass
 class HistoricalObservationSetCursor(ObservationSetCursor):
     """
@@ -251,7 +270,11 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                     break
 
             heads[i] = prev
-        stream_finished: List[bool] = [False for _ in feature_iters]
+        stream_status: List[StreamStatus] = [
+            StreamStatus.IN_PROGRESS for _ in feature_iters
+        ]
+        # These are the next elements in the streams
+        next_heads = [next(stream) for stream in feature_iters]
 
         featuresets = []
         tqdms: List[tqdm.tqdm] = []
@@ -264,35 +287,39 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                 tqdm.tqdm(desc=f"stream_{idx}", total=lengths[idx], position=idx)
                 for idx, stream in enumerate(feature_streams)
             ]
-        while not all(stream_finished):
+        while not all(s.done() for s in stream_status):
             featuresets.append(ObservationSet.from_basefeatures(heads))
             while True:
                 # Advance the next feature stream
                 # until we find an unfinished iterator or we're completely done.
                 remaining_head_idxs = [
-                    i for i, finished in enumerate(stream_finished) if not finished
+                    i for i, status in enumerate(stream_status) if not status.done()
                 ]
-                next_ts = min(heads[idx].observed_ts for idx in remaining_head_idxs)
-                next_feature_idxs = [
+                # Get the earliest ts from the future heads
+                next_ts = min(
+                    next_heads[idx].observed_ts for idx in remaining_head_idxs
+                )
+                next_feature_idx = [
                     idx
                     for idx in remaining_head_idxs
-                    if heads[idx].observed_ts == next_ts
-                ]
-                for next_feature_idx in next_feature_idxs:
-                    prev_feature = heads[next_feature_idx]
-                    next_feature, done = next_or_done(
-                        prev=prev_feature,
-                        iterator=feature_iters[next_feature_idx],
-                    )
-                    if __debug__ and not done:
-                        assert (
-                            next_feature.observed_ts > prev_feature.observed_ts
-                        ), "Features occurred out-of-order or at the same time!"
-                    heads[next_feature_idx] = next_feature
-                    stream_finished[next_feature_idx] = done
-                    if pretty:
-                        tqdms[next_feature_idx].update(n=1)
-                if not done or all(stream_finished):
+                    if next_heads[idx].observed_ts == next_ts
+                ][0]
+                prev_feature = next_heads[next_feature_idx]
+                next_feature, done = next_or_done(
+                    prev=prev_feature,
+                    iterator=feature_iters[next_feature_idx],
+                )
+                status = stream_status[next_feature_idx]
+                if done:
+                    status = status.next_status()
+                    stream_status[next_feature_idx] = status
+                # Advance heads and next_heads by 1
+                heads[next_feature_idx] = next_heads[next_feature_idx]
+                next_heads[next_feature_idx] = next_feature
+
+                if pretty:
+                    tqdms[next_feature_idx].update(n=1)
+                if not status.done() or all(s.done() for s in stream_status):
                     break
         return HistoricalObservationSetCursor.from_featuresets_over_time(
             featuresets=featuresets

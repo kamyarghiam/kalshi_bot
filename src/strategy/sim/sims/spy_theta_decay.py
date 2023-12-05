@@ -99,7 +99,7 @@ def run_spy_theta_decay_strat_with_blind_simulator():
         kalshi_spy_markets = daily_spy_range_kalshi_markets(date=date)
         historical_features: HistoricalObservationSetCursor = (
             compute_historical_features(
-                date, kalshi_spy_markets, day_start, day_end, reload=False
+                date, kalshi_spy_markets, day_start, day_end, reload=True
             )
         )
         strategy = SPYThetaDecay(kalshi_spy_markets)
