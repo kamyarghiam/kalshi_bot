@@ -74,13 +74,6 @@ def es_data_file_to_clean_df(es_file: pathlib.Path) -> pd.DataFrame:
 
 def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
     df = es_data_file_to_clean_df(es_file)
-    # Note: coledb has no timezones :(
-    # So all other features must be tz-naive in order to be compared/ordered
-    #   with the coledb/kalshi orderbook updates.
-    # df["ts_recv"] = df["ts_recv"].apply(
-    #     lambda time: time.tz_localize(utc_tz).tz_convert(eastern_tz)
-    # )
-
     # Because the data is orders, not fills,
     # But we filter to fill,
     #   each fill can fill multiple orders

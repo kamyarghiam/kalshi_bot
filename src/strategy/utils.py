@@ -1,4 +1,5 @@
 import datetime
+import itertools
 import json
 import pathlib
 from abc import ABC, abstractmethod
@@ -156,6 +157,8 @@ def duplicate_time_pick_latest(cursor: ObservationCursor) -> ObservationCursor:
         if obs.observed_ts > last_obs.observed_ts:
             yield last_obs
             last_obs = obs
+        elif obs.observed_ts == last_obs.observed_ts:
+            last_obs = obs
     if last_obs is not None:
         yield last_obs
 
@@ -216,7 +219,6 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
         Takes a list of basefeature lists,
           where each sublist is the same feature over time.
         """
-        feature_iters = [iter(s) for s in feature_streams]
 
         def next_or_done(
             prev: Observation, iterator: Iterator[Observation]
@@ -226,9 +228,31 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
             except StopIteration:
                 return (prev, True)
 
-        heads: List[Tuple[Observation, bool]] = [
-            (next(stream), False) for stream in feature_iters
-        ]
+        feature_iters = [iter(s) for s in feature_streams]
+        heads: List[Observation] = [next(stream) for stream in feature_iters]
+        latest_ts = max(observation.observed_ts for observation in heads)
+
+        # Advance each stream until we get one before the latest_ts
+        # (otherwise first entry will be wrong)
+        for i, stream in enumerate(feature_iters):
+            # One small issue from this is that the streams
+            # may finish before reaching the head
+            # of the latest_ts stream. Small edge case that
+            # I'm not going to worry about now
+            prev: Observation = heads[i]
+            curr: Observation = heads[i]
+
+            while True:
+                prev = curr
+                curr = next(stream)
+                if curr.observed_ts >= latest_ts:
+                    # Put curr back on top
+                    feature_iters[i] = itertools.chain([curr], feature_iters[i])
+                    break
+
+            heads[i] = prev
+        stream_finished: List[bool] = [False for _ in feature_iters]
+
         featuresets = []
         tqdms: List[tqdm.tqdm] = []
         if pretty:
@@ -240,22 +264,22 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                 tqdm.tqdm(desc=f"stream_{idx}", total=lengths[idx], position=idx)
                 for idx, stream in enumerate(feature_streams)
             ]
-        while any(not done for _, done in heads):
-            featuresets.append(ObservationSet.from_basefeatures([f for f, _ in heads]))
+        while not all(stream_finished):
+            featuresets.append(ObservationSet.from_basefeatures(heads))
             while True:
                 # Advance the next feature stream
                 # until we find an unfinished iterator or we're completely done.
                 remaining_head_idxs = [
-                    idx for idx, tup in enumerate(heads) if not tup[1]
+                    i for i, finished in enumerate(stream_finished) if not finished
                 ]
-                next_ts = min(heads[idx][0].observed_ts for idx in remaining_head_idxs)
+                next_ts = min(heads[idx].observed_ts for idx in remaining_head_idxs)
                 next_feature_idxs = [
                     idx
                     for idx in remaining_head_idxs
-                    if heads[idx][0].observed_ts == next_ts
+                    if heads[idx].observed_ts == next_ts
                 ]
                 for next_feature_idx in next_feature_idxs:
-                    prev_feature = heads[next_feature_idx][0]
+                    prev_feature = heads[next_feature_idx]
                     next_feature, done = next_or_done(
                         prev=prev_feature,
                         iterator=feature_iters[next_feature_idx],
@@ -263,11 +287,12 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
                     if __debug__ and not done:
                         assert (
                             next_feature.observed_ts > prev_feature.observed_ts
-                        ), "Features occured out-of-order or at the same time!"
-                    heads[next_feature_idx] = (next_feature, done)
+                        ), "Features occurred out-of-order or at the same time!"
+                    heads[next_feature_idx] = next_feature
+                    stream_finished[next_feature_idx] = done
                     if pretty:
                         tqdms[next_feature_idx].update(n=1)
-                if not done or all(done for _, done in heads):
+                if not done or all(stream_finished):
                     break
         return HistoricalObservationSetCursor.from_featuresets_over_time(
             featuresets=featuresets

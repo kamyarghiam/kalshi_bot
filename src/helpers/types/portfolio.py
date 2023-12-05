@@ -417,7 +417,13 @@ class PortfolioHistory:
                 if order.side == Side.YES
                 else get_opposite_side_price(order.price)
             )
-            plt.scatter(order.time_placed, price, color=color, s=200)
+            plt.scatter(
+                order.time_placed,
+                price,
+                s=200,
+                facecolors="none",
+                edgecolors=color,
+            )
             plt.text(
                 order.time_placed,
                 price * 1.005,
