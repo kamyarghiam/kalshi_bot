@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
-from helpers.types.money import Balance, Cents, Dollars, Price
+from helpers.types.money import Balance, Cents, Dollars, Price, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 
@@ -137,6 +137,9 @@ class Position:
             s += f" | {quantity} @ {price}"
         return s
 
+    def __repr__(self):
+        return str(self)
+
 
 class PortfolioError(Exception):
     """Some issue with buying or selling"""
@@ -215,21 +218,27 @@ class PortfolioHistory:
                     unrealized_pnl -= position.get_value()
         return unrealized_pnl
 
-    def __str__(self):
+    def as_str(self, print_orders: bool = True) -> str:
         # Only compute fees paid once
         positions_str = "\n".join(
             ["  " + str(position) for position in self._positions.values()]
         )
-        orders_str = "\n".join(["  " + str(order) for order in self.orders])
-        return (
+
+        str_ = (
             f"Realized PnL (no fees): {self.realized_pnl}\n"
             + f"Fees paid: {self.fees_paid}\n"
             + f"Realized PnL (with fees): {self.realized_pnl_after_fees}\n"
             + f"Cash left: {self._cash_balance}\n"
             + f"Max exposure: {self.max_exposure}\n"
             + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
-            + f"Orders:\n{orders_str}"
         )
+        if print_orders:
+            orders_str = "\n".join(["  " + str(order) for order in self.orders])
+            str_ += f"Orders:\n{orders_str}"
+        return str_
+
+    def __str__(self):
+        return self.as_str()
 
     def __eq__(self, other):
         return isinstance(other, PortfolioHistory) and (
@@ -241,12 +250,15 @@ class PortfolioHistory:
     def get_position(self, ticker: MarketTicker) -> Position | None:
         return self._positions[ticker] if ticker in self._positions else None
 
+    def can_afford(self, order: Order) -> bool:
+        return self._cash_balance >= order.cost + order.fee
+
     def can_buy(self, order: Order) -> bool:
         if order.ticker in self._positions:
             holding = self._positions[order.ticker]
             if order.side != holding.side:
                 return False
-        return self._cash_balance >= order.cost + order.fee
+        return self.can_afford(order)
 
     def can_sell(self, order: Order) -> bool:
         if order.ticker not in self._positions:
@@ -400,11 +412,22 @@ class PortfolioHistory:
 
         for order in orders:
             color = "red" if order.trade == TradeType.BUY else "green"
-            plt.scatter(order.time_placed, order.price, color=color, s=200)
+            price = (
+                order.price
+                if order.side == Side.YES
+                else get_opposite_side_price(order.price)
+            )
+            plt.scatter(
+                order.time_placed,
+                price,
+                s=200,
+                facecolors="none",
+                edgecolors=color,
+            )
             plt.text(
                 order.time_placed,
-                order.price * 1.005,
-                f"{order.quantity} @ {order.price}",
+                price * 1.005,
+                f"{order.quantity} {order.side.value} @ {order.price}",
                 fontsize=9,
             )
 

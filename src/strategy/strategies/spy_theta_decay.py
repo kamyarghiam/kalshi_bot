@@ -1,5 +1,6 @@
 import bisect
-from typing import Iterable, List
+from datetime import timedelta
+from typing import Dict, Iterable, List
 
 from exchange.interface import MarketTicker
 from helpers.types.money import Cents
@@ -68,6 +69,12 @@ class SPYThetaDecay(Strategy):
         self.last_market_ticker: MarketTicker = kalshi_spy_markets[0].ticker
         self.max_contracts_per_trade = max_contracts_per_trade
         self.max_exposure = max_exposure
+        self.last_orders: Dict[MarketTicker, Order | None] = {
+            market.ticker: None for market in self.markets
+        }
+        # Don't buy anything in this cool off period
+        # To do: could we use something else, like strength of signal?
+        self.cool_off = timedelta(minutes=5)
 
         super().__init__()
 
@@ -100,8 +107,22 @@ class SPYThetaDecay(Strategy):
             if order := ob.buy_order(Side.YES):
                 order.time_placed = update.latest_ts
                 order.quantity = min(order.quantity, self.max_contracts_per_trade)
-                if portfolio.max_exposure + order.cost > self.max_exposure:
+                if not portfolio.can_afford(order):
                     return []
+                if (
+                    portfolio.current_exposure + order.cost + order.fee
+                    > self.max_exposure
+                ):
+                    return []
+                # Cool off for a bit before buying again
+                last_order = self.last_orders[order.ticker]
+                if (
+                    last_order
+                    and last_order.time_placed + self.cool_off >= order.time_placed
+                ):
+                    return []
+                # Place order
+                self.last_orders[order.ticker] = order
                 return [order]
         ################## Sell #####################
         # TODO: if we move out of a bucket, and we're still holding a position

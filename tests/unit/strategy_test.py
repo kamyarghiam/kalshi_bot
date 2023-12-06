@@ -15,6 +15,13 @@ def test_feature_collections():
         pd.Series(
             {
                 "a_feature": "a the first time",
+                "a_num": 1,
+                "ts": datetime.datetime.combine(day, datetime.time(hour=0)),
+            }
+        ),
+        pd.Series(
+            {
+                "a_feature": "a the second time",
                 "a_num": 2,
                 "ts": datetime.datetime.combine(day, datetime.time(hour=1)),
             }
@@ -47,23 +54,24 @@ def test_feature_collections():
     ]
 
     # Cool. Let's check the observed timestamps are all correct.
-    for idx, f in enumerate(a_features):
-        assert ((idx * 3) + 1) == f.observed_ts.hour
+    assert a_features[0].observed_ts.hour == 0
+    assert a_features[1].observed_ts.hour == 1
+    assert a_features[2].observed_ts.hour == 4
 
-    for idx, f in enumerate(b_features):
-        assert ((idx * 3) + 2) == f.observed_ts.hour
+    assert b_features[0].observed_ts.hour == 2
+    assert b_features[1].observed_ts.hour == 5
 
     # Next, lets make a base feature set
     #   that combines a few combinations of these features.
     observed_0s = ObservationSet.from_basefeatures([a_features[0], b_features[0]])
-    assert observed_0s.observed_ts_of("a_feature").hour == 1
-    assert observed_0s.observed_ts_of("a_num").hour == 1
+    assert observed_0s.observed_ts_of("a_feature").hour == 0
+    assert observed_0s.observed_ts_of("a_num").hour == 0
     assert observed_0s.observed_ts_of("b_features").hour == 2
     assert observed_0s.latest_ts.hour == 2
 
     # What if we observe a different set of them together?
     observed_b_before_a = ObservationSet.from_basefeatures(
-        [a_features[1], b_features[0]]
+        [a_features[2], b_features[0]]
     )
     assert observed_b_before_a.observed_ts_of("a_feature").hour == 4
     assert observed_b_before_a.observed_ts_of("a_num").hour == 4
@@ -79,6 +87,8 @@ def test_feature_collections():
     # We check that the length is 3, not 4:
     # There are 3 moments in time where every feature is present.
     # We assume strategies will not run without all features present.
+    # We also skip the first feature from the a_stream because it's not
+    # one before the latest_ts of the head of the streams
     all_featuresets = [fs for fs in hist_features]
     assert len(all_featuresets) == 3
 
