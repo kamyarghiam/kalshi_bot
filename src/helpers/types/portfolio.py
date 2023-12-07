@@ -187,6 +187,9 @@ class PortfolioHistory:
         for position in self._positions.values():
             market = e.get_market(position.ticker)
             if market.result == MarketResult.NOT_DETERMINED:
+                # TODO: we should not be using last_price because
+                # it's not the actual value
+                # TODO: for the price, we need to get a diff price per side
                 # If has not been determined yet, we will use the last price
                 revenue = market.last_price * position.total_quantity
                 cost, _, sell_fees = position.sell(
