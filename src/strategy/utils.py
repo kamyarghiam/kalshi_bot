@@ -338,12 +338,17 @@ class HistoricalObservationSetCursor(ObservationSetCursor):
         )
 
     def precalculate_strategy_features(self, strategy: "Strategy"):
+        self.precalculate_derived_features(derived_features=strategy.derived_features)
+
+    def precalculate_derived_features(
+        self, derived_features: Iterable["DerivedFeature"]
+    ):
         # Do all the pre-calculating we can.
-        for feat in strategy.derived_features:
+        for feat in derived_features:
             feat.precalculate_onto(df=self.df)
         # And then give each derived feature a pointer to the giant df,
         #  which now functions as a cache for all the derived features.
-        for feat in strategy.derived_features:
+        for feat in derived_features:
             feat.preload(df=self.df)
 
     def __iter__(self) -> Generator[ObservationSet, None, None]:

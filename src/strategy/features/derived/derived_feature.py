@@ -1,9 +1,29 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import List, Optional, Sequence, Union
 
 import pandas as pd
 
 from strategy.utils import ObservationCursor, ObservationSet
+
+
+@dataclass
+class ObservedFeature:
+    cursor: ObservationCursor
+    name: str
+
+    def feature_name(self) -> List[str]:
+        return [self.name]
+
+    def get_derived_dependents(
+        self, recursive: bool = False, inclusive: bool = False
+    ) -> List["DerivedFeature"]:
+        return []
+
+    def get_observational_dependents(
+        self, recursive: bool = False, inclusive: bool = False
+    ) -> List["ObservedFeature"]:
+        return [self] if inclusive else []
 
 
 class DerivedFeature(ABC):
@@ -21,19 +41,22 @@ class DerivedFeature(ABC):
         self.output_feat_names = output_feat_names
         self._preload: Optional[pd.DataFrame] = None
 
-    def get_derived_dependents(self, recursive: bool = False) -> List["DerivedFeature"]:
+    def get_derived_dependents(
+        self, recursive: bool = False, inclusive: bool = False
+    ) -> List["DerivedFeature"]:
         feats = [f for f in self.input_feats if isinstance(f, DerivedFeature)]
+        inclusive_add = [self] if inclusive else []
         if not recursive:
-            return feats
-        return list(
+            return inclusive_add + feats
+        return inclusive_add + list(
             set(
                 subf for f in feats for subf in f.get_derived_dependents(recursive=True)
             )
         )
 
     def get_observational_dependents(
-        self, recursive: bool = False
-    ) -> List[ObservationCursor]:
+        self, recursive: bool = False, inclusive: bool = False
+    ) -> List[ObservedFeature]:
         obs_feats = [f for f in self.input_feats if not isinstance(f, DerivedFeature)]
         if not recursive:
             return obs_feats
@@ -153,7 +176,7 @@ class DerivedFeature(ABC):
         return pd.DataFrame(new_rows)
 
 
-AnyFeature = Union[ObservationCursor, DerivedFeature]
+AnyFeature = Union[ObservedFeature, DerivedFeature]
 
 
 class TimeIndependentFeature(DerivedFeature):
