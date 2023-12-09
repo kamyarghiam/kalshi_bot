@@ -47,9 +47,8 @@ def compute_historical_features(
 
 def run_dumb_ob_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
-    # days = [2, 3, 4, 5, 9, 10, 11, 12, 16, 17, 18, 19]
-    days = [2]
-    dates = [datetime.date(year=2023, month=10, day=i) for i in days]
+    days = [27, 28, 29, 30]
+    dates = [datetime.date(year=2023, month=11, day=i) for i in days]
     for date in dates:
         day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
         day_end = datetime.datetime.combine(date=date, time=datetime.time.max)

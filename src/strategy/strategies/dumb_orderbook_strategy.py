@@ -1,10 +1,11 @@
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, Iterable, List
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView
-from helpers.types.orders import Order, Quantity, Side
+from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from strategy.features.base.kalshi import kalshi_orderbook_feature_name
 from strategy.utils import ObservationSet, Strategy
@@ -34,6 +35,11 @@ class DumbOrderbookStrategy(Strategy):
         self.last_signal: Dict[MarketTicker, Signal] = {
             ticker: Signal.NONE for ticker in tickers
         }
+        self.last_order_ts: Dict[MarketTicker, datetime | None] = {
+            ticker: None for ticker in self.tickers
+        }
+        # Cool down between buys
+        self.cool_down = timedelta(minutes=5)
         super().__init__()
 
     @staticmethod
@@ -100,6 +106,7 @@ class DumbOrderbookStrategy(Strategy):
             if self.last_signal[ticker] == signal:
                 continue
             self.last_signal[ticker] = signal
+            order_to_place: Order | None = None
             match signal:
                 case Signal.BUY:
                     # Check that we're holding this market ticker
@@ -118,7 +125,7 @@ class DumbOrderbookStrategy(Strategy):
                             )
                             pnl, fees = portfolio.potential_pnl(order)
                             if pnl - fees > 0:
-                                orders.append(order)
+                                order_to_place = order
                     else:
                         # Buy some Yes's
                         order = ob.buy_order(side=Side.YES)
@@ -127,7 +134,7 @@ class DumbOrderbookStrategy(Strategy):
                                 min(order.quantity, self.max_order_quantity)
                             )
                             if portfolio.can_afford(order):
-                                orders.append(order)
+                                order_to_place = order
                 case Signal.SELL:
                     if (
                         ticker in portfolio.positions
@@ -141,7 +148,7 @@ class DumbOrderbookStrategy(Strategy):
                             )
                             pnl, fees = portfolio.potential_pnl(order)
                             if pnl - fees > 0:
-                                orders.append(order)
+                                order_to_place = order
                     else:
                         # Buy some No's
                         order = ob.buy_order(side=Side.NO)
@@ -150,13 +157,21 @@ class DumbOrderbookStrategy(Strategy):
                                 min(order.quantity, self.max_order_quantity)
                             )
                             if portfolio.can_afford(order):
-                                orders.append(order)
+                                order_to_place = order
 
                 case Signal.NONE:
                     # Do nothing
                     pass
-        for order in orders:
-            # TODO: something is wrong with getting timestamps
-            order.time_placed = update.latest_ts
+            if order_to_place:
+                if order_to_place.trade == TradeType.BUY:
+                    last_order_ts: datetime | None = self.last_order_ts[ticker]
+                    if (
+                        last_order_ts
+                        and (last_order_ts + self.cool_down) > update.latest_ts
+                    ):
+                        continue
+                    self.last_order_ts[ticker] = update.latest_ts
+                order_to_place.time_placed = update.latest_ts
+                orders.append(order_to_place)
 
         return orders
