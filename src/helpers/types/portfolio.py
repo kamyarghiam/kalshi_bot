@@ -9,7 +9,7 @@ from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price, get_opposite_side_price
-from helpers.types.orderbook import Orderbook
+from helpers.types.orderbook import GetOrderbookRequest, Orderbook
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 
 
@@ -71,7 +71,7 @@ class Position:
         provides info about what the position would do
         """
         if order.trade != TradeType.SELL:
-            raise ValueError(f"Not a buy order: {order}")
+            raise ValueError(f"Not a sell order: {order}")
         if self.side != order.side:
             raise ValueError(
                 f"Position has side {self.side} but order has side {order.side}"
@@ -187,28 +187,24 @@ class PortfolioHistory:
         for position in self._positions.values():
             market = e.get_market(position.ticker)
             if market.result == MarketResult.NOT_DETERMINED:
-                # TODO: we should not be using last_price because
-                # it's not the actual value
-                # TODO: for the price, we need to get a diff price per side
-                # If has not been determined yet, we will use the last price
-                revenue = market.last_price * position.total_quantity
+                # We only need the top of the book
+                ob: Orderbook = e.get_market_orderbook(
+                    GetOrderbookRequest(ticker=position.ticker, depth=1)
+                )
+                order = ob.sell_order(position.side)
+                if not order:
+                    # We don't know how this will fair.
+                    continue
+                order.quantity = position.total_quantity
                 cost, _, sell_fees = position.sell(
-                    Order(
-                        ticker=market.ticker,
-                        # Sometimes, market.last_price is 0. Should not affect cost
-                        # If we put the price to 1 cent
-                        price=max(market.last_price, Price(1)),
-                        quantity=position.total_quantity,
-                        trade=TradeType.SELL,
-                        side=position.side,
-                    ),
+                    order,
                     for_info=True,
                 )
                 # We don't include the fees from the revenue because
                 # it's already realized in the portfolio history computation
                 # of "fees_paid". But we include include the fee from the cost
                 # because that has not been realized yet
-                unrealized_pnl += revenue - cost - sell_fees
+                unrealized_pnl += order.revenue - cost - sell_fees
             else:
                 # If the result equals what we expected, we get money
                 if (position.side == Side.NO and market.result == MarketResult.NO) or (

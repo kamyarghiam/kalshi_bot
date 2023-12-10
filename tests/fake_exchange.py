@@ -15,6 +15,7 @@ from helpers.constants import (
     LOGIN_URL,
     LOGOUT_URL,
     MARKETS_URL,
+    ORDERBOOK_URL,
     TRADES_URL,
 )
 from helpers.types.api import Cursor
@@ -38,6 +39,7 @@ from helpers.types.markets import (
     MarketTicker,
 )
 from helpers.types.money import Price
+from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
 from helpers.types.orders import Quantity, QuantityDelta, Side
 from helpers.types.trades import ExternalTrade, GetTradesResponse
 from helpers.types.websockets.common import SeqId, SubscriptionId, Type
@@ -161,18 +163,35 @@ def kalshi_test_exchange_factory():
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,
-                result=MarketResult.NO,
-                last_price=Price(10),
+                result=MarketResult.YES,
+            )
+        elif ticker == MarketTicker("UNREALIZED-PNL-NOT-DETERMINED"):
+            market = Market(
+                status=MarketStatus.OPEN,
+                ticker=ticker,
+                result=MarketResult.NOT_DETERMINED,
             )
         else:
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,
                 result=MarketResult.NOT_DETERMINED,
-                last_price=Price(10),
             )
         return GetMarketResponse(
             market=market,
+        )
+
+    @router.get(MARKETS_URL + "/{ticker}" + ORDERBOOK_URL)
+    def get_orderbook(ticker: MarketTicker, depth: int | None = None):
+        yes = [[i, 10 * i] for i in range(30, 50)]
+        no = [[i, 10 * i] for i in range(20, 40)]
+
+        if depth:
+            yes = yes[-1 * depth :]
+            no = no[-1 * depth :]
+
+        return GetOrderbookResponse(
+            orderbook=ApiOrderbook(yes=yes, no=no),
         )
 
     @router.get(MARKETS_URL)
@@ -186,7 +205,6 @@ def kalshi_test_exchange_factory():
                 else status,
                 ticker=MarketTicker("some_ticker"),
                 result=MarketResult.NOT_DETERMINED,
-                last_price=Price(10),
             )
             for _ in range(100)
         ]

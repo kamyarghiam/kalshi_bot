@@ -11,6 +11,7 @@ LOGIN_URL = URL("/login")
 MARKETS_URL = URL("/markets")
 LOGOUT_URL = URL("/logout")
 TRADES_URL = URL("/markets/trades")
+ORDERBOOK_URL = URL("/orderbook")
 
 # ENV VARS
 USERNAME_ENV_VAR = "API_USERNAME"

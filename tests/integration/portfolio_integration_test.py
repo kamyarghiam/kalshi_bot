@@ -21,7 +21,7 @@ def test_get_unrealized_pnl(exchange_interface: ExchangeInterface):
         ticker=determined_ticker,
         price=Price(5),
         quantity=Quantity(100),
-        side=Side.NO,
+        side=Side.YES,
         trade=TradeType.BUY,
     )
     portfolio.buy(order1)
@@ -31,12 +31,12 @@ def test_get_unrealized_pnl(exchange_interface: ExchangeInterface):
         ticker=not_determined_ticker,
         price=Price(2),
         quantity=Quantity(100),
-        side=Side.NO,
+        side=Side.YES,
         trade=TradeType.BUY,
     )
     portfolio.buy(order2)
     # From fake exchange
-    sell_price = Price(10)
+    sell_price = Price(49)
     profit_order_2 = (sell_price - order2.price) * order2.quantity - compute_fee(
         sell_price, order2.quantity
     )

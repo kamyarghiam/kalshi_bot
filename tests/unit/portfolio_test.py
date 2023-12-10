@@ -553,7 +553,7 @@ def test_position_error_scenarios():
 
     with pytest.raises(ValueError) as err:
         position.sell(bad_order)
-    assert err.match("Not a buy order: .*")
+    assert err.match("Not a sell order: .*")
 
     # Make order trade bad
     bad_order.trade = TradeType.SELL
@@ -684,29 +684,31 @@ def test_get_unrealized_pnl():
         status=MarketStatus.SETTLED,
         ticker=MarketTicker("determined_profit"),
         result=MarketResult.NO,
-        last_price=Price(95),
     )
 
     market2 = Market(
         status=MarketStatus.SETTLED,
         ticker=MarketTicker("determined_loss"),
         result=MarketResult.YES,
-        last_price=Price(95),
     )
     market3 = Market(
         status=MarketStatus.OPEN,
         ticker=MarketTicker("not_determined"),
         result=MarketResult.NOT_DETERMINED,
-        last_price=Price(95),
     )
 
     mock_exchange = MagicMock(spec=ExchangeInterface)
     mock_exchange.get_market.side_effect = [market1, market2, market3]
+    mock_exchange.get_market_orderbook.return_value = Orderbook(
+        market_ticker=MarketTicker("not_determined"),
+        no=OrderbookSide({Price(39): Quantity(200)}),
+        yes=OrderbookSide({Price(49): Quantity(200)}),
+    )
 
     profit1 = get_opposite_side_price(Price(10)) * Quantity(100)
     profit2 = -1 * Price(5) * Quantity(1000)
-    profit3 = (Price(95) - Price(10)) * Quantity(1000) - compute_fee(
-        Price(95), Quantity(1000)
+    profit3 = (Price(39) - Price(10)) * Quantity(1000) - compute_fee(
+        Price(39), Quantity(1000)
     )
     assert p.get_unrealized_pnl(mock_exchange) == profit1 + profit2 + profit3
 

@@ -3,8 +3,9 @@ import typing
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
+from helpers.types.api import ExternalApi
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
@@ -188,17 +189,34 @@ class Orderbook:
 
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):
-        yes = OrderbookSide()
-        no = OrderbookSide()
-        for level in orderbook_snapshot.yes:
-            yes.add_level(level[0], level[1])
-        for level in orderbook_snapshot.no:
-            no.add_level(level[0], level[1])
-        return cls(
-            market_ticker=orderbook_snapshot.market_ticker,
+        return cls.from_lists(
+            ticker=orderbook_snapshot.market_ticker,
+            yes=orderbook_snapshot.yes,
+            no=orderbook_snapshot.no,
             ts=orderbook_snapshot.ts,
-            yes=yes,
-            no=no,
+        )
+
+    @classmethod
+    def from_lists(
+        cls,
+        ticker: MarketTicker,
+        yes: List,
+        no: List,
+        ts: datetime | None = None,
+    ):
+        ts = datetime.now() if ts is None else ts
+
+        yes_side = OrderbookSide()
+        no_side = OrderbookSide()
+        for level in yes:
+            yes_side.add_level(level[0], level[1])
+        for level in no:
+            no_side.add_level(level[0], level[1])
+        return cls(
+            market_ticker=ticker,
+            ts=ts,
+            yes=yes_side,
+            no=no_side,
         )
 
     def get_view(self, view: OrderbookView) -> "Orderbook":
@@ -258,3 +276,22 @@ class Orderbook:
             quantity=bbo[1],
             trade=TradeType.SELL,
         )
+
+
+class ApiOrderbook(ExternalApi):
+    yes: List[List] = []
+    no: List[List] = []
+
+    def to_internal_orderbook(self, ticker: MarketTicker) -> Orderbook:
+        return Orderbook.from_lists(ticker, self.yes, self.no)
+
+
+class GetOrderbookResponse(ExternalApi):
+    orderbook: ApiOrderbook
+
+
+class GetOrderbookRequest(ExternalApi):
+    ticker: MarketTicker
+    # Depth specifies the maximum number of orderbook
+    # price levels you want to see for either side.
+    depth: int | None = None

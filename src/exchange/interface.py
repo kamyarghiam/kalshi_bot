@@ -5,7 +5,12 @@ from typing import ContextManager, Generator, List
 from fastapi.testclient import TestClient
 
 from exchange.connection import Connection, Websocket
-from helpers.constants import EXCHANGE_STATUS_URL, MARKETS_URL, TRADES_URL
+from helpers.constants import (
+    EXCHANGE_STATUS_URL,
+    MARKETS_URL,
+    ORDERBOOK_URL,
+    TRADES_URL,
+)
 from helpers.types.common import URL
 from helpers.types.exchange import ExchangeStatusResponse
 from helpers.types.markets import (
@@ -16,6 +21,7 @@ from helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
+from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
 
@@ -71,6 +77,16 @@ class ExchangeInterface:
                 url=MARKETS_URL.add(URL(f"/{ticker}")),
             )
         ).market
+
+    def get_market_orderbook(self, request: GetOrderbookRequest) -> Orderbook:
+        return GetOrderbookResponse.parse_obj(
+            self._connection.get(
+                url=MARKETS_URL.add(f"{request.ticker}").add(ORDERBOOK_URL),
+                params=dict(depth=str(request.depth))
+                if request.depth is not None
+                else {},
+            )
+        ).orderbook.to_internal_orderbook(request.ticker)
 
     def get_trades(
         self,
