@@ -116,34 +116,78 @@ def convert_from_cole_db_to_outputs(
     market_open = datetime.time(9, 30)
     market_close = datetime.time(16, 0)
     markets = daily_spy_range_kalshi_markets(date_to_read)
-    # Pick a random one
-    ticker = markets[4].ticker
-    input_array_list = []
-    bbo_vec_list = []
-    for ob in db.read(
-        ticker,
-        datetime.datetime.combine(date_to_read, market_open),
-        datetime.datetime.combine(date_to_read, market_close),
-    ):
-        vec = orderbook_to_input_vector(ob)
-        input_array_list.append(vec)
-        bbo_vec_list.append(orderbook_to_bbo_vector(ob))
+    for market in markets:
+        ticker = market.ticker
+        input_array_list = []
+        bbo_vec_list = []
+        for ob in db.read(
+            ticker,
+            datetime.datetime.combine(date_to_read, market_open),
+            datetime.datetime.combine(date_to_read, market_close),
+        ):
+            vec = orderbook_to_input_vector(ob)
+            input_array_list.append(vec)
+            bbo_vec_list.append(orderbook_to_bbo_vector(ob))
 
-    input_column_names = (
-        ["sec_until_4pm"]
-        + [f"yes_bid_{i}" for i in range(1, 100)]
-        + [f"no_bid_{i}" for i in range(1, 100)]
-    )
-    assert len(input_column_names) == 199
+        input_column_names = (
+            ["sec_until_4pm"]
+            + [f"yes_bid_{i}" for i in range(1, 100)]
+            + [f"no_bid_{i}" for i in range(1, 100)]
+        )
+        assert len(input_column_names) == 199
 
-    base_path = LOCAL_STORAGE_FOLDER / f"research/single_market_model/{ticker}"
-    if not base_path.exists():
-        base_path.mkdir()
-    input_df = pd.DataFrame(input_array_list, columns=input_column_names)
-    input_df.to_csv(base_path / "input_vec.csv", index=False)
+        base_path = LOCAL_STORAGE_FOLDER / f"research/single_market_model/{ticker}"
+        if not base_path.exists():
+            base_path.mkdir()
+        input_df = pd.DataFrame(input_array_list, columns=input_column_names)
+        input_df.to_csv(base_path / "input_vec.csv", index=False)
 
-    output_column_names = ["sec_until_4pm", "best_yes_bid", "best_yes_ask"]
-    output_df = pd.DataFrame(bbo_vec_list, columns=output_column_names)
-    output_df.to_csv(base_path / "output_df.csv", index=False)
-    end = datetime.datetime.now()
-    print(end - start)
+        output_column_names = ["sec_until_4pm", "best_yes_bid", "best_yes_ask"]
+        output_df = pd.DataFrame(bbo_vec_list, columns=output_column_names)
+        output_df.to_csv(base_path / "output_df.csv", index=False)
+        end = datetime.datetime.now()
+        print("    ", ticker)
+        print("    ", end - start)
+
+
+def output_vectors_to_csv():
+    dates = [
+        datetime.date(2023, 12, 1),
+        datetime.date(2023, 12, 4),
+        datetime.date(2023, 12, 5),
+        datetime.date(2023, 12, 8),
+        datetime.date(2023, 11, 24),
+        datetime.date(2023, 11, 27),
+        datetime.date(2023, 11, 28),
+        datetime.date(2023, 11, 29),
+        datetime.date(2023, 11, 30),
+        datetime.date(2023, 10, 2),
+        datetime.date(2023, 10, 3),
+        datetime.date(2023, 10, 4),
+        datetime.date(2023, 10, 5),
+        datetime.date(2023, 10, 9),
+        datetime.date(2023, 10, 10),
+        datetime.date(2023, 10, 11),
+        datetime.date(2023, 10, 12),
+        datetime.date(2023, 10, 16),
+        datetime.date(2023, 10, 17),
+        datetime.date(2023, 10, 18),
+        datetime.date(2023, 10, 19),
+        datetime.date(2023, 10, 23),
+        datetime.date(2023, 10, 24),
+        datetime.date(2023, 9, 11),
+        datetime.date(2023, 9, 12),
+        datetime.date(2023, 9, 14),
+        datetime.date(2023, 9, 18),
+        datetime.date(2023, 9, 19),
+        datetime.date(2023, 9, 20),
+        datetime.date(2023, 9, 26),
+        datetime.date(2023, 9, 28),
+    ]
+    for date in dates:
+        try:
+            print("starting", date)
+            convert_from_cole_db_to_outputs(date)
+            print("done", date)
+        except Exception as e:
+            print(e)
