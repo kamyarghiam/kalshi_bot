@@ -45,16 +45,19 @@ def test_orderbook_to_input_vector():
             index = 99 + i
             assert almost_equal(vec[index], (((i * 3) / total_no_qty)))
 
+        for value in vec:
+            assert value != 0
+
 
 def test_orderbook_to_bbo_vector():
     ob = Orderbook(
         market_ticker=MarketTicker("testing"),
         yes=OrderbookSide(levels={Price(i): Quantity(i) for i in range(1, 20)}),
         no=OrderbookSide(levels={Price(i): Quantity(i) for i in range(1, 30)}),
-        ts=datetime.datetime(2020, 12, 15, 3, 50, 1),
+        ts=datetime.datetime(2020, 12, 15, 15, 59, 1),
     )
     vec = orderbook_to_bbo_vector(ob)
-    assert vec[0] == 1608022201
+    assert vec[0] == 59
     assert vec[1] == Price(19)
     assert vec[2] == Price(71)
 
@@ -63,9 +66,9 @@ def test_orderbook_to_bbo_vector():
         market_ticker=MarketTicker("testing"),
         yes=OrderbookSide(levels={}),
         no=OrderbookSide(levels={}),
-        ts=datetime.datetime(2020, 12, 15, 3, 51, 1),
+        ts=datetime.datetime(2020, 12, 15, 15, 59, 2),
     )
     vec = orderbook_to_bbo_vector(ob)
-    assert vec[0] == 1608022261
+    assert vec[0] == 58
     assert np.isnan(vec[1])
     assert np.isnan(vec[2])
