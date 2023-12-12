@@ -44,6 +44,7 @@ The size of the vector is always 1 + 99 + 99 = 199
 
 
 import datetime
+import time
 
 import numpy as np
 
@@ -71,6 +72,29 @@ def orderbook_to_input_vector(ob: Orderbook):
         assert value != 0
 
     return input_vector
+
+
+def orderbook_to_bbo_vector(ob: Orderbook) -> np.array:
+    """Converts orderbook into bbo for output values
+
+    This will later be used to compute the output values
+    of the ML model"""
+    # Consists of ts, best bid, and best ask
+    bbo_vector = np.zeros(3)
+    bbo_vector[0] = time.mktime(ob.ts.timetuple())
+
+    bbo = ob.get_bbo()
+    if bbo.bid:
+        bbo_vector[1] = bbo.bid.price
+    else:
+        bbo_vector[1] = np.nan
+
+    if bbo.ask:
+        bbo_vector[2] = bbo.ask.price
+    else:
+        bbo_vector[2] = np.nan
+
+    return bbo_vector
 
 
 def get_seconds_until_4pm(ts: datetime.datetime):

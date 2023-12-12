@@ -1,5 +1,6 @@
 import datetime
 
+import numpy as np
 from mock import patch
 
 from helpers.types.markets import MarketTicker
@@ -8,6 +9,7 @@ from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Quantity
 from strategy.research.orderbook_only.single_market_model import (
     get_seconds_until_4pm,
+    orderbook_to_bbo_vector,
     orderbook_to_input_vector,
 )
 from tests.utils import almost_equal
@@ -42,3 +44,28 @@ def test_orderbook_to_input_vector():
         for i in range(1, 100):
             index = 99 + i
             assert almost_equal(vec[index], (((i * 3) / total_no_qty)))
+
+
+def test_orderbook_to_bbo_vector():
+    ob = Orderbook(
+        market_ticker=MarketTicker("testing"),
+        yes=OrderbookSide(levels={Price(i): Quantity(i) for i in range(1, 20)}),
+        no=OrderbookSide(levels={Price(i): Quantity(i) for i in range(1, 30)}),
+        ts=datetime.datetime(2020, 12, 15, 3, 50, 1),
+    )
+    vec = orderbook_to_bbo_vector(ob)
+    assert vec[0] == 1608022201
+    assert vec[1] == Price(19)
+    assert vec[2] == Price(71)
+
+    # Test NaN
+    ob = Orderbook(
+        market_ticker=MarketTicker("testing"),
+        yes=OrderbookSide(levels={}),
+        no=OrderbookSide(levels={}),
+        ts=datetime.datetime(2020, 12, 15, 3, 51, 1),
+    )
+    vec = orderbook_to_bbo_vector(ob)
+    assert vec[0] == 1608022261
+    assert np.isnan(vec[1])
+    assert np.isnan(vec[2])
