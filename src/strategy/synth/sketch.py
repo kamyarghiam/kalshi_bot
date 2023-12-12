@@ -1,8 +1,14 @@
+import random
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Dict, Generator, Generic, List, TypeVar
 
 from strategy.features.derived.derived_feature import DerivedFeature, ObservedFeature
-from strategy.synth.utils import FeatureEvaluator, Synth, SynthAttemptMetadata
+from strategy.synth.utils import (
+    FeatureEvaluator,
+    FeatureSynth,
+    FeatureSynthAttemptMetadata,
+)
 from strategy.utils import HistoricalObservationSetCursor
 
 T = TypeVar("T")
@@ -26,7 +32,7 @@ class Domain(ABC, Generic[T]):
 D = TypeVar("D", bound=DerivedFeature)
 
 
-class SketchSynth(Synth):
+class SketchSynth(FeatureSynth):
     """
     IDEA: A derived feature is really a program that takes in features,
      and some hyperparameters and outputs more features.
@@ -48,6 +54,7 @@ class SketchSynth(Synth):
         fixed: Dict[str, Any],
         parameters: Dict[str, Domain],
         evaluator: FeatureEvaluator,
+        save_last_n: int = 128,
     ):
         """
         Takes in the CLASS of a derived feature, some fixed parameters,
@@ -58,6 +65,8 @@ class SketchSynth(Synth):
         self.fixed = fixed
         self.feature_class = feature_class
         self.evaluator = evaluator
+        self.save_last_n = save_last_n
+        self.last_n_parameters: List[Dict[str, Any]] = []
 
     def sample_new_parameters(self) -> Dict[str, Any]:
         new_params = {k: d.sample() for k, d in self.parameters.items()}
@@ -66,12 +75,18 @@ class SketchSynth(Synth):
 
     def synthesize(
         self, base_features: List[ObservedFeature], goal_feature_name: str
-    ) -> Generator[SynthAttemptMetadata, None, None]:
+    ) -> Generator[FeatureSynthAttemptMetadata, None, None]:
         base_hist = HistoricalObservationSetCursor.from_observation_streams(
             [f.cursor for f in base_features]
         )
         while True:
-            derived_feature = self.feature_class(**self.sample_new_parameters())
+            new_params = self.sample_new_parameters()
+            if new_params in self.last_n_parameters:
+                continue
+            self.last_n_parameters.append(new_params)
+            if len(self.last_n_parameters) > self.save_last_n:
+                self.last_n_parameters.pop(0)
+            derived_feature = self.feature_class(**new_params)
             base_hist.precalculate_derived_features(derived_features=[derived_feature])
             # Go through each feature this thing makes and check if it works.
             for feat_name in derived_feature.output_feat_names:
@@ -80,8 +95,20 @@ class SketchSynth(Synth):
                     goal_feature_name=goal_feature_name,
                     predicted_feature_name=feat_name,
                 )
-                yield SynthAttemptMetadata(
+                yield FeatureSynthAttemptMetadata(
                     score=score,
                     goal_feature_name=goal_feature_name,
                     predicted_feature_name=feat_name,
                 )
+
+
+@dataclass
+class IntegerRangeDomain(Domain[int]):
+    low: int
+    high: int
+
+    def sample(self) -> int:
+        return random.randint(self.low, self.high)
+
+    def __contains__(self, other: int):
+        return self.low <= other and other < self.high

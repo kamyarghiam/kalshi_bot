@@ -10,10 +10,6 @@ from strategy.utils import ObservationCursor, ObservationSet
 @dataclass
 class ObservedFeature:
     cursor: ObservationCursor
-    name: str
-
-    def feature_name(self) -> List[str]:
-        return [self.name]
 
     def get_derived_dependents(
         self, recursive: bool = False, inclusive: bool = False

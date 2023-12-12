@@ -47,28 +47,28 @@ class FeatureEvaluator(ABC):
 
 
 class PercentWrongEvaluator(FeatureEvaluator):
-    @abstractmethod
     def _evaluate(self, goal_feature: pd.Series, predicted_feature: pd.Series) -> float:
         matches = goal_feature.eq(predicted_feature)
-        return float(matches.value_counts()[False]) / float(len(goal_feature))
+        value_counts = matches.value_counts()
+        num_wrong = value_counts.get(False, 0)
+        return float(num_wrong) / float(len(goal_feature))
 
 
 class MSEEvaluator(FeatureEvaluator):
-    @abstractmethod
     def _evaluate(self, goal_feature: pd.Series, predicted_feature: pd.Series) -> float:
         errs = goal_feature.sub(predicted_feature).to_numpy()
         return errs.dot(errs) / len(goal_feature)
 
 
-class SynthAttemptMetadata(BaseModel):
+class FeatureSynthAttemptMetadata(BaseModel):
     score: float
     goal_feature_name: str
     predicted_feature_name: str
 
 
-class Synth(ABC):
+class FeatureSynth(ABC):
     @abstractmethod
     def synthesize(
         self, base_features: List[ObservedFeature], goal_feature_name: str
-    ) -> Generator[SynthAttemptMetadata, None, None]:
+    ) -> Generator[FeatureSynthAttemptMetadata, None, None]:
         pass
