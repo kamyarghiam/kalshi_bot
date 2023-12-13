@@ -44,6 +44,8 @@ The size of the vector is always 1 + 99 + 99 = 199
 
 
 import datetime
+import os
+import time
 
 import numpy as np
 import pandas as pd
@@ -118,39 +120,39 @@ def convert_from_cole_db_to_outputs(
     markets = daily_spy_range_kalshi_markets(date_to_read)
     for market in markets:
         ticker = market.ticker
-        input_array_list = []
+        # input_array_list = []
         bbo_vec_list = []
         for ob in db.read(
             ticker,
             datetime.datetime.combine(date_to_read, market_open),
             datetime.datetime.combine(date_to_read, market_close),
         ):
-            vec = orderbook_to_input_vector(ob)
-            input_array_list.append(vec)
+            # vec = orderbook_to_input_vector(ob)
+            # input_array_list.append(vec)
             bbo_vec_list.append(orderbook_to_bbo_vector(ob))
 
-        input_column_names = (
-            ["sec_until_4pm"]
-            + [f"yes_bid_{i}" for i in range(1, 100)]
-            + [f"no_bid_{i}" for i in range(1, 100)]
-        )
-        assert len(input_column_names) == 199
+        # input_column_names = (
+        #     ["sec_until_4pm"]
+        #     + [f"yes_bid_{i}" for i in range(1, 100)]
+        #     + [f"no_bid_{i}" for i in range(1, 100)]
+        # )
+        # assert len(input_column_names) == 199
 
         base_path = LOCAL_STORAGE_FOLDER / f"research/single_market_model/{ticker}"
         if not base_path.exists():
             base_path.mkdir()
-        input_df = pd.DataFrame(input_array_list, columns=input_column_names)
-        input_df.to_csv(base_path / "input_vec.csv", index=False)
+        # input_df = pd.DataFrame(input_array_list, columns=input_column_names)
+        # input_df.to_csv(base_path / "input_vec.csv", index=False)
 
         output_column_names = ["sec_until_4pm", "best_yes_bid", "best_yes_ask"]
         output_df = pd.DataFrame(bbo_vec_list, columns=output_column_names)
-        output_df.to_csv(base_path / "output_df.csv", index=False)
+        output_df.to_csv(base_path / "bbo_vec.csv", index=False)
         end = datetime.datetime.now()
         print("    ", ticker)
         print("    ", end - start)
 
 
-def output_vectors_to_csv():
+def vectors_to_csv():
     dates = [
         datetime.date(2023, 12, 1),
         datetime.date(2023, 12, 4),
@@ -191,3 +193,70 @@ def output_vectors_to_csv():
             print("done", date)
         except Exception as e:
             print(e)
+
+
+def bbo_vec_to_output_vec():
+    base_path = LOCAL_STORAGE_FOLDER / "research/single_market_model/"
+    tickers = os.listdir(base_path)
+
+    # TODO: remove
+    tickers = [tickers[0]]
+    for ticker in tickers:
+        print(f"{ticker}")
+        start = time.time()
+        file_path = (base_path / ticker) / "bbo_vec.csv"
+        output_fp = (base_path / ticker) / "output_vec.csv"
+        df = pd.read_csv(file_path)
+        # Loop backward and record last ask, bid, ask_time_change, bid_time_change
+        # If there's a change between a future bid or ask, record the price differential
+        # and the time differential for both the bid and the ask
+
+        # TODO: filter our nans and outliers
+
+        # sec_until_4pm,best_yes_bid,best_yes_ask
+        last_bid = df.iloc[-1].best_yes_bid
+        last_bid_time = df.iloc[-1].sec_until_4pm
+        last_ask = df.iloc[-1].best_yes_ask
+        last_ask_time = df.iloc[-1].sec_until_4pm
+
+        output_vecs = []
+        for index in range(len(df) - 1, -1, -1):
+            # Only fill if times not equal, backfills beginning
+            row = df.iloc[index]
+
+            if (
+                last_bid_time != df.iloc[-1].sec_until_4pm
+                and last_ask_time != df.iloc[-1].sec_until_4pm
+            ):
+                vec = [
+                    last_bid - row.best_yes_bid,
+                    row.sec_until_4pm - last_bid_time,
+                    last_ask - row.best_yes_ask,
+                    row.sec_until_4pm - last_ask_time,
+                ]
+            else:
+                vec = [np.nan, np.nan, np.nan, np.nan]
+
+            output_vecs.append(vec)
+
+            if row.best_yes_bid != last_bid:
+                last_bid = row.best_yes_bid
+                last_bid_time = row.sec_until_4pm
+            if row.best_yes_ask != last_ask:
+                last_ask = row.best_yes_ask
+                last_ask_time = row.sec_until_4pm
+
+        output_df = pd.DataFrame(
+            output_vecs[::-1],
+            columns=["bid", "bid_time", "ask", "ask_time"],
+        )
+
+        output_df.to_csv(output_fp, index=False)
+
+        end = time.time()
+        print(end - start)
+        # TODO: run this one day and compare outputs to see if valid
+        break
+
+
+bbo_vec_to_output_vec()
