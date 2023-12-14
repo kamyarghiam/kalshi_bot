@@ -51,7 +51,9 @@ import numpy as np
 import pandas as pd
 
 from data.coledb.coledb import ColeDBInterface
+from exchange.interface import ExchangeInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
+from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.orderbook import Orderbook
 from strategy.features.base.kalshi import daily_spy_range_kalshi_markets
 
@@ -195,7 +197,7 @@ def vectors_to_csv():
             print(e)
 
 
-def bbo_vec_to_output_vec():
+def bbo_vec_to_output_vec(e: ExchangeInterface):
     base_path = LOCAL_STORAGE_FOLDER / "research/single_market_model/"
     tickers = os.listdir(base_path)
 
@@ -213,38 +215,52 @@ def bbo_vec_to_output_vec():
 
         # TODO: filter our nans and outliers
 
-        # sec_until_4pm,best_yes_bid,best_yes_ask
-        last_bid = df.iloc[-1].best_yes_bid
-        last_bid_time = df.iloc[-1].sec_until_4pm
-        last_ask = df.iloc[-1].best_yes_ask
-        last_ask_time = df.iloc[-1].sec_until_4pm
+        # We use the settlement info to determine the last price
+        m = e.get_market(MarketTicker(ticker))
 
+        if m.result == MarketResult.NOT_DETERMINED:
+            print(f"ERROR: {ticker} not determined")
+            continue
+
+        # This is what we set the result to until we hit a boundary
+        if m.result == MarketResult.YES:
+            prev_section_bid = 100
+            prev_section_ask = 100
+        else:
+            prev_section_bid = 0
+            prev_section_ask = 0
+        prev_section_bid_time = 0
+        prev_section_ask_time = 0
+
+        # THese represent the value of the current section
+        current_bid = df.iloc[-1].best_yes_bid
+        current_ask = df.iloc[-1].best_yes_ask
+        last_time = df.iloc[-1].sec_until_4pm
+
+        # sec_until_4pm,best_yes_bid,best_yes_ask
         output_vecs = []
         for index in range(len(df) - 1, -1, -1):
             # Only fill if times not equal, backfills beginning
             row = df.iloc[index]
 
-            if (
-                last_bid_time != df.iloc[-1].sec_until_4pm
-                and last_ask_time != df.iloc[-1].sec_until_4pm
-            ):
-                vec = [
-                    last_bid - row.best_yes_bid,
-                    row.sec_until_4pm - last_bid_time,
-                    last_ask - row.best_yes_ask,
-                    row.sec_until_4pm - last_ask_time,
-                ]
-            else:
-                vec = [np.nan, np.nan, np.nan, np.nan]
+            if (not np.isnan(row.best_yes_bid)) and row.best_yes_bid != current_bid:
+                prev_section_bid = current_bid
+                prev_section_bid_time = last_time
+                current_bid = row.best_yes_bid
+            if (not np.isnan(row.best_yes_ask)) and row.best_yes_ask != current_ask:
+                prev_section_ask = current_ask
+                prev_section_ask_time = last_time
+                current_ask = row.best_yes_ask
+
+            vec = [
+                prev_section_bid - row.best_yes_bid,
+                row.sec_until_4pm - prev_section_bid_time,
+                prev_section_ask - row.best_yes_ask,
+                row.sec_until_4pm - prev_section_ask_time,
+            ]
 
             output_vecs.append(vec)
-
-            if row.best_yes_bid != last_bid:
-                last_bid = row.best_yes_bid
-                last_bid_time = row.sec_until_4pm
-            if row.best_yes_ask != last_ask:
-                last_ask = row.best_yes_ask
-                last_ask_time = row.sec_until_4pm
+            last_time = row.sec_until_4pm
 
         output_df = pd.DataFrame(
             output_vecs[::-1],
@@ -259,4 +275,5 @@ def bbo_vec_to_output_vec():
         break
 
 
-bbo_vec_to_output_vec()
+# with ExchangeInterface(is_test_run=False) as e:
+#     bbo_vec_to_output_vec(e)
