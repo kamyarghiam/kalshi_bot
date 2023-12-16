@@ -162,7 +162,7 @@ def vectors_to_csv():
         datetime.date(2023, 12, 8),
         datetime.date(2023, 11, 24),
         datetime.date(2023, 11, 27),
-        datetime.date(2023, 11, 28),
+        # datetime.date(2023, 11, 28), edge case, not determined
         datetime.date(2023, 11, 29),
         datetime.date(2023, 11, 30),
         datetime.date(2023, 10, 2),
@@ -203,8 +203,6 @@ def bbo_vec_to_output_vec(
 ):
     tickers = os.listdir(base_path)
 
-    # TODO: remove
-    tickers = [tickers[0]]
     for ticker in tickers:
         print(f"{ticker}")
         start = time.time()
@@ -215,12 +213,20 @@ def bbo_vec_to_output_vec(
         # If there's a change between a future bid or ask, record the price differential
         # and the time differential for both the bid and the ask
 
-        # TODO: filter our nans and outliers
+        # TODO: filter our nans and outliers when doing analysis
+        # TODO: also handle gapped markets
 
         # We use the settlement info to determine the last price
         m = e.get_market(MarketTicker(ticker))
 
         if m.result == MarketResult.NOT_DETERMINED:
+            # There is an edge case where Nov28 was not determined properly
+            # So we determined it manually ourselves based on result on website
+            if m.ticker.startswith("INXD-23NOV28"):
+                if m.ticker == "INXD-23NOV28-B4562":
+                    m.result = MarketResult.YES
+                else:
+                    m.result = MarketResult.NO
             print(f"ERROR: {ticker} not determined")
             continue
 
@@ -234,6 +240,13 @@ def bbo_vec_to_output_vec(
         prev_section_bid_time = 0
         prev_section_ask_time = 0
 
+        if len(df) == 0:
+            output_df = pd.DataFrame(
+                [],
+                columns=["bid", "bid_time", "ask", "ask_time"],
+            )
+            output_df.to_csv(output_fp, index=False)
+            continue
         # THese represent the value of the current section
         current_bid = df.iloc[-1].best_yes_bid
         current_ask = df.iloc[-1].best_yes_ask
@@ -272,13 +285,10 @@ def bbo_vec_to_output_vec(
             output_vecs[::-1],
             columns=["bid", "bid_time", "ask", "ask_time"],
         )
-
         output_df.to_csv(output_fp, index=False)
 
         end = time.time()
         print(end - start)
-        # TODO: run this one day and compare outputs to see if valid
-        break
 
 
 # with ExchangeInterface(is_test_run=False) as e:
