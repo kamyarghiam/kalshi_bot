@@ -12,8 +12,8 @@ def test_get_unrealized_pnl(exchange_interface: ExchangeInterface):
     if pytest.is_functional:
         pytest.skip("Hard to test with actual exchange")
 
-    determined_ticker = MarketTicker("UNREALIZED-PNL-DETERMINED")
-    not_determined_ticker = MarketTicker("UNREALIZED-PNL-NOT-DETERMINED")
+    determined_ticker = MarketTicker("DETERMINED-YES")
+    not_determined_ticker = MarketTicker("NOT-DETERMINED")
 
     portfolio = PortfolioHistory(Balance(Cents(5000)))
 

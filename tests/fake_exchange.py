@@ -158,14 +158,19 @@ def kalshi_test_exchange_factory():
 
     @router.get(MARKETS_URL + "/{ticker}")
     def get_market(ticker: MarketTicker):
-        if ticker == MarketTicker("UNREALIZED-PNL-DETERMINED"):
-            # For unrealized pnl test
+        if ticker == MarketTicker("DETERMINED-YES"):
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,
                 result=MarketResult.YES,
             )
-        elif ticker == MarketTicker("UNREALIZED-PNL-NOT-DETERMINED"):
+        elif ticker == MarketTicker("DETERMINED-NO"):
+            market = Market(
+                status=MarketStatus.OPEN,
+                ticker=ticker,
+                result=MarketResult.NO,
+            )
+        elif ticker == MarketTicker("NOT-DETERMINED"):
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,

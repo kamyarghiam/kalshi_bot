@@ -197,8 +197,10 @@ def vectors_to_csv():
             print(e)
 
 
-def bbo_vec_to_output_vec(e: ExchangeInterface):
-    base_path = LOCAL_STORAGE_FOLDER / "research/single_market_model/"
+def bbo_vec_to_output_vec(
+    e: ExchangeInterface,
+    base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/",
+):
     tickers = os.listdir(base_path)
 
     # TODO: remove
@@ -235,7 +237,8 @@ def bbo_vec_to_output_vec(e: ExchangeInterface):
         # THese represent the value of the current section
         current_bid = df.iloc[-1].best_yes_bid
         current_ask = df.iloc[-1].best_yes_ask
-        last_time = df.iloc[-1].sec_until_4pm
+        last_bid_time = df.iloc[-1].sec_until_4pm
+        last_ask_time = df.iloc[-1].sec_until_4pm
 
         # sec_until_4pm,best_yes_bid,best_yes_ask
         output_vecs = []
@@ -243,14 +246,18 @@ def bbo_vec_to_output_vec(e: ExchangeInterface):
             # Only fill if times not equal, backfills beginning
             row = df.iloc[index]
 
-            if (not np.isnan(row.best_yes_bid)) and row.best_yes_bid != current_bid:
-                prev_section_bid = current_bid
-                prev_section_bid_time = last_time
-                current_bid = row.best_yes_bid
-            if (not np.isnan(row.best_yes_ask)) and row.best_yes_ask != current_ask:
-                prev_section_ask = current_ask
-                prev_section_ask_time = last_time
-                current_ask = row.best_yes_ask
+            if not np.isnan(row.best_yes_bid):
+                if row.best_yes_bid != current_bid:
+                    prev_section_bid = current_bid
+                    prev_section_bid_time = last_bid_time
+                    current_bid = row.best_yes_bid
+                last_bid_time = row.sec_until_4pm
+            if not np.isnan(row.best_yes_ask):
+                if row.best_yes_ask != current_ask:
+                    prev_section_ask = current_ask
+                    prev_section_ask_time = last_ask_time
+                    current_ask = row.best_yes_ask
+                last_ask_time = row.sec_until_4pm
 
             vec = [
                 prev_section_bid - row.best_yes_bid,
@@ -260,7 +267,6 @@ def bbo_vec_to_output_vec(e: ExchangeInterface):
             ]
 
             output_vecs.append(vec)
-            last_time = row.sec_until_4pm
 
         output_df = pd.DataFrame(
             output_vecs[::-1],
