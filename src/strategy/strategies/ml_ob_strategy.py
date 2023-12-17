@@ -80,7 +80,7 @@ class MLOrderbookStrategy(Strategy):
             if abs(ask_change) > 1:
                 print(ask_predict)
 
-            # TODO: finish :( doesn't work
+            # TODO: set the limit lower, kinda works
 
         return Signal.NONE
 
