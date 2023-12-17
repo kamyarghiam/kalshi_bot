@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, Iterable, List
 
+import joblib  # Added for saving scaler
 import pandas as pd
 from tensorflow.keras.models import load_model
 
@@ -47,6 +48,8 @@ class MLOrderbookStrategy(Strategy):
         self.base_path = LOCAL_STORAGE_FOLDER / "research/single_market_model/"
         self.loaded_bid_model = load_model(self.base_path / (self.bid_model_name))
         self.loaded_ask_model = load_model(self.base_path / (self.ask_model_name))
+        self.bid_scaler = joblib.load(self.base_path / "bid-scaler.pkl")
+        self.ask_scaler = joblib.load(self.base_path / "ask-scaler.pkl")
         # Cool down between buys
         self.cool_down = timedelta(minutes=5)
         super().__init__()
@@ -58,9 +61,16 @@ class MLOrderbookStrategy(Strategy):
             input_vec = orderbook_to_input_vector(ob)
             df = pd.DataFrame([input_vec])
             df.fillna(0, inplace=True)
-            reshaped = df.values.reshape(df.shape[0], 1, df.shape[1])
-            bid_predict = self.loaded_bid_model.predict(reshaped, verbose=0)[0]
-            ask_predict = self.loaded_ask_model.predict(reshaped, verbose=0)[0]
+            scaled_bid = self.bid_scaler.transform(df)
+            reshaped_bid = scaled_bid.reshape(
+                scaled_bid.shape[0], 1, scaled_bid.shape[1]
+            )
+            scaled_ask = self.ask_scaler.transform(df)
+            reshaped_ask = scaled_ask.reshape(
+                scaled_ask.shape[0], 1, scaled_ask.shape[1]
+            )
+            bid_predict = self.loaded_bid_model.predict(reshaped_bid, verbose=0)[0]
+            ask_predict = self.loaded_ask_model.predict(reshaped_ask, verbose=0)[0]
 
             bid_change = bid_predict[0]
             ask_change = ask_predict[0]

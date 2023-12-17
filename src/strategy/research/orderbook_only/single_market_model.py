@@ -48,9 +48,11 @@ import os
 import random
 import time
 
+import joblib  # Added for saving scaler
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.layers import LSTM, Dense
 from tensorflow.keras.models import Sequential, load_model
 
@@ -449,23 +451,33 @@ def train_models(base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/
         X_train, X_test, y_train, y_test = train_test_split(
             features, targets, test_size=0.2, random_state=42
         )
+        # Normalize data
+        scaler = MinMaxScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
+        joblib.dump(scaler, base_path / f"{model_name[i]}-scaler.pkl")
+
         # Reshape the data to be suitable for LSTM input
         # (3D tensor with shape [samples, time steps, features])
         # TODO: go back to this --> really understand what's going on here
-        X_train = X_train.values.reshape(X_train.shape[0], 1, X_train.shape[1])
-        X_test = X_test.values.reshape(X_test.shape[0], 1, X_test.shape[1])
+        X_train = X_train.reshape(X_train.shape[0], 1, X_train.shape[1])
+        X_test = X_test.reshape(X_test.shape[0], 1, X_test.shape[1])
 
         # Build the LSTM model
         model = Sequential()
-        model.add(LSTM(50, input_shape=(X_train.shape[1], X_train.shape[2])))
-        model.add(Dense(2))  # 4 output nodes for the four target variables
+        model.add(
+            LSTM(
+                50, activation="relu", input_shape=(X_train.shape[1], X_train.shape[2])
+            )
+        )
+        model.add(Dense(2, activation="linear"))
         model.compile(
             optimizer="adam", loss="mse"
         )  # Use mean squared error as the loss function
 
         # Train the model
         model.fit(
-            X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test)
+            X_train, y_train, epochs=5, batch_size=32, validation_data=(X_test, y_test)
         )
 
         # Evaluate the model on the test set
@@ -479,14 +491,16 @@ def predict(base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/"):
     model_name = "prediction_model_ask.h5"
     # assert False, "change the model name"
     loaded_model = load_model(base_path / (model_name))
+    scaler = joblib.load(base_path / "ask-scaler.pkl")
 
     df = pd.read_csv((base_path / "INXD-23SEP14-B4437") / "input_vec.csv")
     # NOTE: you need to replace the nans with zeros in the input data
     df.fillna(0, inplace=True)
-    reshaped = df.values.reshape(df.shape[0], 1, df.shape[1])
+    scaled = scaler.transform(df)
+    reshaped = scaled.reshape(scaled.shape[0], 1, scaled.shape[1])
 
     # Now, you can use the loaded_model for predictions on new data
     # For example, assuming new_features_reshaped is your new
     # data in the appropriate format
     predictions = loaded_model.predict(reshaped)
-    print("Predictions:", predictions[0])
+    print("Predictions:", predictions)
