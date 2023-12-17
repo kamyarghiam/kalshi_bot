@@ -13,7 +13,7 @@ def test_bbo_vec_to_output_vec(
     tmp_path: Path,
 ):
     ticker = MarketTicker("DETERMINED-YES")
-    sample_output_csv = pd.DataFrame(
+    sample_bbo_vec_csv = pd.DataFrame(
         {
             "sec_until_4pm": [99, 50, 25, 20, 5],
             "best_yes_bid": [10, 2, np.nan, 95, 95],
@@ -22,7 +22,7 @@ def test_bbo_vec_to_output_vec(
     )
     folder = tmp_path / ticker
     folder.mkdir()
-    sample_output_csv.to_csv(folder / "bbo_vec.csv")
+    sample_bbo_vec_csv.to_csv(folder / "bbo_vec.csv")
     bbo_vec_to_output_vec(exchange_interface, base_path=tmp_path)
     output_path = folder / "output_vec.csv"
     assert output_path.exists()
