@@ -476,8 +476,8 @@ def train_models(base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/
 
 def predict(base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/"):
     # Load the saved model
-    model_name = "prediction_model_test.h5"
-    assert False, "change the model name"
+    model_name = "prediction_model_ask.h5"
+    # assert False, "change the model name"
     loaded_model = load_model(base_path / (model_name))
 
     df = pd.read_csv((base_path / "INXD-23SEP14-B4437") / "input_vec.csv")
