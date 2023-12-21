@@ -28,7 +28,6 @@ class SPYThetaDecay(Strategy):
     def __init__(
         self,
         kalshi_spy_markets: List[SPYRangedKalshiMarket],
-        current_market_ticker: MarketTicker | None = None,
         max_contracts_per_trade: Quantity = Quantity(20),
         max_exposure: Cents = Cents(10000),
     ):
@@ -49,11 +48,8 @@ class SPYThetaDecay(Strategy):
             list of market tickers that should have a one on one correspondence
             with the market_lower_thresholds (the indices should line up the correct
             market from the other list)
-        current_market_ticker:
-            specify this if you only want to place orders on this market
         """
         # The market ticker we're currently analyzing
-        self.current_market_ticker = current_market_ticker
         self.markets: List[SPYRangedKalshiMarket] = kalshi_spy_markets
         self.market_lower_thresholds = [
             Cents(0) if m.spy_min is None else Cents(m.spy_min * 100)
@@ -81,24 +77,27 @@ class SPYThetaDecay(Strategy):
     def consume_next_step(
         self, update: ObservationSet, portfolio: PortfolioHistory
     ) -> Iterable[Order]:
-        # We only want to start working when the ES updates catch up to OB updates
-        # TODO: potential issue is if there's a late OB update on a market
-        # other issue is it resolves is that we only trigger on ES updates
-        if update.series[spy_price_feature_ts_name()] != update.latest_ts:
-            return []
-        # Skip messages before 9:30 am
-        if update.latest_ts.hour < 9 or (
-            update.latest_ts.hour == 9 and update.latest_ts.minute < 30
-        ):
-            return []
         curr_spy_price: Cents = update.series[spy_price_feature_name()] // 1000000
         market_ticker = self.get_market_from_stock_price(curr_spy_price)
-        if self.current_market_ticker and market_ticker != self.current_market_ticker:
-            return []
         # Orderbook of the market ticker that the price falls into
         ob: Orderbook = update.series[
             kalshi_orderbook_feature_name(ticker=market_ticker)
         ]
+
+        # Skip messages before 9:30 am or after 4pm
+        if (
+            update.latest_ts.hour < 9
+            or (update.latest_ts.hour == 9 and update.latest_ts.minute < 30)
+            or (update.latest_ts.hour > 16)
+        ):
+            return []
+
+        # We only want to start working when the ES updates catch up to OB updates
+        # Other thing this resolves is that we only trigger on ES update
+        # One potential issue is if there's a late OB update on a market
+        if update.series[spy_price_feature_ts_name()] != update.latest_ts:
+            ################## Sell #####################
+            return self.get_potential_sell_order(portfolio, update)
 
         ################# Buy ########################
         if self.last_market_ticker != market_ticker:
@@ -125,25 +124,37 @@ class SPYThetaDecay(Strategy):
                 self.last_orders[order.ticker] = order
                 return [order]
         ################## Sell #####################
-        # TODO: if we move out of a bucket, and we're still holding a position
-        # from a previous bucket, we should manage that and eventually sell?
-        elif market_ticker in portfolio.positions:
+        else:
             # We are in the same bucket as before and bought an order here.
             # And we're holding a position in this bucket. Try to sell
-            order = ob.sell_order(Side.YES)
-            if order:
-                order.quantity = min(
-                    portfolio.positions[market_ticker].total_quantity,
-                    order.quantity,
-                )
-                pnl, fees = portfolio.potential_pnl(order)
-                if pnl - fees > 0:
-                    # TODO: PROBLEM HERE WITH UPDATING STATE
-                    # We don't know if the order actually went
-                    # through, so my state may be incorrect
-                    order.time_placed = update.latest_ts
-                    return [order]
+            return self.get_potential_sell_order(portfolio, update)
 
+        return []
+
+    def get_potential_sell_order(
+        self,
+        portfolio: PortfolioHistory,
+        update: ObservationSet,
+    ):
+        for market in self.markets:
+            market_ticker = market.ticker
+            ob: Orderbook = update.series[
+                kalshi_orderbook_feature_name(ticker=market_ticker)
+            ]
+            if market_ticker in portfolio.positions:
+                order = ob.sell_order(Side.YES)
+                if order:
+                    order.quantity = min(
+                        portfolio.positions[market_ticker].total_quantity,
+                        order.quantity,
+                    )
+                    pnl, fees = portfolio.potential_pnl(order)
+                    if pnl - fees > 10:
+                        # TODO: PROBLEM HERE WITH UPDATING STATE
+                        # We don't know if the order actually went
+                        # through, so my state may be incorrect
+                        order.time_placed = update.latest_ts
+                        return [order]
         return []
 
     def get_market_from_stock_price(self, stock_price: Cents):

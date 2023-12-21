@@ -43,7 +43,7 @@ class BlindOrderSim(StrategySimulator):
                     )
                 portfolio_history.place_order(order)
                 last_order_ts = order.time_placed
-            if count % 1000 == 0:
+            if count % 100000 == 0:
                 print("WROTE TO LOGS")
                 log.write_text(str(portfolio_history))
         return portfolio_history

@@ -1,7 +1,6 @@
 import datetime
 from typing import List
 
-from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.money import Balance, Cents
@@ -16,7 +15,6 @@ from strategy.features.base.spy import (
     hist_spy_local_path,
     sync_to_local,
 )
-from strategy.sim.sim_types.active_ioc import ActiveIOCStrategySimulator
 from strategy.sim.sim_types.blind import BlindOrderSim
 from strategy.strategies.spy_theta_decay import SPYThetaDecay
 from strategy.utils import HistoricalObservationSetCursor, duplicate_time_pick_latest
@@ -57,42 +55,13 @@ def compute_historical_features(
     return historical_features
 
 
-def run_spy_theta_decay_strat_with_active_ioc_simulator():
-    date = datetime.date(year=2023, month=9, day=14)
-    day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
-    day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
-
-    kalshi_spy_markets = daily_spy_range_kalshi_markets(date=date)
-    historical_features: HistoricalObservationSetCursor = compute_historical_features(
-        date, kalshi_spy_markets, day_start, day_end, reload=False
-    )
-    for m in kalshi_spy_markets:
-        print(m.ticker)
-        strategy = SPYThetaDecay(kalshi_spy_markets, m.ticker)
-        historical_features.precalculate_strategy_features(strategy=strategy)
-        kalshi_orderbook_updates = ColeDBInterface().read_cursor(
-            ticker=m.ticker, start_ts=day_start, end_ts=day_end
-        )
-        sim = ActiveIOCStrategySimulator(
-            m.ticker,
-            kalshi_orderbook_updates=kalshi_orderbook_updates,
-            historical_data=historical_features,
-            # TODO: eventually we don't want to ignore these
-            ignore_price=True,
-            ignore_qty=True,
-            pretty=True,
-        )
-        result = sim.run(strategy=strategy)
-        print(result)
-
-
 def run_spy_theta_decay_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
     # dates = [
     #     datetime.date(year=2023, month=10, day=i)
     #     for i in [2, 3, 4, 5, 9, 10, 11, 12, 16, 17, 18, 19]
     # ]
-    dates = [datetime.date(year=2023, month=11, day=27)]
+    dates = [datetime.date(year=2023, month=10, day=2)]
     for date in dates:
         day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
         day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
