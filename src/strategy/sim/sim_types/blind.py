@@ -1,4 +1,5 @@
 import datetime
+from pathlib import Path
 
 import tqdm
 
@@ -29,7 +30,10 @@ class BlindOrderSim(StrategySimulator):
         # First, run the strategy from start to end to get all the orders it places.
         hist_iter = tqdm.tqdm(self.hist, desc="Running sim")
         last_order_ts: datetime.datetime | None = None
+        count = 0
+        log = Path("logs.txt")
         for update in hist_iter:
+            count += 1
             orders_requested = strategy.consume_next_step(update, portfolio_history)
             for order in orders_requested:
                 if last_order_ts and order.time_placed < last_order_ts:
@@ -39,4 +43,7 @@ class BlindOrderSim(StrategySimulator):
                     )
                 portfolio_history.place_order(order)
                 last_order_ts = order.time_placed
+            if count % 1000 == 0:
+                print("WROTE TO LOGS")
+                log.write_text(str(portfolio_history))
         return portfolio_history

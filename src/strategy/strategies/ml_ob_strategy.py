@@ -50,6 +50,7 @@ class MLOrderbookStrategy(Strategy):
         self.loaded_ask_model = load_model(self.base_path / (self.ask_model_name))
         self.bid_scaler = joblib.load(self.base_path / "bid-scaler.pkl")
         self.ask_scaler = joblib.load(self.base_path / "ask-scaler.pkl")
+
         # Cool down between buys
         self.cool_down = timedelta(minutes=5)
         super().__init__()
@@ -73,14 +74,19 @@ class MLOrderbookStrategy(Strategy):
             ask_predict = self.loaded_ask_model.predict(reshaped_ask, verbose=0)[0]
 
             bid_change = bid_predict[0]
+            bid_time_until = bid_predict[1]
             ask_change = ask_predict[0]
+            ask_time_until = ask_predict[1]
 
-            if abs(bid_change) > 1:
-                print(bid_predict)
-            if abs(ask_change) > 1:
-                print(ask_predict)
+            if (ask_change > 0.30 and ask_time_until < 60) or (
+                bid_change > 0.30 and bid_time_until < 60
+            ):
+                return Signal.BUY
 
-            # TODO: set the limit lower, kinda works
+            if (ask_change < 0 and ask_time_until < 60) or (
+                bid_change < 0 and bid_time_until < 60
+            ):
+                return Signal.SELL
 
         return Signal.NONE
 
@@ -94,34 +100,60 @@ class MLOrderbookStrategy(Strategy):
             return []
 
         orders: List[Order] = []
-        for ticker in self.tickers:
-            ob: Orderbook = update.series[kalshi_orderbook_feature_name(ticker=ticker)]
+        ticker = ""
+        for inner_ticker in self.tickers:
+            if (
+                update.latest_ts
+                == update.series[
+                    kalshi_orderbook_feature_name(ticker=inner_ticker) + "__observed_ts"
+                ]
+            ):
+                ticker = inner_ticker
+                break
+        else:
+            assert False, "could not find ticker"
+        last_order_ts: datetime | None = self.last_order_ts[ticker]
+        if last_order_ts and (last_order_ts + self.cool_down) > update.latest_ts:
+            return []
+        order_to_place: Order | None = None
+        ob: Orderbook = update.series[kalshi_orderbook_feature_name(ticker=ticker)]
+        if ticker in portfolio.positions:
+            if portfolio.positions[ticker].side == Side.YES:
+                order = ob.sell_order(side=Side.YES)
+                if order:
+                    order.quantity = min(
+                        portfolio.positions[ticker].total_quantity,
+                        order.quantity,
+                    )
+                    pnl, fees = portfolio.potential_pnl(order)
+                    if pnl - fees > 100:
+                        order_to_place = order
+            else:
+                order = ob.sell_order(side=Side.NO)
+                if order:
+                    order.quantity = Quantity(
+                        min(
+                            portfolio.positions[ticker].total_quantity,
+                            order.quantity,
+                        )
+                    )
+                    pnl, fees = portfolio.potential_pnl(order)
+                    if pnl - fees > 100:
+                        order_to_place = order
+        else:
             signal = self.get_signal(ob)
             # Bake in a cooldown so we don't double dip
             if self.last_signal[ticker] == signal:
-                continue
+                return []
             self.last_signal[ticker] = signal
-            order_to_place: Order | None = None
             match signal:
                 case Signal.BUY:
                     # Check that we're holding this market ticker
                     # on NO side and then sell
-                    if (
+                    if not (
                         ticker in portfolio.positions
                         and portfolio.positions[ticker].side == Side.NO
                     ):
-                        order = ob.sell_order(side=Side.NO)
-                        if order:
-                            order.quantity = Quantity(
-                                min(
-                                    portfolio.positions[ticker].total_quantity,
-                                    order.quantity,
-                                )
-                            )
-                            pnl, fees = portfolio.potential_pnl(order)
-                            if pnl - fees > 0:
-                                order_to_place = order
-                    else:
                         # Buy some Yes's
                         order = ob.buy_order(side=Side.YES)
                         if order:
@@ -131,20 +163,10 @@ class MLOrderbookStrategy(Strategy):
                             if portfolio.can_afford(order):
                                 order_to_place = order
                 case Signal.SELL:
-                    if (
+                    if not (
                         ticker in portfolio.positions
                         and portfolio.positions[ticker].side == Side.YES
                     ):
-                        order = ob.sell_order(side=Side.YES)
-                        if order:
-                            order.quantity = min(
-                                portfolio.positions[ticker].total_quantity,
-                                order.quantity,
-                            )
-                            pnl, fees = portfolio.potential_pnl(order)
-                            if pnl - fees > 0:
-                                order_to_place = order
-                    else:
                         # Buy some No's
                         order = ob.buy_order(side=Side.NO)
                         if order:
@@ -155,18 +177,19 @@ class MLOrderbookStrategy(Strategy):
                                 order_to_place = order
 
                 case Signal.NONE:
-                    # Do nothing
+                    # do nothing
                     pass
-            if order_to_place:
-                if order_to_place.trade == TradeType.BUY:
-                    last_order_ts: datetime | None = self.last_order_ts[ticker]
-                    if (
-                        last_order_ts
-                        and (last_order_ts + self.cool_down) > update.latest_ts
-                    ):
-                        continue
-                    self.last_order_ts[ticker] = update.latest_ts
-                order_to_place.time_placed = update.latest_ts
-                orders.append(order_to_place)
+
+        if order_to_place:
+            if order_to_place.trade == TradeType.BUY:
+                last_order_ts = self.last_order_ts[ticker]
+                if (
+                    last_order_ts
+                    and (last_order_ts + self.cool_down) > update.latest_ts
+                ):
+                    return []
+                self.last_order_ts[ticker] = update.latest_ts
+            order_to_place.time_placed = update.latest_ts
+            orders.append(order_to_place)
 
         return orders

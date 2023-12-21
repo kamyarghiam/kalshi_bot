@@ -1,6 +1,8 @@
 import datetime
+import warnings
 from typing import List
 
+from exchange.interface import ExchangeInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.money import Balance, Cents
 from helpers.types.portfolio import PortfolioHistory
@@ -12,6 +14,8 @@ from strategy.features.base.kalshi import (
 from strategy.sim.sim_types.blind import BlindOrderSim
 from strategy.strategies.ml_ob_strategy import MLOrderbookStrategy
 from strategy.utils import HistoricalObservationSetCursor, duplicate_time_pick_latest
+
+warnings.filterwarnings("ignore")
 
 
 def compute_historical_features(
@@ -45,8 +49,8 @@ def compute_historical_features(
 
 def run_ml_ob_strat_with_blind_simulator():
     """Runs on blind simulator across several days"""
-    days = [27, 28, 29, 30]
-    dates = [datetime.date(year=2023, month=11, day=i) for i in days]
+    days = [30]
+    dates = [datetime.date(year=2023, month=8, day=i) for i in days]
     for date in dates:
         day_start = datetime.datetime.combine(date=date, time=datetime.time.min)
         day_end = datetime.datetime.combine(date=date, time=datetime.time.max)
@@ -63,9 +67,9 @@ def run_ml_ob_strat_with_blind_simulator():
         )
         result: PortfolioHistory = sim.run(strategy=strategy)
         print(result.as_str(True))
-        # if result.has_open_positions():
-        #     with ExchangeInterface(is_test_run=False) as e:
-        #         print("Unrealized pnl: ", result.get_unrealized_pnl(e))
+        if result.has_open_positions():
+            with ExchangeInterface(is_test_run=False) as e:
+                print("Unrealized pnl: ", result.get_unrealized_pnl(e))
         # for market in kalshi_spy_markets:
         #     print(f"Creating graph for {market.ticker}")
         #     result.pta_analysis_chart(market.ticker, day_start, day_end)
