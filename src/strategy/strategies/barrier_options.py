@@ -19,6 +19,9 @@ from strategy.utils import ObservationSet, Strategy
 
 
 class BarrierOptions(Strategy):
+    """The purpose of this strategy was to try modeling SPY markets using
+    a normal distribution. This strategy is retired since it didn't work lmao"""
+
     def __init__(
         self,
         kalshi_spy_market: SPYRangedKalshiMarket,
