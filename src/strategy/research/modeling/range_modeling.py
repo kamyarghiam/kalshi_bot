@@ -53,11 +53,46 @@ def binary_call_option_price(S, K, T, r, sigma, is_put=True):
     return option_price
 
 
-def double_no_touch_option_price(S, L, U, T, r, sigma):
-    """TODO: find a good range for T (maybe 0 to 2) and solve for sigma"""
+def double_no_touch_option_price(S: float, L: float, U: float, T: float, sigma: float):
+    """S = Current stock value
+    L = lower bound
+    U = upper bound
+    T = time left, should be between 0 and 2
+    S = Volatility, as a percentage
+    """
+    assert L < U
+    assert 0 < sigma < 1
+    if T == 0:
+        # Set it to some super small value
+        T = 0.00001
+    assert 0 < T and T < 2
+    # Risk free rate
+    r = 0.05
     if S < ((L + U) / 2):
         d1 = (math.log(S / L) + (r - 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
     else:
         d1 = (math.log(U / S) + (r - 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
     option_price = math.exp(-r * T) * (norm.cdf(d1))
     return option_price
+
+
+def compute_std_from_barrier_option(S: float, L: float, U: float, T: float, P: Price):
+    """
+    Given a price, computes the standard deviation
+    for the given option as a percentage
+
+    S = Current stock value
+    L = lower bound
+    U = upper bound
+    T = time left, should be between 0 and 2
+    P = price of the contract
+
+    NOTE: there is a small risk here. There are often multiple
+    solutions to a problem. You may have to constrain the range
+    to get the right solution
+    """
+    result = minimize_scalar(
+        lambda std: abs(double_no_touch_option_price(S, L, U, T, std) - P),
+        bounds=(0, 0.6),
+    )
+    return result.x
