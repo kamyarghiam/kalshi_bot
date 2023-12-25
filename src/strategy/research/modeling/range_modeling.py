@@ -65,7 +65,7 @@ def double_no_touch_option_price(S: float, L: float, U: float, T: float, sigma: 
     if T == 0:
         # Set it to some super small value
         T = 0.00001
-    assert 0 < T and T < 2
+    # assert 0 < T and T <= 2
     # Risk free rate
     r = 0.05
     if S < ((L + U) / 2):
@@ -93,6 +93,6 @@ def compute_std_from_barrier_option(S: float, L: float, U: float, T: float, P: P
     """
     result = minimize_scalar(
         lambda std: abs(double_no_touch_option_price(S, L, U, T, std) - P),
-        bounds=(0, 0.6),
+        bounds=(0, 1),
     )
     return result.x

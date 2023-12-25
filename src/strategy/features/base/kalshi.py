@@ -98,6 +98,10 @@ def kalshi_orderbook_feature_name(ticker: MarketTicker) -> str:
     return f"kalshi_orderbook_{ticker}"
 
 
+def kalshi_orderbook_ts_name(ticker: MarketTicker) -> str:
+    return f"kalshi_orderbook_{ticker}__observed_ts"
+
+
 def hist_kalshi_orderbook_feature(
     ticker: MarketTicker, start_ts: datetime.datetime, end_ts: datetime.datetime
 ) -> ObservationCursor:
