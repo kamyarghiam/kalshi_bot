@@ -76,9 +76,11 @@ class BarrierOptions(Strategy):
             return []
         price = bbo.bid.price
 
-        T = 1 - (get_seconds_until_4pm(update.latest_ts) / self.total_market_day_time)
-        time_multiplier = 365
-        T *= time_multiplier
+        t_max = 0.1
+        t_min = 0
+        T = t_min + (
+            (get_seconds_until_4pm(update.latest_ts) / self.total_market_day_time)
+        ) * (t_max - t_min)
         if self.std_dev is not None:
             self.ts.append(update.latest_ts)
             self.actual.append(price)
@@ -88,8 +90,36 @@ class BarrierOptions(Strategy):
                     curr_spy_price, self.m.spy_min, self.m.spy_max, T, self.std_dev
                 )
             )
-        self.std_dev = compute_std_from_barrier_option(
-            curr_spy_price, self.m.spy_min, self.m.spy_max, T, price / 100
-        )
+        # TODO: if predictions start to become  off, we use std to readjust
+        if self.count % 100 == 0:
+            self.std_dev = compute_std_from_barrier_option(
+                curr_spy_price, self.m.spy_min, self.m.spy_max, T, price / 100
+            )
+
+        # if self.count % 1000 == 0:
+        #     print("graphing")
+        #     print(self.std_dev)
+        #     print(T)
+        #     prices = [
+        #         i
+        #         for i in range(
+        #             int(self.m.spy_min - 10000), int(self.m.spy_max + 10000), 1000
+        #         )
+        #     ]
+        #     y_val = [
+        #         double_no_touch_option_price(
+        #             p, self.m.spy_min, self.m.spy_max, T, self.std_dev
+        #         )
+        #         for p in prices
+        #     ]
+        #     plt.plot(prices, y_val)
+        #     plt.axvline(x=self.m.spy_min)
+        #     plt.axvline(x=self.m.spy_max)
+        #     plt.axvline(x=curr_spy_price, color="orange")
+        #     plt.show()
 
         return []
+
+
+# TODO: we need a measure of steepness. This way, we can know how much a
+# price change in SPY changes Kalshi price
