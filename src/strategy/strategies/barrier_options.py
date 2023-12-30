@@ -80,14 +80,12 @@ class BarrierOptions(Strategy):
         T = get_seconds_until_4pm(update.latest_ts) / total_sec_per_year
         self.ts.append(update.latest_ts)
         self.actual.append(price)
-        self.predictions.append(
-            100
-            * double_no_touch_option_price(
-                curr_spy_price, self.m.spy_min, self.m.spy_max, T, self.std_dev
-            )
+        prediction = 100 * double_no_touch_option_price(
+            curr_spy_price, self.m.spy_min, self.m.spy_max, T, self.std_dev
         )
+        self.predictions.append(prediction)
         # TODO: if predictions start to become  off, we use std to readjust
-        if self.count % 100 == 0:
+        if abs(price - prediction) > 5:
             self.std_dev = compute_std_from_barrier_option(
                 curr_spy_price, self.m.spy_min, self.m.spy_max, T, price / 100
             )

@@ -1,6 +1,6 @@
 import math
 
-from scipy.optimize import minimize_scalar
+from scipy.optimize import minimize, minimize_scalar
 from scipy.stats import norm
 
 from helpers.utils import Price
@@ -61,7 +61,6 @@ def double_no_touch_option_price(S: float, L: float, U: float, T: float, sigma: 
     S = Volatility, as a percentage
     """
     assert L < U
-    assert 0 < sigma < 1
     if T == 0:
         # Set it to some super small value
         T = 0.00001
@@ -92,8 +91,10 @@ def compute_std_from_barrier_option(S: float, L: float, U: float, T: float, P: P
     to get the right solution
     """
 
-    result = minimize_scalar(
+    result = minimize(
         lambda std: abs(double_no_touch_option_price(S, L, U, T, std) - P),
-        bounds=(0, 1),
+        [0.06],
+        method="Nelder-Mead",
+        bounds=[(0, 100)],
     )
-    return result.x
+    return result.x[0]
