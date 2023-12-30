@@ -91,8 +91,9 @@ def compute_std_from_barrier_option(S: float, L: float, U: float, T: float, P: P
     solutions to a problem. You may have to constrain the range
     to get the right solution
     """
+
     result = minimize_scalar(
         lambda std: abs(double_no_touch_option_price(S, L, U, T, std) - P),
-        bounds=(0, 0.01),
+        bounds=(0, 1),
     )
     return result.x

@@ -38,7 +38,7 @@ class BarrierOptions(Strategy):
         else:
             self.m.spy_max = Cents(self.m.spy_max * 100)
 
-        self.std_dev = None
+        self.std_dev = 0.01
         # Total seconds in a market day
         self.total_market_day_time = 30 * 60 + 6 * 60 * 60
         self.ts = []
@@ -76,20 +76,16 @@ class BarrierOptions(Strategy):
             return []
         price = bbo.bid.price
 
-        t_max = 0.1
-        t_min = 0
-        T = t_min + (
-            (get_seconds_until_4pm(update.latest_ts) / self.total_market_day_time)
-        ) * (t_max - t_min)
-        if self.std_dev is not None:
-            self.ts.append(update.latest_ts)
-            self.actual.append(price)
-            self.predictions.append(
-                100
-                * double_no_touch_option_price(
-                    curr_spy_price, self.m.spy_min, self.m.spy_max, T, self.std_dev
-                )
+        total_sec_per_year = 365 * 24 * 60 * 60
+        T = get_seconds_until_4pm(update.latest_ts) / total_sec_per_year
+        self.ts.append(update.latest_ts)
+        self.actual.append(price)
+        self.predictions.append(
+            100
+            * double_no_touch_option_price(
+                curr_spy_price, self.m.spy_min, self.m.spy_max, T, self.std_dev
             )
+        )
         # TODO: if predictions start to become  off, we use std to readjust
         if self.count % 100 == 0:
             self.std_dev = compute_std_from_barrier_option(

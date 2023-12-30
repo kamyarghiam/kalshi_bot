@@ -72,7 +72,7 @@ def run_barrier_options_graph():
                 date, kalshi_spy_markets, day_start, day_end, reload=False
             )
         )
-        for m in [kalshi_spy_markets[2]]:
+        for m in [kalshi_spy_markets[3]]:
             strategy = BarrierOptions(m)
             historical_features.precalculate_strategy_features(strategy=strategy)
             sim = BlindOrderSim(
