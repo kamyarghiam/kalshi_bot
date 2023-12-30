@@ -31,7 +31,6 @@ class BlindOrderSim(StrategySimulator):
         hist_iter = tqdm.tqdm(self.hist, desc="Running sim")
         last_order_ts: datetime.datetime | None = None
         count = 0
-        log = Path("logs.txt")
         for update in hist_iter:
             count += 1
             orders_requested = strategy.consume_next_step(update, portfolio_history)
@@ -43,7 +42,4 @@ class BlindOrderSim(StrategySimulator):
                     )
                 portfolio_history.place_order(order)
                 last_order_ts = order.time_placed
-            if count % 100000 == 0:
-                print("WROTE TO LOGS")
-                log.write_text(str(portfolio_history))
         return portfolio_history

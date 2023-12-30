@@ -10,10 +10,7 @@ from strategy.features.base.kalshi import (
     kalshi_orderbook_ts_name,
 )
 from strategy.features.base.spy import spy_price_feature_name, spy_price_feature_ts_name
-from strategy.research.modeling.range_modeling import (
-    compute_std_from_barrier_option,
-    double_no_touch_option_price,
-)
+from strategy.research.modeling.range_modeling import double_no_touch_option_price
 from strategy.research.orderbook_only.single_market_model import get_seconds_until_4pm
 from strategy.utils import ObservationSet, Strategy
 
@@ -45,6 +42,10 @@ class BarrierOptions(Strategy):
         self.predictions = []
         self.actual = []
         self.count = 0
+        self.std_dev = 1.6
+        self.T = []
+        self.spy_price = []
+        self.kalshi_price = []
         super().__init__()
 
     def consume_next_step(
@@ -75,26 +76,26 @@ class BarrierOptions(Strategy):
         if not bbo.bid:
             return []
         price = bbo.bid.price
-
-        t_max = 0.1
-        t_min = 0
-        T = t_min + (
-            (get_seconds_until_4pm(update.latest_ts) / self.total_market_day_time)
-        ) * (t_max - t_min)
-        if self.std_dev is not None:
-            self.ts.append(update.latest_ts)
-            self.actual.append(price)
-            self.predictions.append(
-                100
-                * double_no_touch_option_price(
-                    curr_spy_price, self.m.spy_min, self.m.spy_max, T, self.std_dev
-                )
-            )
+        time_in_year = 365 * 24 * 60 * 60
+        self.spy_price.append(curr_spy_price)
+        self.kalshi_price.append(price)
+        self.T.append(get_seconds_until_4pm(update.latest_ts) / time_in_year)
+        # t_max = 0.1
+        # t_min = 0
+        # T = t_min + (
+        #     (get_seconds_until_4pm(update.latest_ts) / self.total_market_day_time)
+        # ) * (t_max - t_min)
+        self.ts.append(update.latest_ts)
+        self.actual.append(price)
+        prediction = 100 * double_no_touch_option_price(
+            curr_spy_price, self.m.spy_min, self.m.spy_max, 0.0000069, 0.422
+        )
+        self.predictions.append(prediction)
         # TODO: if predictions start to become  off, we use std to readjust
-        if self.count % 100 == 0:
-            self.std_dev = compute_std_from_barrier_option(
-                curr_spy_price, self.m.spy_min, self.m.spy_max, T, price / 100
-            )
+        # if self.count % 100 == 0:
+        # self.std_dev = compute_std_from_barrier_option(
+        #     curr_spy_price, self.m.spy_min, self.m.spy_max, T, price / 100
+        # )
 
         # if self.count % 1000 == 0:
         #     print("graphing")

@@ -2,6 +2,7 @@ import datetime
 from typing import List
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.money import Balance, Cents
@@ -72,7 +73,7 @@ def run_barrier_options_graph():
                 date, kalshi_spy_markets, day_start, day_end, reload=False
             )
         )
-        for m in [kalshi_spy_markets[2]]:
+        for m in [kalshi_spy_markets[3]]:
             strategy = BarrierOptions(m)
             historical_features.precalculate_strategy_features(strategy=strategy)
             sim = BlindOrderSim(
@@ -83,6 +84,19 @@ def run_barrier_options_graph():
             predictions = strategy.predictions
             ts = strategy.ts
             actual = strategy.actual
+
+            print("saving")
+            df = pd.DataFrame(
+                {
+                    "spy_price": strategy.spy_price,
+                    "kalshi_price": strategy.kalshi_price,
+                    "T": strategy.T,
+                }
+            )
+            df.to_csv(
+                LOCAL_STORAGE_FOLDER / "research/simple_spy_kalshi_10022023.csv",
+                index=False,
+            )
 
             plt.scatter(ts, predictions, label="predictions", color="orange")
             plt.plot(ts, actual, label="actual")
