@@ -718,7 +718,7 @@ def test_read_write_across_chunks(cole_db: ColeDBInterface):
     with pytest.raises(FileNotFoundError):
         next(reader)
 
-    now = datetime.now()
+    now = datetime.utcfromtimestamp(1704042451)
     snapshot1 = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[[2, 100]],  # type:ignore[list-item]
@@ -750,7 +750,7 @@ def test_read_write_across_chunks(cole_db: ColeDBInterface):
         market_ticker=ticker,
         yes=[[3, 100]],  # type:ignore[list-item]
         no=[[1, 20]],  # type:ignore[list-item]
-        ts=datetime.now() - timedelta(seconds=2),
+        ts=now - timedelta(seconds=2),
     )
     cole_db.write(snapshot1)
     cole_db.write(delta1)

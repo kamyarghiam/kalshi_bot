@@ -53,8 +53,6 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.layers import LSTM, Dense
-from tensorflow.keras.models import Sequential, load_model
 
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
@@ -62,6 +60,9 @@ from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.orderbook import Orderbook
 from strategy.features.base.kalshi import daily_spy_range_kalshi_markets
+
+# from tensorflow.keras.layers import LSTM, Dense
+# from tensorflow.keras.models import Sequential, load_model
 
 
 def orderbook_to_input_vector(ob: Orderbook):
