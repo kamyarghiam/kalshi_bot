@@ -79,7 +79,7 @@ In order for functional tests to pass, your username and password should corresp
 an actual username and password on Kalshi's demo website.
 
 ### AWS Access
-
+[TODO: please ignore this section for now while we set up AWS]
 In order to run tests, we need to give you access to AWS. Someone needs to create an AWS account for you, and you will need to create an access key and a secret access key. Then, in the
 `~/.aws/credentials` file locally, you need to paste the following:
 
