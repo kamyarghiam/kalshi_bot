@@ -4,7 +4,6 @@ from typing import Dict, Iterable, List
 
 import joblib  # Added for saving scaler
 import pandas as pd
-from tensorflow.keras.models import load_model
 
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.markets import MarketTicker
@@ -17,6 +16,8 @@ from strategy.research.orderbook_only.single_market_model import (
     orderbook_to_input_vector,
 )
 from strategy.utils import ObservationSet, Strategy
+
+# from tensorflow.keras.models import load_model
 
 
 class Signal(Enum):
