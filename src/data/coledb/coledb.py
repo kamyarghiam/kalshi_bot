@@ -822,7 +822,6 @@ class ColeDBInterface:
                 if end_ts and orderbook.ts > end_ts:
                     return
                 if start_ts is None or start_ts <= orderbook.ts:
-                    # orderbook.ts = ColeDBInterface.tz.localize(orderbook.ts)
                     yield orderbook
                 if not file_empty:
                     if isinstance(msg, OrderbookSnapshotRM):
