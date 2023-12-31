@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from mock import MagicMock, patch
+from pytz import timezone
 
 from data.coledb.coledb import (
     ColeBytes,
@@ -87,8 +88,8 @@ def test_encode_decode_orderbook_delta():
     delta = QuantityDelta(12345)
     side = Side.YES
     price = Price(31)
-    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
-    ts = datetime(2023, 8, 9, 20, 31, 56, 800000)
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55).astimezone(ColeDBInterface.tz)
+    ts = datetime(2023, 8, 9, 20, 31, 56, 800000).astimezone(ColeDBInterface.tz)
 
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
@@ -119,8 +120,10 @@ def test_encode_decode_orderbook_delta():
     # Time too high
     bad_time_diff = (1 << 32) / 10
     with pytest.raises(ValueError) as e:
-        msg.ts = datetime.fromtimestamp(bad_time_diff)
-        ColeDBInterface._encode_to_bytes(msg, datetime.fromtimestamp(0))
+        msg.ts = datetime.fromtimestamp(bad_time_diff).astimezone(ColeDBInterface.tz)
+        ColeDBInterface._encode_to_bytes(
+            msg, datetime.fromtimestamp(0).astimezone(ColeDBInterface.tz)
+        )
     assert e.match(
         "Timestamp delta more than 4 bytes in orderbook delta. "
         + "Side: Side.YES. "
@@ -135,14 +138,16 @@ def test_encode_decode_orderbook_delta():
     delta = QuantityDelta((1 << 31) - 1)
     side = Side.NO
     price = Price(99)
-    ts = datetime(2023, 8, 9, 20, 31, 56, 860000)
+    ts = datetime(2023, 8, 9, 20, 31, 56, 860000).astimezone(ColeDBInterface.tz)
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
 
     b = ColeDBInterface._encode_to_bytes(msg, chunk_start_time)
     # It will round up the ts to the nearest decimal
-    msg.ts = ts = datetime(2023, 8, 9, 20, 31, 56, 900000)
+    msg.ts = ts = datetime(2023, 8, 9, 20, 31, 56, 900000).astimezone(
+        ColeDBInterface.tz
+    )
     assert (
         ColeDBInterface._decode_to_response_message(
             ColeBytes(io.BytesIO(b)), ticker, chunk_start_time
@@ -155,8 +160,10 @@ def test_encode_decode_orderbook_delta():
     delta = QuantityDelta(12345)
     side = Side.YES
     price = Price(31)
-    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
-    ts = datetime.fromtimestamp((chunk_start_time.timestamp() + (((1 << 32) - 1) / 10)))
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55).astimezone(ColeDBInterface.tz)
+    ts = datetime.fromtimestamp(
+        (chunk_start_time.timestamp() + (((1 << 32) - 1) / 10))
+    ).astimezone(ColeDBInterface.tz)
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
@@ -173,7 +180,7 @@ def test_encode_decode_orderbook_delta():
     delta = QuantityDelta(1)
     side = Side.NO
     price = Price(1)
-    ts = datetime(2023, 8, 9, 20, 31, 56, 800000)
+    ts = datetime(2023, 8, 9, 20, 31, 56, 800000).astimezone(ColeDBInterface.tz)
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
     )
@@ -188,8 +195,8 @@ def test_encode_decode_orderbook_delta():
     # Negative delta
     delta = QuantityDelta(-4058)
     price = Price(3)
-    ts = datetime(2023, 8, 10, 22, 29, 58)
-    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
+    ts = datetime(2023, 8, 10, 22, 29, 58).astimezone(ColeDBInterface.tz)
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55).astimezone(ColeDBInterface.tz)
     side = Side.NO
     msg = OrderbookDeltaRM(
         market_ticker=ticker, price=price, delta=delta, side=side, ts=ts
@@ -238,8 +245,8 @@ def test_get_num_byte_sections_per_bits():
 def test_encode_decode_orderbook_snapshot():
     # Basic test
     ticker = MarketTicker("some_ticker")
-    chunk_start_ts = datetime.fromtimestamp(0)
-    ts = datetime.fromtimestamp(10)
+    chunk_start_ts = datetime.fromtimestamp(0).astimezone(ColeDBInterface.tz)
+    ts = datetime.fromtimestamp(10).astimezone(ColeDBInterface.tz)
     snapshot = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[[2, 100]],  # type:ignore[list-item]
@@ -269,7 +276,9 @@ def test_encode_decode_orderbook_snapshot():
     # Time too high
     bad_time_diff = (1 << 32) / 10
     with pytest.raises(ValueError) as e:
-        snapshot.ts = datetime.fromtimestamp(bad_time_diff)
+        snapshot.ts = datetime.fromtimestamp(bad_time_diff).astimezone(
+            ColeDBInterface.tz
+        )
         ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     assert e.match(
         "Timestamp delta is more than 4 bytes in snapshot. "
@@ -281,7 +290,7 @@ def test_encode_decode_orderbook_snapshot():
     chunk_start_ts = datetime(2023, 8, 9, 20, 31, 55)
     edge_ts = datetime.fromtimestamp(
         (chunk_start_ts.timestamp() + (((1 << 32) - 1) / 10))
-    )
+    ).astimezone(ColeDBInterface.tz)
     snapshot.ts = edge_ts
     b = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_ts)
     assert (
@@ -568,33 +577,33 @@ def test_read_chunk_apply_deltas_generator(tmp_path: Path):
     assert e.match("End ts must be larger than start ts")
 
     ticker = MarketTicker("some_ticker")
-    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55)
+    chunk_start_time = datetime(2023, 8, 9, 20, 31, 55, tzinfo=ColeDBInterface.tz)
     snapshot = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[[2, 100]],  # type:ignore[list-item]
         no=[[1, 20]],  # type:ignore[list-item]
-        ts=datetime(2023, 8, 9, 20, 31, 55, 800000),
+        ts=datetime(2023, 8, 9, 20, 31, 55, 800000, tzinfo=ColeDBInterface.tz),
     )
     delta1 = OrderbookDeltaRM(
         market_ticker=ticker,
         price=Price(31),
         delta=QuantityDelta(12345),
         side=Side.YES,
-        ts=datetime(2023, 8, 9, 20, 31, 56, 800000),
+        ts=datetime(2023, 8, 9, 20, 31, 56, 800000, tzinfo=ColeDBInterface.tz),
     )
     delta2 = OrderbookDeltaRM(
         market_ticker=ticker,
         price=Price(31),
         delta=QuantityDelta(12345),
         side=Side.YES,
-        ts=datetime(2023, 8, 9, 20, 31, 57, 800000),
+        ts=datetime(2023, 8, 9, 20, 31, 57, 800000, tzinfo=ColeDBInterface.tz),
     )
     delta3 = OrderbookDeltaRM(
         market_ticker=ticker,
         price=Price(31),
         delta=QuantityDelta(12345),
         side=Side.YES,
-        ts=datetime(2023, 8, 9, 20, 31, 58, 800000),
+        ts=datetime(2023, 8, 9, 20, 31, 58, 800000, tzinfo=ColeDBInterface.tz),
     )
     snapshot_bytes = ColeDBInterface._encode_to_bytes(snapshot, chunk_start_time)
     delta_bytes1 = ColeDBInterface._encode_to_bytes(delta1, chunk_start_time)
@@ -718,7 +727,7 @@ def test_read_write_across_chunks(cole_db: ColeDBInterface):
     with pytest.raises(FileNotFoundError):
         next(reader)
 
-    now = datetime.utcfromtimestamp(1704042451)
+    now = datetime.fromtimestamp(1704042451).astimezone(timezone("US/Eastern"))
     snapshot1 = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[[2, 100]],  # type:ignore[list-item]

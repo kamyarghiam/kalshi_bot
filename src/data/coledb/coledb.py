@@ -393,7 +393,7 @@ class ColeDBInterface:
         total_bits += 1
 
         # Timestamp bytes length
-        timestamp = data.ts.timestamp()
+        timestamp = data.ts.astimezone(ColeDBInterface.tz).timestamp()
         timestamp_delta: int = round(
             # Take 1 decimal place after seconds
             (timestamp - chunk_start_timestamp.timestamp())
@@ -514,7 +514,7 @@ class ColeDBInterface:
 
         # Timestamp (TODO: refactor to merge logic with other encode func)
         # Timestamp bytes length
-        timestamp = data.ts.timestamp()
+        timestamp = data.ts.astimezone(ColeDBInterface.tz).timestamp()
         timestamp_delta: int = round(
             # Take 1 decimal place after seconds
             (timestamp - chunk_start_timestamp.timestamp())
@@ -649,7 +649,9 @@ class ColeDBInterface:
 
         # Timestamp. We divide by 10 to get the sub-second precision
         timestamp_delta = (b.read(timestamp_bits_length)) / 10
-        ts = datetime.fromtimestamp(chunk_start_timestamp.timestamp() + timestamp_delta)
+        ts = datetime.fromtimestamp(
+            chunk_start_timestamp.timestamp() + timestamp_delta
+        ).astimezone(ColeDBInterface.tz)
         num_bits_read += timestamp_bits_length
 
         # Quantity delta
@@ -704,7 +706,9 @@ class ColeDBInterface:
 
         # Timestamp. We divide by 10 to get the sub-second precision
         timestamp_delta = (b.read(timestamp_bits_length)) / 10
-        ts = datetime.fromtimestamp(chunk_start_timestamp.timestamp() + timestamp_delta)
+        ts = datetime.fromtimestamp(
+            chunk_start_timestamp.timestamp() + timestamp_delta
+        ).astimezone(ColeDBInterface.tz)
         num_bits_read += timestamp_bits_length
 
         snapshot_rm = OrderbookSnapshotRM(market_ticker=ticker, ts=ts, yes=[], no=[])
@@ -818,7 +822,7 @@ class ColeDBInterface:
                 if end_ts and orderbook.ts > end_ts:
                     return
                 if start_ts is None or start_ts <= orderbook.ts:
-                    orderbook.ts = ColeDBInterface.tz.localize(orderbook.ts)
+                    # orderbook.ts = ColeDBInterface.tz.localize(orderbook.ts)
                     yield orderbook
                 if not file_empty:
                     if isinstance(msg, OrderbookSnapshotRM):
