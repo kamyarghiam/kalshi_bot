@@ -26,7 +26,7 @@ from tests.fake_exchange import OrderbookDeltaRM
 def test_read_write_metadata(tmp_path: Path):
     path = tmp_path / "metadata"
     metadata = ColeDBMetadata(path)
-    now = datetime.now()
+    now = datetime.now().astimezone(ColeDBInterface.tz)
     metadata.chunk_first_time_stamps.append(now)
     metadata.num_msgs_in_last_file = 1000
     metadata.last_chunk_num = 5
@@ -857,3 +857,20 @@ def test_coledb_write_guardrails():
     with pytest.raises(RuntimeError) as e:
         db.write(MagicMock())
     assert e.match("Pytest is running, are you sure you want to write to ColeDB?")
+
+
+def test_read_df():
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/"))
+    data = cole_db.read_df(
+        MarketTicker("INXD-23AUG31-B4512"),
+        start_ts=datetime(2023, 8, 31, 9, 30, 11).astimezone(ColeDBInterface.tz),
+        end_ts=datetime(2023, 8, 31, 9, 31, 11).astimezone(ColeDBInterface.tz),
+    )
+    assert len(data) == 39
+    assert len(data.columns) == 199
+    row = data.iloc[0]
+    assert row.ts == datetime(2023, 8, 31, 9, 30, 11, 177187).timestamp()
+    assert row.yes_bid_11 == 135
+    assert row.no_bid_48 == 31
+    assert row.no_bid_50 == 5
+    assert row.no_bid_60 == 5

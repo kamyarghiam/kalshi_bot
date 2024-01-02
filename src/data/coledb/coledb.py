@@ -55,7 +55,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
+import numpy as np
 import pytz
+from pandas import DataFrame
 
 from helpers.constants import COLEDB_DEFAULT_STORAGE_PATH
 from helpers.types.markets import EventTicker, MarketTicker, Ticker
@@ -95,6 +97,10 @@ class ColeDBMetadata:
         metadata: ColeDBMetadata = pickle.loads(path.read_bytes())
         # In case we move around the folder structure
         metadata.path = path
+        # Time zones
+        metadata.chunk_first_time_stamps = [
+            dt.astimezone(ColeDBInterface.tz) for dt in metadata.chunk_first_time_stamps
+        ]
         return metadata
 
     @property
@@ -332,6 +338,21 @@ class ColeDBInterface:
                 path_to_chunk, ticker, chunk_start_ts, start_ts, end_ts
             )
             chunk_name += 1
+
+    def read_df(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+    ) -> DataFrame:
+        """Reads data into pandas df"""
+        d = [orderbook_to_df(ob) for ob in self.read(ticker, start_ts, end_ts)]
+        columns = (
+            ["ts"]
+            + [f"yes_bid_{i}" for i in range(1, 100)]
+            + [f"no_bid_{i}" for i in range(1, 100)]
+        )
+        return DataFrame(d, columns=columns)
 
     @staticmethod
     def _write_data_to_last_file(
@@ -854,3 +875,20 @@ def get_num_byte_sections_per_bits(num_bits: int, byte_section_size: int) -> int
     5          2
     """
     return (num_bits // byte_section_size) + min(num_bits % byte_section_size, 1)
+
+
+def orderbook_to_df(ob: Orderbook):
+    """Converts orderbook info into df row
+
+    Fills empty row with nans"""
+    # Consists of: Time until expiration, 1 - 99 volumes Yes, 1 - 99 Volumes No
+    df_row = np.empty(199)
+    df_row.fill(np.nan)
+    df_row[0] = ob.ts.timestamp()
+    for price, quantity in ob.yes.levels.items():
+        df_row[price] = quantity
+
+    for price, quantity in ob.no.levels.items():
+        df_row[99 + price] = quantity
+
+    return df_row
