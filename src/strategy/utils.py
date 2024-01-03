@@ -22,6 +22,9 @@ from typing import (
 import pandas as pd
 import tqdm.autonotebook as tqdm
 
+from data.coledb.coledb import ColeDBInterface
+from exchange.interface import MarketTicker
+from helpers.types.markets import EventTicker
 from helpers.types.orders import Order
 from helpers.types.portfolio import PortfolioHistory
 
@@ -371,3 +374,46 @@ class Strategy(ABC):
         self, update: ObservationSet, portfolio: PortfolioHistory
     ) -> Iterable[Order]:
         pass
+
+
+def get_spy_ob_merged_df(
+    db: ColeDBInterface,
+    spy_file: pathlib.Path,
+    ticker: MarketTicker,
+    nrows: int | None = None,
+):
+    """Gets the OB from Kalshi for a market and merges it timewise
+    with the corresponding ES data
+    """
+
+    # Small issue with nrows is that we can't do conditional filtering -- first nrows
+    # might not have a Trade of Fill action
+    spy_df = pd.read_csv(spy_file, nrows=nrows)
+    spy_df = spy_df[(spy_df.action == "T") | (spy_df.action == "F")][
+        ["price", "ts_recv"]
+    ]
+    spy_df = spy_df.rename(columns={"price": "spy_price", "ts_recv": "ts"})
+    spy_df = spy_df.sort_values(by="ts")
+    spy_df.ts /= 10**9
+    spy_df.set_index("ts", inplace=True)
+    market_data: pd.DataFrame = db.read_df(ticker, nrows=nrows)
+    market_data.sort_values(by="ts", inplace=True)
+    market_data.set_index("ts", inplace=True)
+    market_data.fillna(0, inplace=True)
+    final_df = pd.concat([spy_df, market_data]).sort_index()
+
+    return final_df.ffill()
+
+
+def get_market_data_from_event_ticker(
+    db: ColeDBInterface, event_ticker: EventTicker, nrows: int | None = None
+) -> List[pd.DataFrame]:
+    """Get dataframes of SPY market data for each market in an event"""
+    path = db.cole_db_storage_path / (event_ticker.replace("-", "/"))
+    market_tickers = [
+        MarketTicker(event_ticker + "-" + x.name)
+        for x in path.iterdir()
+        if not x.is_file()
+    ]
+
+    return [db.read_df(ticker, nrows=nrows) for ticker in market_tickers]

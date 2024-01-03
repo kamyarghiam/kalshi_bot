@@ -57,6 +57,7 @@ from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pytz
+from numpy.typing import NDArray
 from pandas import DataFrame
 
 from helpers.constants import COLEDB_DEFAULT_STORAGE_PATH
@@ -344,9 +345,14 @@ class ColeDBInterface:
         ticker: MarketTicker,
         start_ts: datetime | None = None,
         end_ts: datetime | None = None,
+        nrows: int | None = None,
     ) -> DataFrame:
         """Reads data into pandas df"""
-        d = [orderbook_to_df(ob) for ob in self.read(ticker, start_ts, end_ts)]
+        d: List[NDArray] = []
+        for ob in self.read(ticker, start_ts, end_ts):
+            if nrows and len(d) == nrows:
+                break
+            d.append(orderbook_to_df_row(ob))
         columns = (
             ["ts"]
             + [f"yes_bid_{i}" for i in range(1, 100)]
@@ -877,7 +883,7 @@ def get_num_byte_sections_per_bits(num_bits: int, byte_section_size: int) -> int
     return (num_bits // byte_section_size) + min(num_bits % byte_section_size, 1)
 
 
-def orderbook_to_df(ob: Orderbook):
+def orderbook_to_df_row(ob: Orderbook):
     """Converts orderbook info into df row
 
     Fills empty row with nans"""

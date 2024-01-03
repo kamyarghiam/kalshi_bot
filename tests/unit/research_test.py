@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from mock import patch
 
+from data.coledb.coledb import ColeDBInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
@@ -15,6 +16,7 @@ from strategy.research.orderbook_only.single_market_model import (
     orderbook_to_bbo_vector,
     orderbook_to_input_vector,
 )
+from strategy.utils import get_spy_ob_merged_df
 from tests.utils import almost_equal
 
 
@@ -165,3 +167,16 @@ def test_clean_and_combine_data(tmp_path: Path):
     assert row.sec_until_4pm == 5
     assert row.yes_bid_1 == 4
     assert row.no_bid_1 == 5
+
+
+def test_get_spy_ob_merged_df():
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/"))
+    df = get_spy_ob_merged_df(
+        cole_db,
+        Path("tests/data/databento/20230831-truncated.mbo.csv"),
+        MarketTicker("INXD-23AUG31-B4512"),
+        5,
+    )
+    assert len(df) == 10
+    # Backfilled properly from ffill
+    assert df.iloc[-1].yes_bid_10 == 150

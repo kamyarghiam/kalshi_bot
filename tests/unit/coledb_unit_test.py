@@ -865,8 +865,9 @@ def test_read_df():
         MarketTicker("INXD-23AUG31-B4512"),
         start_ts=datetime(2023, 8, 31, 9, 30, 11).astimezone(ColeDBInterface.tz),
         end_ts=datetime(2023, 8, 31, 9, 31, 11).astimezone(ColeDBInterface.tz),
+        nrows=5,
     )
-    assert len(data) == 39
+    assert len(data) == 5
     assert len(data.columns) == 199
     row = data.iloc[0]
     assert row.ts == datetime(2023, 8, 31, 9, 30, 11, 177187).timestamp()
