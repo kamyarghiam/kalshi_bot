@@ -405,6 +405,34 @@ def get_spy_ob_merged_df(
     return final_df.ffill()
 
 
+def get_spy_ob_bbo_merged_df(
+    db: ColeDBInterface,
+    spy_file: pathlib.Path,
+    ticker: MarketTicker,
+    nrows: int | None = None,
+):
+    """Gets the OB bbo from Kalshi for a market and merges it timewise
+    with the corresponding ES data
+    """
+
+    # Small issue with nrows is that we can't do conditional filtering -- first nrows
+    # might not have a Trade of Fill action
+    spy_df = pd.read_csv(spy_file, nrows=nrows)
+    spy_df = spy_df[(spy_df.action == "T") | (spy_df.action == "F")][
+        ["price", "ts_recv"]
+    ]
+    spy_df = spy_df.rename(columns={"price": "spy_price", "ts_recv": "ts"})
+    spy_df = spy_df.sort_values(by="ts")
+    spy_df.ts /= 10**9
+    spy_df.set_index("ts", inplace=True)
+    market_data: pd.DataFrame = db.read_bbo_df(ticker, nrows=nrows)
+    market_data.sort_values(by="ts", inplace=True)
+    market_data.set_index("ts", inplace=True)
+    final_df = pd.concat([spy_df, market_data]).sort_index()
+
+    return final_df.ffill()
+
+
 def get_market_data_from_event_ticker(
     db: ColeDBInterface, event_ticker: EventTicker, nrows: int | None = None
 ) -> List[pd.DataFrame]:

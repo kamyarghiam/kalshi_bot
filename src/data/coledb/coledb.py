@@ -347,7 +347,7 @@ class ColeDBInterface:
         end_ts: datetime | None = None,
         nrows: int | None = None,
     ) -> DataFrame:
-        """Reads data into pandas df"""
+        """Reads data into pandas df for the entire orderbook"""
         d: List[NDArray] = []
         for ob in self.read(ticker, start_ts, end_ts):
             if nrows and len(d) == nrows:
@@ -358,6 +358,22 @@ class ColeDBInterface:
             + [f"yes_bid_{i}" for i in range(1, 100)]
             + [f"no_bid_{i}" for i in range(1, 100)]
         )
+        return DataFrame(d, columns=columns)
+
+    def read_bbo_df(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+        nrows: int | None = None,
+    ) -> DataFrame:
+        """Reads data into pandas df for the bbo"""
+        d: List[NDArray] = []
+        for ob in self.read(ticker, start_ts, end_ts):
+            if nrows and len(d) == nrows:
+                break
+            d.append(orderbook_to_bbo_row(ob))
+        columns = ["ts", "yes_bid_price", "yes_bid_qty", "yes_ask_price", "yes_ask_qty"]
         return DataFrame(d, columns=columns)
 
     @staticmethod
@@ -896,5 +912,24 @@ def orderbook_to_df_row(ob: Orderbook):
 
     for price, quantity in ob.no.levels.items():
         df_row[99 + price] = quantity
+
+    return df_row
+
+
+def orderbook_to_bbo_row(ob: Orderbook):
+    """Converts orderbook info into df row with bbo info
+
+    Fills empty row with nans"""
+    # ts, yes_bid_price, yes_bid_qty, yes_ask_price, yes_ask_qty
+    df_row = np.empty(5)
+    df_row.fill(np.nan)
+    df_row[0] = ob.ts.timestamp()
+    bbo = ob.get_bbo()
+    if bbo.bid:
+        df_row[1] = bbo.bid.price
+        df_row[2] = bbo.bid.quantity
+    if bbo.ask:
+        df_row[3] = bbo.ask.price
+        df_row[4] = bbo.ask.quantity
 
     return df_row
