@@ -6,7 +6,9 @@ from typing import Deque, Iterable, List
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
+from data.coledb.coledb import ColeDBInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
@@ -31,6 +33,18 @@ class SigmoidParams:
     c: float = -9.63582632e-03
     d: float = -3.02836067e-02
 
+    @property
+    def array(self):
+        return [self.m, self.b, self.shift_up, self.c, self.d]
+
+    def update(self, new_array: List[float]):
+        assert len(new_array) == 5
+        self.m = new_array[0]
+        self.b = new_array[1]
+        self.shift_up = new_array[2]
+        self.c = new_array[3]
+        self.d = new_array[4]
+
 
 class INXZStrategy:
     def __init__(
@@ -43,13 +57,68 @@ class INXZStrategy:
         self.ticker = ticker
         self.max_order_quantity = 10
         self.spy_price_threshold = INXZStrategy.extract_market_threshold(ticker)
+        # TODO: update this
+        self.close_time_unix: float = INXZStrategy.get_close_time(ticker)
 
         # TODO: should we also keep track of ask prices?
         # SPY Data and orderbook data
-        self.data = pd.DataFrame({"spy_price": [], "yes_bid_price": []})
+        self.data = pd.DataFrame({"ts": [], "spy_price": [], "yes_bid_price": []})
         # Holds most recent spy price
         self.spy_prices: Deque[Cents] = collections.deque(maxlen=10000)
+        self.sigmoid_params = SigmoidParams()
         super().__init__()
+
+    @staticmethod
+    def get_close_time(ticker: MarketTicker) -> float:
+        """Gets the unix close time based on the market ticker"""
+        # Looks like 23NOV12
+        event_ticker = ticker.split("-")[1]
+        input_format = "%y%b%d"
+        parsed_date = datetime.strptime(event_ticker, input_format)
+        # 4 PM
+        target_time = datetime(
+            parsed_date.year,
+            parsed_date.month,
+            parsed_date.day,
+            16,
+            0,
+            0,
+            tzinfo=ColeDBInterface.tz,
+        )
+        return target_time.timestamp()
+
+    def update_data_with_sigmoid_params(self, spy_std_dev: float):
+        """Minimization functions for the bids"""
+        params = self.sigmoid_params
+        self.data["w"] = params.m * (self.close_time_unix - self.data.ts) + params.b
+        self.data["sigmoid"] = (
+            1
+            / (
+                1
+                + np.exp(
+                    -1 * (self.spy_price_threshold - self.data.spy_price) * params.c
+                    + (self.data.w)
+                    + params.d * spy_std_dev
+                )
+            )
+        ) + params.shift_up
+
+    def get_yes_bid_prediction(
+        self, params: SigmoidParams, spy_price: float, ts: int, spy_std_dev: float
+    ) -> Cents:
+        w = params.m * (self.close_time_unix - ts) + params.b
+        return Cents(
+            1
+            / (
+                1
+                + np.exp(
+                    -1 * (self.spy_price_threshold - spy_price) * params.c
+                    + w
+                    + params.d * spy_std_dev
+                )
+            )
+            + params.shift_up
+        )
 
     def get_spy_std_dev(self):
         """Computes the standard deviation of SPY given the prices we have
@@ -76,12 +145,16 @@ class INXZStrategy:
         self,
         ob: Orderbook,
         spy_price: Cents,
-        ts: datetime,
+        ts: int,
     ) -> Signal:
         """TODO: fill out"""
+        # TODO: this can be outside of the price range of 0 < yes_bid < 99
+        self.get_yes_bid_prediction(
+            self.sigmoid_params, spy_price, ts, self.get_spy_std_dev()
+        )
         return Signal.NONE
 
-    def append_data(self, ob: Orderbook, spy_price: Cents):
+    def append_data(self, ob: Orderbook, spy_price: Cents, ts: int):
         """Adds spy and kalshi price data to our knowledge base"""
         self.spy_prices.append(spy_price)
         if bid := ob.get_bbo().bid:
@@ -89,21 +162,33 @@ class INXZStrategy:
                 [
                     self.data,
                     pd.DataFrame(
-                        {"spy_price": [spy_price], "yes_bid_price": [bid.price]}
+                        {
+                            "ts": [ts],
+                            "spy_price": [spy_price],
+                            "yes_bid_price": [bid.price],
+                        }
                     ),
                 ],
                 ignore_index=True,
             )
 
-    @staticmethod
-    def training_wheels(ob: Orderbook, spy_price: Cents, ts: datetime):
+    def training_wheels(self, ob: Orderbook, spy_price: Cents, ts: int):
+        ts_date = datetime.fromtimestamp(ts).astimezone(ColeDBInterface.tz)
         assert 30000 < spy_price and spy_price < 50000
-        assert ts.day == ob.ts.day
-        assert ts.month == ob.ts.month
-        assert ts.year == ob.ts.year
+        assert ts_date.day == ob.ts.day
+        assert ts_date.month == ob.ts.month
+        assert ts_date.year == ob.ts.year
+        assert len(str(int(ts))) == len(str(int(self.close_time_unix)))
+        close_date = datetime.fromtimestamp(self.close_time_unix).astimezone(
+            ColeDBInterface.tz
+        )
+        assert ts_date.day == close_date.day
+        assert ts_date.month == close_date.month
+        assert ts_date.year == close_date.year
+        assert close_date.hour == 16
 
     def get_orders(
-        self, ob: Orderbook, spy_price: Cents, ts: datetime, portfolio: PortfolioHistory
+        self, ob: Orderbook, spy_price: Cents, ts: int, portfolio: PortfolioHistory
     ) -> List[Order]:
         # TODO: this only holds one position at a time and doesn't
         # sell for a loss
@@ -130,7 +215,7 @@ class INXZStrategy:
         return []
 
     def get_buy_orders(
-        self, ob: Orderbook, spy_price: Cents, ts: datetime, portfolio: PortfolioHistory
+        self, ob: Orderbook, spy_price: Cents, ts: int, portfolio: PortfolioHistory
     ):
         signal = self.get_signal(ob, spy_price, ts)
         buy_order: Order | None = None
@@ -150,15 +235,33 @@ class INXZStrategy:
                 return [buy_order]
         return []
 
+    def train_data(self):
+        spy_std_dev = self.get_spy_std_dev()
+
+        def minimize_bids(x):
+            self.update_data_with_sigmoid_params(spy_std_dev)
+            # Adjust below for bids (yes_ask_price)
+            return abs((100 * self.data.sigmoid) - self.data.yes_bid_price).sum()
+
+        result = minimize(
+            minimize_bids,
+            self.sigmoid_params.array,
+            method="Nelder-Mead",
+        )
+        self.sigmoid_params.update(result.x)
+
     def consume_next_step(
         self,
         ob: Orderbook,
         spy_price: Cents,
-        ts: datetime,
+        ts: int,
         portfolio: PortfolioHistory,
     ) -> Iterable[Order]:
         # Skip messages outside of market hours
-        if (ts.hour < 9 or (ts.hour == 9 and ts.minute < 30)) or (ts.hour > 16):
+        ts_date = datetime.fromtimestamp(ts).astimezone(ColeDBInterface.tz)
+        if (ts_date.hour < 9 or (ts_date.hour == 9 and ts_date.minute < 30)) or (
+            ts_date.hour > 16
+        ):
             return []
 
         # TODO: remove these training wheels
@@ -166,5 +269,7 @@ class INXZStrategy:
         self.training_wheels(ob, spy_price, ts)
         ################################################
 
-        self.append_data(ob, spy_price)
-        return self.get_orders(ob, spy_price, ts, portfolio)
+        order = self.get_orders(ob, spy_price, ts, portfolio)
+        self.append_data(ob, spy_price, ts)
+        self.train_data()
+        return order
