@@ -1,4 +1,5 @@
 import collections
+import pdb
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -66,6 +67,7 @@ class INXZStrategy:
         # Holds most recent spy price
         self.spy_prices: Deque[Cents] = collections.deque(maxlen=10000)
         self.sigmoid_params = SigmoidParams()
+        self.count = 0
         super().__init__()
 
     @staticmethod
@@ -87,16 +89,17 @@ class INXZStrategy:
         )
         return target_time.timestamp()
 
-    def update_data_with_sigmoid_params(self, spy_std_dev: float):
+    def update_data_with_sigmoid_params(
+        self, params: SigmoidParams, spy_std_dev: float
+    ):
         """Minimization functions for the bids"""
-        params = self.sigmoid_params
         self.data["w"] = params.m * (self.close_time_unix - self.data.ts) + params.b
         self.data["sigmoid"] = (
             1
             / (
                 1
                 + np.exp(
-                    -1 * (self.spy_price_threshold - self.data.spy_price) * params.c
+                    (self.data.spy_price - self.spy_price_threshold) * params.c
                     + (self.data.w)
                     + params.d * spy_std_dev
                 )
@@ -149,9 +152,11 @@ class INXZStrategy:
     ) -> Signal:
         """TODO: fill out"""
         # TODO: this can be outside of the price range of 0 < yes_bid < 99
-        self.get_yes_bid_prediction(
+        pred = self.get_yes_bid_prediction(
             self.sigmoid_params, spy_price, ts, self.get_spy_std_dev()
         )
+        # TODO: remove
+        print(pred)
         return Signal.NONE
 
     def append_data(self, ob: Orderbook, spy_price: Cents, ts: int):
@@ -239,7 +244,9 @@ class INXZStrategy:
         spy_std_dev = self.get_spy_std_dev()
 
         def minimize_bids(x):
-            self.update_data_with_sigmoid_params(spy_std_dev)
+            pdb.set_trace()
+            params = SigmoidParams(m=x[0], b=x[1], shift_up=x[2], c=x[3], d=x[4])
+            self.update_data_with_sigmoid_params(params, spy_std_dev)
             # Adjust below for bids (yes_ask_price)
             return abs((100 * self.data.sigmoid) - self.data.yes_bid_price).sum()
 
@@ -271,5 +278,7 @@ class INXZStrategy:
 
         order = self.get_orders(ob, spy_price, ts, portfolio)
         self.append_data(ob, spy_price, ts)
-        self.train_data()
+        self.count += 1
+        if self.count % 10000 == 0:
+            self.train_data()
         return order
