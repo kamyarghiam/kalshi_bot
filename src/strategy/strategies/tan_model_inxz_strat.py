@@ -26,7 +26,6 @@ class Signal(Enum):
 
 @dataclass
 class ModelParams:
-    # Defaults are based on training from October 18th data
     price_0: float = -1.73003590e01
     c: float = 4.50041769e-07
 
@@ -59,6 +58,7 @@ class TanModelINXZStrategy:
         self.data = pd.DataFrame({"ts": [], "spy_price": [], "yes_bid_price": []})
         self.price_threshold = TanModelINXZStrategy.get_price_threshold(ticker)
         self.model_params = ModelParams()
+        self.trained_once = False
         self.count = 0
         super().__init__()
 
@@ -139,14 +139,29 @@ class TanModelINXZStrategy:
         spy_price: Cents,
         ts: int,
     ) -> Signal:
-        """TODO: fill out"""
+        if not self.trained_once:
+            return Signal.NONE
+
         pred = self.get_yes_bid_prediction(
             self.model_params,
             spy_price,
             ts,
         )
-        # TODO: incorporate omega!!
-        print(pred)
+        # How much info should we extract from our prediction vs actual price
+        omega = 0.7
+        # How much of a difference should our price have from the actual price
+        threshold = Cents(4)
+        bbo = ob.get_bbo()
+        if not bbo.bid:
+            return Signal.NONE
+        kalshi_price = bbo.bid.price
+
+        predicted_price = pred * omega + (1 - omega) * kalshi_price
+
+        if predicted_price > kalshi_price + threshold:
+            return Signal.BUY
+        elif predicted_price < kalshi_price - threshold:
+            return Signal.SELL
         return Signal.NONE
 
     def append_data(self, ob: Orderbook, spy_price: Cents, ts: int):
@@ -234,19 +249,27 @@ class TanModelINXZStrategy:
         return []
 
     def train_data(self):
+        # We want to train on future data
+        shift_amount = 62
+        assert (
+            self.count > shift_amount
+        ), "We need at least the shift amount of data to train"
         training_data = self.data.copy()
         training_data["norm_price"] = training_data.spy_price - self.price_threshold
         training_data["norm_ts"] = training_data.ts - self.open_time_unix
+        actual_price = training_data.yes_bid_price.shift(shift_amount)
+        actual_price = actual_price.dropna()
 
         # TODO: we may need to shift the data! We want to make sure
         # I'm capturing future predictions!!
         params, _ = curve_fit(
             self.tan_model,
             (training_data.norm_price, training_data.norm_ts),
-            training_data.yes_bid_price,
+            actual_price,
             p0=[self.model_params.price_0, self.model_params.c],
         )
         self.model_params.update(params)
+        self.trained_once = True
 
     def consume_next_step(
         self,
