@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 
 from data.coledb.coledb import ColeDBInterface
+from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Cents
 from helpers.types.portfolio import PortfolioHistory
@@ -63,6 +64,9 @@ def main():
                 break
             ts = ob_ts
     print(portfolio)
+    if portfolio.has_open_positions():
+        with ExchangeInterface(is_test_run=False) as e:
+            print("Unrealized pnl: ", portfolio.get_unrealized_pnl(e))
 
 
 def load_spy_data(

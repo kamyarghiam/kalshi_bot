@@ -46,7 +46,6 @@ class TanModelINXZStrategy:
         ticker: MarketTicker,
     ):
         self.ticker = ticker
-        self.max_order_quantity = 10
         self.spy_price_threshold = TanModelINXZStrategy.extract_market_threshold(ticker)
         # TODO: update this
         (
@@ -61,6 +60,15 @@ class TanModelINXZStrategy:
         self.model_params = ModelParams()
         self.trained_once = False
         self.count = 0
+
+        # Hyperparams
+        self.max_order_quantity = 100
+        self.shift_amount = 62
+        # How much info should we extract from our prediction vs actual price
+        self.omega = 0.7
+        # How much of a difference should our price have from the actual price
+        self.threshold = Cents(4)
+
         super().__init__()
 
     @staticmethod
@@ -148,19 +156,15 @@ class TanModelINXZStrategy:
             spy_price,
             ts,
         )
-        # How much info should we extract from our prediction vs actual price
-        omega = 0.7
-        # How much of a difference should our price have from the actual price
-        threshold = Cents(4)
         bbo = ob.get_bbo()
         if not bbo.bid:
             return Signal.NONE
         kalshi_price = bbo.bid.price
 
-        predicted_price = pred * omega + (1 - omega) * kalshi_price
-        if predicted_price > kalshi_price + threshold:
+        predicted_price = pred * self.omega + (1 - self.omega) * kalshi_price
+        if predicted_price > kalshi_price + self.threshold:
             return Signal.BUY
-        elif predicted_price < kalshi_price - threshold:
+        elif predicted_price < kalshi_price - self.threshold:
             return Signal.SELL
         return Signal.NONE
 
@@ -209,10 +213,10 @@ class TanModelINXZStrategy:
         if self.ticker not in portfolio.positions:
             return self.get_buy_orders(ob, spy_price, ts, portfolio)
         elif self.ticker in portfolio.positions:
-            return self.get_sell_orders(ob, portfolio)
+            return self.get_sell_orders(ob, ts, portfolio)
         return []
 
-    def get_sell_orders(self, ob: Orderbook, portfolio: PortfolioHistory):
+    def get_sell_orders(self, ob: Orderbook, ts: int, portfolio: PortfolioHistory):
         order = ob.sell_order(side=portfolio.positions[self.ticker].side)
         if order:
             order.quantity = Quantity(
@@ -224,6 +228,9 @@ class TanModelINXZStrategy:
             pnl, fees = portfolio.potential_pnl(order)
             # TODO: only sell for profit? What about stop loss
             if pnl - fees > 0:
+                order.time_placed = datetime.fromtimestamp(ts).astimezone(
+                    ColeDBInterface.tz
+                )
                 return [order]
         return []
 
@@ -245,19 +252,23 @@ class TanModelINXZStrategy:
                 min(buy_order.quantity, self.max_order_quantity)
             )
             if portfolio.can_afford(buy_order):
+                buy_order.time_placed = datetime.fromtimestamp(ts).astimezone(
+                    ColeDBInterface.tz
+                )
                 return [buy_order]
         return []
 
     def train_data(self):
         # We want to train on future data
-        shift_amount = 62
         assert (
-            self.count > shift_amount
+            self.count > self.shift_amount
         ), "We need at least the shift amount of data to train"
         training_data = self.data.copy()
         training_data["norm_price"] = training_data.spy_price - self.price_threshold
         training_data["norm_ts"] = training_data.ts - self.open_time_unix
-        training_data["yes_bid_price"] = training_data.yes_bid_price.shift(shift_amount)
+        training_data["yes_bid_price"] = training_data.yes_bid_price.shift(
+            self.shift_amount
+        )
         training_data.dropna(inplace=True)
 
         # TODO: we may need to shift the data! We want to make sure
