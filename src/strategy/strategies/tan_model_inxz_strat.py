@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -69,14 +70,14 @@ class TanModelINXZStrategy:
         return price_threshold
 
     @staticmethod
-    def tan_model(price_time_tup: Tuple[int, int], price_0, c):
+    def tan_model(price_time_tup: Tuple, price_0, c):
         """We need to take in the price and time as a tuple because there are two
         independent variables to this optimization. That's what curve_fit allows"""
         price, time = price_time_tup
         return (np.tanh(c * (price - price_0) * time) + 1) * 50
 
     @staticmethod
-    def get_open_close_time(ticker: MarketTicker) -> Tuple[float, float]:
+    def get_open_close_time(ticker: MarketTicker) -> Tuple:
         """Gets the unix open and close times based on the market ticker"""
         # Looks like 23NOV12
         event_ticker = ticker.split("-")[1]
@@ -103,7 +104,7 @@ class TanModelINXZStrategy:
             0,
             tzinfo=ColeDBInterface.tz,
         )
-        return open_time.timestamp(), close_time.timestamp()
+        return time.mktime(open_time.timetuple()), time.mktime(close_time.timetuple())
 
     def get_yes_bid_prediction(
         self,
@@ -157,7 +158,6 @@ class TanModelINXZStrategy:
         kalshi_price = bbo.bid.price
 
         predicted_price = pred * omega + (1 - omega) * kalshi_price
-
         if predicted_price > kalshi_price + threshold:
             return Signal.BUY
         elif predicted_price < kalshi_price - threshold:
@@ -195,7 +195,7 @@ class TanModelINXZStrategy:
         assert ts_date.month == close_date.month
         assert ts_date.year == close_date.year
         assert close_date.hour == 16
-        open_date = datetime.fromtimestamp(self.close_time_unix).astimezone(
+        open_date = datetime.fromtimestamp(self.open_time_unix).astimezone(
             ColeDBInterface.tz
         )
         assert open_date.hour == 9
@@ -257,15 +257,15 @@ class TanModelINXZStrategy:
         training_data = self.data.copy()
         training_data["norm_price"] = training_data.spy_price - self.price_threshold
         training_data["norm_ts"] = training_data.ts - self.open_time_unix
-        actual_price = training_data.yes_bid_price.shift(shift_amount)
-        actual_price = actual_price.dropna()
+        training_data["yes_bid_price"] = training_data.yes_bid_price.shift(shift_amount)
+        training_data.dropna(inplace=True)
 
         # TODO: we may need to shift the data! We want to make sure
         # I'm capturing future predictions!!
         params, _ = curve_fit(
             self.tan_model,
             (training_data.norm_price, training_data.norm_ts),
-            actual_price,
+            training_data.yes_bid_price,
             p0=[self.model_params.price_0, self.model_params.c],
         )
         self.model_params.update(params)
@@ -294,5 +294,6 @@ class TanModelINXZStrategy:
         self.append_data(ob, spy_price, ts)
         self.count += 1
         if self.count % 10000 == 0:
+            print(self.count)
             self.train_data()
         return order
