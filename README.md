@@ -54,11 +54,12 @@ https://demo.kalshi.co.
 
 Next, you will need to export these three variables in your local environment (explained later):
 
-- API_URL (example: https://demo-api.kalshi.co/trade-api)
-- API_VERSION (example: v2)
-- API_USERNAME
-- API_PASSWORD
-- TRADING_ENV
+- KALSHI API_URL (example: https://demo-api.kalshi.co/trade-api)
+- KALSHI API_VERSION (example: v2)
+- KALSHI API_USERNAME
+- KALSHI API_PASSWORD
+- KALSHI TRADING_ENV
+- DATABENTO API KEY
 
 In order for tests to pass, you need these env vars. These vars are used for functional
 tests and some regular testing. You can automatically add these env vars
@@ -67,11 +68,12 @@ by creating a bash script like so:
 ```
 #!/bin/sh
 
-export API_URL='https://demo-api.kalshi.co/trade-api'
-export API_VERSION='v2'
-export API_USERNAME='your-email@email.com'
-export API_PASSWORD='some-password'
-export TRADING_ENV = 'demo' or 'prod'
+export KALSHI_API_URL='https://demo-api.kalshi.co/trade-api'
+export KALSHI_API_VERSION='v2'
+export KALSHI_API_USERNAME='your-email@email.com'
+export KALSHI_API_PASSWORD='some-password'
+export KALSHI_TRADING_ENV = 'demo' or 'prod'
+export DATABENTO_API_KEY  = 'some-api-key'
 ```
 
 And then adding the following to your bash / zsh profile: `source path/to/your/script.sh`.
@@ -79,8 +81,8 @@ In order for functional tests to pass, your username and password should corresp
 an actual username and password on Kalshi's demo website.
 
 ### AWS Access
-[TODO: please ignore this section for now while we set up AWS]
 
+[TODO: please ignore this section for now while we set up AWS]
 
 In order to run tests, we need to give you access to AWS. Someone needs to create an AWS account for you, and you will need to create an access key and a secret access key. Then, in the
 `~/.aws/credentials` file locally, you need to paste the following:

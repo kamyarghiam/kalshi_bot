@@ -314,7 +314,7 @@ class TanModelINXZStrategy:
 
         # TODO: remove these training wheels
         ############# TRAINING WHEELS #############
-        self.training_wheels(ob, spy_price, ts)
+        # self.training_wheels(ob, spy_price, ts)
         ################################################
 
         order = self.get_orders(ob, spy_price, ts, portfolio)

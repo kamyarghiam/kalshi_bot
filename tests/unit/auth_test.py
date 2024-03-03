@@ -3,18 +3,26 @@ from datetime import datetime, timedelta
 import pytest
 from mock import patch  # type:ignore
 
-from helpers.types.auth import Auth, LogInResponse, MemberId, MemberIdAndToken, Token
+from helpers.types.auth import (
+    Auth,
+    DatabentoAPIKey,
+    LogInResponse,
+    MemberId,
+    MemberIdAndToken,
+    Token,
+)
 from helpers.types.common import URL
 
 
 @patch(
     "os.environ",
     {
-        "API_USERNAME": "NAME",
-        "API_PASSWORD": "PASS",
-        "API_URL": "URL",
-        "API_VERSION": "VERSION",
-        "TRADING_ENV": "prod",
+        "KALSHI_API_USERNAME": "NAME",
+        "KALSHI_API_PASSWORD": "PASS",
+        "KALSHI_API_URL": "URL",
+        "KALSHI_API_VERSION": "VERSION",
+        "KALSHI_TRADING_ENV": "prod",
+        "DATABENTO_API_KEY": "test-key",
     },
 )
 def test_succesful_auth():
@@ -23,6 +31,7 @@ def test_succesful_auth():
     assert auth._password == "PASS"
     assert auth._username == "NAME"
     assert auth._api_version == URL("VERSION")
+    assert auth._databento_api_key == DatabentoAPIKey("test-key")
 
 
 def test_missing_creds():
@@ -30,10 +39,11 @@ def test_missing_creds():
     with patch(
         "os.environ",
         {
-            "API_PASSWORD": "PASS",
-            "API_URL": "URL",
-            "API_VERSION": "VERSION",
-            "TRADING_ENV": "demo",
+            "KALSHI_API_PASSWORD": "PASS",
+            "KALSHI_API_URL": "URL",
+            "KALSHI_API_VERSION": "VERSION",
+            "KALSHI_TRADING_ENV": "demo",
+            "DATABENTO_API_KEY": "test-key",
         },
     ):
         with pytest.raises(ValueError):
@@ -43,10 +53,11 @@ def test_missing_creds():
     with patch(
         "os.environ",
         {
-            "API_USERNAME": "NAME",
-            "API_URL": "URL",
-            "API_VERSION": "VERSION",
-            "TRADING_ENV": "prod",
+            "KALSHI_API_USERNAME": "NAME",
+            "KALSHI_API_URL": "URL",
+            "KALSHI_API_VERSION": "VERSION",
+            "KALSHI_TRADING_ENV": "prod",
+            "DATABENTO_API_KEY": "test-key",
         },
     ):
         with pytest.raises(ValueError):
@@ -56,10 +67,11 @@ def test_missing_creds():
     with patch(
         "os.environ",
         {
-            "API_USERNAME": "NAME",
-            "API_PASSWORD": "PASS",
-            "API_VERSION": "VERSION",
-            "TRADING_ENV": "demo",
+            "KALSHI_API_USERNAME": "NAME",
+            "KALSHI_API_PASSWORD": "PASS",
+            "KALSHI_API_VERSION": "VERSION",
+            "KALSHI_TRADING_ENV": "demo",
+            "DATABENTO_API_KEY": "test-key",
         },
     ):
         with pytest.raises(ValueError):
@@ -69,10 +81,10 @@ def test_missing_creds():
     with patch(
         "os.environ",
         {
-            "API_USERNAME": "NAME",
-            "API_PASSWORD": "PASS",
-            "API_URL": "URL",
-            "TRADING_ENV": "demo",
+            "KALSHI_API_USERNAME": "NAME",
+            "KALSHI_API_PASSWORD": "PASS",
+            "KALSHI_API_URL": "URL",
+            "KALSHI_TRADING_ENV": "demo",
         },
     ):
         with pytest.raises(ValueError):
@@ -82,9 +94,22 @@ def test_missing_creds():
     with patch(
         "os.environ",
         {
-            "API_USERNAME": "NAME",
-            "API_PASSWORD": "PASS",
-            "API_URL": "URL",
+            "KALSHI_API_USERNAME": "NAME",
+            "KALSHI_API_PASSWORD": "PASS",
+            "KALSHI_API_URL": "URL",
+        },
+    ):
+        with pytest.raises(ValueError):
+            Auth()
+
+    # Missing databento api key
+    with patch(
+        "os.environ",
+        {
+            "KALSHI_API_PASSWORD": "PASS",
+            "KALSHI_API_URL": "URL",
+            "KALSHI_API_VERSION": "VERSION",
+            "KALSHI_TRADING_ENV": "demo",
         },
     ):
         with pytest.raises(ValueError):
@@ -94,11 +119,12 @@ def test_missing_creds():
 @patch(
     "os.environ",
     {
-        "API_USERNAME": "NAME",
-        "API_PASSWORD": "PASS",
-        "API_URL": "URL",
-        "API_VERSION": "VERSION",
-        "TRADING_ENV": "demo",
+        "KALSHI_API_USERNAME": "NAME",
+        "KALSHI_API_PASSWORD": "PASS",
+        "KALSHI_API_URL": "URL",
+        "KALSHI_API_VERSION": "VERSION",
+        "KALSHI_TRADING_ENV": "demo",
+        "DATABENTO_API_KEY": "test-key",
     },
 )
 def test_valid_auth():
@@ -131,11 +157,12 @@ def test_valid_auth():
 @patch(
     "os.environ",
     {
-        "API_USERNAME": "NAME",
-        "API_PASSWORD": "PASS",
-        "API_URL": "https://trading-api.kalshi.com/trade-api/v2/events",
-        "API_VERSION": "VERSION",
-        "TRADING_ENV": "demo",
+        "KALSHI_API_USERNAME": "NAME",
+        "KALSHI_API_PASSWORD": "PASS",
+        "KALSHI_API_URL": "https://trading-api.kalshi.com/trade-api/v2/events",
+        "KALSHI_API_VERSION": "VERSION",
+        "KALSHI_TRADING_ENV": "demo",
+        "DATABENTO_API_KEY": "test-key",
     },
 )
 def test_using_prod():

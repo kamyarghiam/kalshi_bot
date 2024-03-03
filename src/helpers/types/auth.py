@@ -6,6 +6,7 @@ from pydantic import Field
 
 from helpers.constants import (
     API_VERSION_ENV_VAR,
+    DATABENTO_API_KEY,
     ENV_VARS,
     KALSHI_PROD_BASE_URL,
     PASSWORD_ENV_VAR,
@@ -36,6 +37,10 @@ class Password(NonNullStr):
 
 class Username(NonNullStr):
     """Type that encapsulates username"""
+
+
+class DatabentoAPIKey(NonNullStr):
+    """Api key for databento"""
 
 
 class LogInResponse(
@@ -82,6 +87,7 @@ class Auth:
         self._base_url: URL = URL(os.environ.get(URL_ENV_VAR))
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
         self.env: TradingEnv = TradingEnv(os.environ.get(TRADING_ENV_ENV_VAR))
+        self._databento_api_key = DatabentoAPIKey(os.environ.get(DATABENTO_API_KEY))
 
         if is_test_run and KALSHI_PROD_BASE_URL in self._base_url:
             raise ValueError("You're running against prod. Are you sure?")
@@ -106,6 +112,10 @@ class Auth:
     @property
     def api_version(self) -> URL:
         return self._api_version
+
+    @property
+    def databento_api_key(self) -> DatabentoAPIKey:
+        return self._databento_api_key
 
     def is_valid(self):
         """Checks that we are signed in and that the token is not stale"""

@@ -43,11 +43,12 @@ def env_vars(request):
         return
     old_environ = dict(os.environ)
     environ = {
-        "API_URL": "https://demo-api.kalshi.co/trade-api",
-        "API_VERSION": "v2",
-        "API_USERNAME": "your-email@email.com",
-        "API_PASSWORD": "some-password",
-        "TRADING_ENV": "test",
+        "KALSHI_API_URL": "https://demo-api.kalshi.co/trade-api",
+        "KALSHI_API_VERSION": "v2",
+        "KALSHI_API_USERNAME": "your-email@email.com",
+        "KALSHI_API_PASSWORD": "some-password",
+        "KALSHI_TRADING_ENV": "test",
+        "DATABENTO_API_KEY": "test_databento_key",
     }
     os.environ.update(environ)
     try:
