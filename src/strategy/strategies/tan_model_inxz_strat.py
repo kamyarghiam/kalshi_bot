@@ -45,6 +45,7 @@ class TanModelINXZStrategy:
         self,
         ticker: MarketTicker,
     ):
+        # TODO: we also need to submit passive orders
         self.ticker = ticker
         self.spy_price_threshold = TanModelINXZStrategy.extract_market_threshold(ticker)
         # TODO: update this
@@ -213,11 +214,26 @@ class TanModelINXZStrategy:
         if self.ticker not in portfolio.positions:
             return self.get_buy_orders(ob, spy_price, ts, portfolio)
         elif self.ticker in portfolio.positions:
-            return self.get_sell_orders(ob, ts, portfolio)
+            return self.get_sell_orders(ob, ts, spy_price, portfolio)
         return []
 
-    def get_sell_orders(self, ob: Orderbook, ts: int, portfolio: PortfolioHistory):
-        order = ob.sell_order(side=portfolio.positions[self.ticker].side)
+    def get_sell_orders(
+        self, ob: Orderbook, ts: int, spy_price: Cents, portfolio: PortfolioHistory
+    ) -> List[Order]:
+        side = portfolio.positions[self.ticker].side
+        signal = self.get_signal(ob, spy_price, ts)
+        # Do not sell if we still think it's going up
+        match signal:
+            case Signal.BUY:
+                if side == Side.YES:
+                    return []
+            case Signal.SELL:
+                if side == Side.NO:
+                    return []
+            case Signal.NONE:
+                # Do nothing
+                pass
+        order = ob.sell_order(side=side)
         if order:
             order.quantity = Quantity(
                 min(
