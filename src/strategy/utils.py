@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
+from queue import Queue
+from threading import Thread
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -445,3 +447,21 @@ def get_market_data_from_event_ticker(
     ]
 
     return [db.read_df(ticker, nrows=nrows) for ticker in market_tickers]
+
+
+def merge_generators(gen1: Generator, gen2: Generator):
+    """Given two generators, returns messages in order of receiving them"""
+    queue: Queue = Queue()
+
+    def generator_listener(generator, queue):
+        for item in generator:
+            queue.put(item)
+
+    thread1 = Thread(target=generator_listener, args=(gen1, queue))
+    thread2 = Thread(target=generator_listener, args=(gen2, queue))
+
+    thread1.start()
+    thread2.start()
+
+    while True:
+        yield queue.get()  # This will block until a message is available in the queue

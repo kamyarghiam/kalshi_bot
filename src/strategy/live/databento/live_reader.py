@@ -27,3 +27,5 @@ class Databento:
             elif isinstance(msg, db.MBOMsg):
                 price = round((msg.price / 1e7))
                 yield Cents(price)
+            else:
+                print("Unknown databento message: ", msg)

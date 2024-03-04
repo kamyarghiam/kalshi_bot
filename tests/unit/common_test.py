@@ -1,5 +1,6 @@
 import random
 from datetime import datetime
+from time import sleep
 
 import pytest
 from mock import MagicMock, patch
@@ -10,6 +11,7 @@ from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orders import Quantity, Side, compute_fee
 from helpers.types.trades import ExternalTrade
 from helpers.utils import PendingMessages, compute_pnl, send_alert_email
+from strategy.utils import merge_generators
 
 
 def test_basic_urls():
@@ -167,3 +169,20 @@ def test_to_internal_trade():
     assert trade.yes_price == internal_trade.yes_price
     assert trade.taker_side == internal_trade.taker_side
     assert trade.ticker == internal_trade.ticker
+
+
+def test_merge_generators():
+    def gen1():
+        yield 0
+        sleep(0.03)
+        yield 2
+
+    def gen2():
+        sleep(0.02)
+        yield 1
+        sleep(0.03)
+        yield 3
+
+    gen = merge_generators(gen1(), gen2())
+    for i in range(4):
+        assert next(gen) == i
