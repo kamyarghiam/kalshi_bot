@@ -12,9 +12,8 @@ from strategy.utils import PortfolioHistory, merge_generators
 
 
 def main(is_test_run: bool = True):
-    # TODO: fill these out
-    ticker = MarketTicker("")
-    balance = Cents(10000)
+    ticker = MarketTicker("INXZ-24MAR04-T5137.08")
+    balance = Cents(4335)
     if ticker == "":
         assert False, "put a ticker in"
     # TODO: get this from Kalshi's platform
@@ -47,3 +46,7 @@ def main(is_test_run: bool = True):
                     for order in orders:
                         if e.place_order(order):
                             portfolio.place_order(order)
+
+
+if __name__ == "__main__":
+    main(is_test_run=False)
