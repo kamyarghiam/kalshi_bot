@@ -5,8 +5,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Union
 
+from pydantic import BaseModel, Extra
+
 from helpers.types.api import ExternalApi
-from helpers.types.auth import MemberId
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
 
@@ -103,7 +104,7 @@ class Order:
 
 class CreateOrderRequest(ExternalApi):
     action: TradeType
-    client_order_id: MemberId
+    client_order_id: str
     count: Quantity
     side: Side
     ticker: MarketTicker
@@ -122,3 +123,21 @@ class CreateOrderRequest(ExternalApi):
     # If type = market and action = buy, buy_max_cost
     # represents the maximum cents that can be spent to acquire a position
     buy_max_cost: Cents | None = None
+
+
+class CreateOrderStatus(Enum):
+    RESTING = "resting"
+    CANCELED = "canceled"
+    EXECUTED = "executed"
+    PENDING = "pending"
+
+
+class CreateOrderResponse(ExternalApi):
+    class OrderResponse(BaseModel):
+        class Config:
+            extra = Extra.allow
+            use_enum_values = True
+
+        status: CreateOrderStatus
+
+    order: OrderResponse

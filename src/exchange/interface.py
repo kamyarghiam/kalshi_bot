@@ -9,6 +9,7 @@ from helpers.constants import (
     EXCHANGE_STATUS_URL,
     MARKETS_URL,
     ORDERBOOK_URL,
+    PLACE_ORDER_URL,
     TRADES_URL,
 )
 from helpers.types.common import URL
@@ -22,6 +23,15 @@ from helpers.types.markets import (
     MarketTicker,
 )
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
+from helpers.types.orders import (
+    CreateOrderRequest,
+    CreateOrderResponse,
+    CreateOrderStatus,
+    Order,
+    OrderType,
+    Quantity,
+    Side,
+)
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
 
@@ -44,6 +54,34 @@ class ExchangeInterface:
         """
         self.is_test_run = is_test_run
         self._connection = Connection(test_client, is_test_run)
+
+    def place_order(self, order: Order) -> bool:
+        """Attempts to place IOC order. Returns whether order is executed.
+        NOTE: I haven't looked into the semantics of what happens if the
+        order is partially filled"""
+
+        # TODO: test me!
+        price = (
+            {"yes_price": order.price}
+            if order.side == Side.YES
+            else {"no_price": order.price}
+        )
+        raw_resp = self._connection.post(
+            PLACE_ORDER_URL,
+            CreateOrderRequest(
+                ticker=order.ticker,
+                action=order.trade,
+                type=OrderType.LIMIT,
+                client_order_id=str(hash(order)),
+                count=order.quantity,
+                side=order.side,
+                expiration_ts=datetime.now(),  # Some time in the past to trigger IOC
+                sell_position_floor=Quantity(0),
+                **price,  # type:ignore[arg-type]
+            ),
+        )
+        resp = CreateOrderResponse.parse_obj(raw_resp)
+        return resp.order.status == CreateOrderStatus.EXECUTED
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(

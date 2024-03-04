@@ -41,8 +41,9 @@ def main(is_test_run: bool = True):
                     last_spy_price = data
 
                 if last_ob and last_spy_price:
-                    strat.consume_next_step(
+                    orders = strat.consume_next_step(
                         last_ob, last_spy_price, round(time.time()), portfolio
                     )
-                    # TODO: place orders on Kalshi
-                    ...
+                    for order in orders:
+                        if e.place_order(order):
+                            portfolio.place_order(order)
