@@ -37,7 +37,7 @@ from helpers.types.websockets.response import (
     UnsubscribedWR,
     WebsocketResponse,
 )
-from tests.utils import random_data_from_basemodel
+from tests.utils import random_data
 
 
 def test_websocket_wrapper():
@@ -67,13 +67,13 @@ def test_convert_websocket_response():
     ]
 
     for response_type in all_response_types:
-        random_data = random_data_from_basemodel(  # type:ignore
+        data = random_data(  # type:ignore
             response_type  # type:ignore
         )
-        response_as_wr = WebsocketResponse(**random_data.dict())
+        response_as_wr = WebsocketResponse(**data.dict())
         # Does not error
-        result = response_as_wr.convert(random_data)
-        assert result == random_data
+        result = response_as_wr.convert(data)
+        assert result == data
 
 
 def test_parse_response():

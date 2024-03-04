@@ -60,7 +60,6 @@ class ExchangeInterface:
         NOTE: I haven't looked into the semantics of what happens if the
         order is partially filled"""
 
-        # TODO: test me!
         price = (
             {"yes_price": order.price}
             if order.side == Side.YES
@@ -75,13 +74,15 @@ class ExchangeInterface:
                 client_order_id=str(hash(order)),
                 count=order.quantity,
                 side=order.side,
-                expiration_ts=datetime.now(),  # Some time in the past to trigger IOC
+                expiration_ts=str(
+                    datetime.now()
+                ),  # Some time in the past to trigger IOC
                 sell_position_floor=Quantity(0),
                 **price,  # type:ignore[arg-type]
             ),
         )
-        resp = CreateOrderResponse.parse_obj(raw_resp)
-        return resp.order.status == CreateOrderStatus.EXECUTED
+        resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
+        return resp.order.status == CreateOrderStatus.EXECUTED.value
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(

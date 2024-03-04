@@ -60,7 +60,8 @@ def compute_fee(price: Price, quantity: Quantity) -> Cents:
     )
 
 
-@dataclass()
+# Unsafe hash is for CreateOrderRequest to create unique id for order
+@dataclass(unsafe_hash=True)
 class Order:
     price: Price
     quantity: Quantity
@@ -117,7 +118,7 @@ class CreateOrderRequest(ExternalApi):
     # If not supplied, then it's Good Till Cancelled
     # If time is in past, then it's IOC
     # If in future, unfilled quantity will expire in future
-    expiration_ts: datetime | None = None
+    expiration_ts: str | None = None
     # SellPositionFloor will not let you flip position for a market order if set to 0.
     sell_position_floor: Quantity | None = None
     # If type = market and action = buy, buy_max_cost
@@ -132,12 +133,15 @@ class CreateOrderStatus(Enum):
     PENDING = "pending"
 
 
+class InnerCreateOrderResponse(BaseModel):
+    class Config:
+        extra = Extra.allow
+        use_enum_values = True
+
+    # TODO: right now, this is parsed as a string
+    # in parse_obj, fix later
+    status: CreateOrderStatus
+
+
 class CreateOrderResponse(ExternalApi):
-    class OrderResponse(BaseModel):
-        class Config:
-            extra = Extra.allow
-            use_enum_values = True
-
-        status: CreateOrderStatus
-
-    order: OrderResponse
+    order: InnerCreateOrderResponse

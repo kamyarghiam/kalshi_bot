@@ -16,6 +16,7 @@ from helpers.constants import (
     LOGOUT_URL,
     MARKETS_URL,
     ORDERBOOK_URL,
+    PLACE_ORDER_URL,
     TRADES_URL,
 )
 from helpers.types.api import Cursor
@@ -40,7 +41,15 @@ from helpers.types.markets import (
 )
 from helpers.types.money import Price
 from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
-from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.orders import (
+    CreateOrderRequest,
+    CreateOrderResponse,
+    CreateOrderStatus,
+    InnerCreateOrderResponse,
+    Quantity,
+    QuantityDelta,
+    Side,
+)
 from helpers.types.trades import ExternalTrade, GetTradesResponse
 from helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from helpers.types.websockets.request import (
@@ -198,6 +207,17 @@ def kalshi_test_exchange_factory():
         return GetOrderbookResponse(
             orderbook=ApiOrderbook(yes=yes, no=no),
         )
+
+    @router.post(PLACE_ORDER_URL)
+    def create_order(order: CreateOrderRequest):
+        if order.ticker == MarketTicker("EXECUTED"):
+            return CreateOrderResponse(
+                order=InnerCreateOrderResponse(status=CreateOrderStatus.EXECUTED),
+            )
+        else:
+            return CreateOrderResponse(
+                order=InnerCreateOrderResponse(status=CreateOrderStatus.PENDING),
+            )
 
     @router.get(MARKETS_URL)
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):
