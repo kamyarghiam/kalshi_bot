@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from types import TracebackType
 from typing import ContextManager, Generator, List
@@ -74,9 +75,7 @@ class ExchangeInterface:
                 client_order_id=str(hash(order)),
                 count=order.quantity,
                 side=order.side,
-                expiration_ts=str(
-                    datetime.now()
-                ),  # Some time in the past to trigger IOC
+                expiration_ts=int(time.time()),  # Some time in the past to trigger IOC
                 sell_position_floor=Quantity(0),
                 **price,  # type:ignore[arg-type]
             ),

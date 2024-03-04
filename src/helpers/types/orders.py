@@ -104,6 +104,9 @@ class Order:
 
 
 class CreateOrderRequest(ExternalApi):
+    class Config:
+        use_enum_values = True
+
     action: TradeType
     client_order_id: str
     count: Quantity
@@ -118,7 +121,7 @@ class CreateOrderRequest(ExternalApi):
     # If not supplied, then it's Good Till Cancelled
     # If time is in past, then it's IOC
     # If in future, unfilled quantity will expire in future
-    expiration_ts: str | None = None
+    expiration_ts: int | None = None
     # SellPositionFloor will not let you flip position for a market order if set to 0.
     sell_position_floor: Quantity | None = None
     # If type = market and action = buy, buy_max_cost

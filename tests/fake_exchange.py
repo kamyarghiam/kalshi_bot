@@ -210,7 +210,7 @@ def kalshi_test_exchange_factory():
 
     @router.post(PLACE_ORDER_URL)
     def create_order(order: CreateOrderRequest):
-        if order.ticker == MarketTicker("EXECUTED"):
+        if order.ticker == MarketTicker("MOON-26DEC31"):
             return CreateOrderResponse(
                 order=InnerCreateOrderResponse(status=CreateOrderStatus.EXECUTED),
             )
