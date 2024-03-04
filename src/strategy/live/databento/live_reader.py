@@ -24,8 +24,8 @@ class Databento:
         for msg in self._client:
             if isinstance(msg, db.SymbolMappingMsg):
                 continue
-            elif isinstance(msg, db.MBOMsg):
+            elif isinstance(msg, db.MBP1Msg):
                 price = round((msg.price / 1e7))
                 yield Cents(price)
             else:
-                print("Unknown databento message: ", msg)
+                raise ValueError("Unknown databento message: ", msg)
