@@ -21,7 +21,7 @@ from helpers.types.common import URL
         "KALSHI_API_PASSWORD": "PASS",
         "KALSHI_API_URL": "URL",
         "KALSHI_API_VERSION": "VERSION",
-        "KALSHI_TRADING_ENV": "prod",
+        "KALSHI_TRADING_ENV": "test",
         "DATABENTO_API_KEY": "test-key",
     },
 )
@@ -56,7 +56,7 @@ def test_missing_creds():
             "KALSHI_API_USERNAME": "NAME",
             "KALSHI_API_URL": "URL",
             "KALSHI_API_VERSION": "VERSION",
-            "KALSHI_TRADING_ENV": "prod",
+            "KALSHI_TRADING_ENV": "test",
             "DATABENTO_API_KEY": "test-key",
         },
     ):
@@ -161,12 +161,12 @@ def test_valid_auth():
         "KALSHI_API_PASSWORD": "PASS",
         "KALSHI_API_URL": "https://trading-api.kalshi.com/trade-api/v2/events",
         "KALSHI_API_VERSION": "VERSION",
-        "KALSHI_TRADING_ENV": "demo",
+        "KALSHI_TRADING_ENV": "test",
         "DATABENTO_API_KEY": "test-key",
     },
 )
 def test_using_prod():
-    # Test that we can't use pro credentials
+    # Test that we can't use prod credentials
     with pytest.raises(ValueError):
         Auth()
 

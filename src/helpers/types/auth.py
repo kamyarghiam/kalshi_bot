@@ -89,8 +89,12 @@ class Auth:
         self.env: TradingEnv = TradingEnv(os.environ.get(TRADING_ENV_ENV_VAR))
         self._databento_api_key = DatabentoAPIKey(os.environ.get(DATABENTO_API_KEY))
 
-        if is_test_run and KALSHI_PROD_BASE_URL in self._base_url:
+        if is_test_run and (
+            self.env == TradingEnv.PROD or KALSHI_PROD_BASE_URL in self._base_url
+        ):
             raise ValueError("You're running against prod. Are you sure?")
+        elif not is_test_run and self.env != TradingEnv.PROD:
+            raise ValueError("You said it's not a test run but env vars are demo")
 
         # Filled after getting info from exchange
         self._member_id: MemberId | None = None

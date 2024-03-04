@@ -12,7 +12,7 @@ from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 
 def main():
     # Load historical data
-    date = "2023-11-30"
+    date = "2023-10-18"
     db = ColeDBInterface()
     end_time = "16:00:00"  # 4 pm
     end_datetime_str = f"{date} {end_time}"

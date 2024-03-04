@@ -187,6 +187,9 @@ class TanModelINXZStrategy:
             )
 
     def training_wheels(self, ob: Orderbook, spy_price: Cents, ts: int):
+        # Only test first 500 messages
+        if self.count > 500:
+            return
         ts_date = datetime.fromtimestamp(ts).astimezone(ColeDBInterface.tz)
         assert 30000 < spy_price and spy_price < 50000
         assert ts_date.day == ob.ts.day
@@ -294,6 +297,7 @@ class TanModelINXZStrategy:
             (training_data.norm_price, training_data.norm_ts),
             training_data.yes_bid_price,
             p0=[self.model_params.price_0, self.model_params.c],
+            maxfev=5000,
         )
         self.model_params.update(params)
         self.trained_once = True
@@ -314,7 +318,7 @@ class TanModelINXZStrategy:
 
         # TODO: remove these training wheels
         ############# TRAINING WHEELS #############
-        # self.training_wheels(ob, spy_price, ts)
+        self.training_wheels(ob, spy_price, ts)
         ################################################
 
         order = self.get_orders(ob, spy_price, ts, portfolio)
