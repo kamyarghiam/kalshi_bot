@@ -32,6 +32,7 @@ from helpers.types.orders import (
     OrderType,
     Quantity,
     Side,
+    TradeType,
 )
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
@@ -76,10 +77,13 @@ class ExchangeInterface:
                 count=order.quantity,
                 side=order.side,
                 expiration_ts=int(time.time()),  # Some time in the past to trigger IOC
-                sell_position_floor=Quantity(0),
+                sell_position_floor=Quantity(0)
+                if order.trade == TradeType.SELL
+                else None,
                 **price,  # type:ignore[arg-type]
             ),
         )
+        print(raw_resp)
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
         return resp.order.status == CreateOrderStatus.EXECUTED.value
 

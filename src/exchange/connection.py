@@ -304,7 +304,7 @@ class Connection:
                 method=method.value,
                 url=self._api_version.add(url),
                 params=params,
-                json=None if body is None else body.dict(),
+                json=None if body is None else body.dict(exclude_none=True),
                 headers=headers,
             )
         )
