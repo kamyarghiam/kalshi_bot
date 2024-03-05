@@ -78,6 +78,18 @@ def main(is_test_run: bool = True):
                     )
 
 
+def get_bbo_as_string(ob: Orderbook | None) -> str:
+    if ob is None:
+        return ""
+    bbo = ob.get_bbo()
+    result = ""
+    if bbo.ask:
+        result += f"Ask: {bbo.ask.price}\n"
+    if bbo.bid:
+        result += f"Bid: {bbo.bid.price}"
+    return result
+
+
 def generate_table(
     num_snapshot_msgs: int,
     num_delta_msgs: int,
@@ -96,13 +108,12 @@ def generate_table(
     table.add_column("Kalshi BBO", style="cyan", width=12)
     table.add_column("Strat prediction", style="cyan", width=12)
     table.add_column("Portfolio", style="cyan", width=12)
-    bbo = None if ob is None else ob.get_bbo()
     table.add_row(
         str(num_snapshot_msgs),
         str(num_delta_msgs),
         str(num_spy_msgs),
         str(spy_price),
-        str(bbo),
+        str(get_bbo_as_string(ob)),
         str(prediction),
         str(portfolio),
     )

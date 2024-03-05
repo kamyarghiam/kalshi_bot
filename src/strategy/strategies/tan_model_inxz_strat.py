@@ -195,7 +195,7 @@ class TanModelINXZStrategy:
         if self.count > 500:
             return
         ts_date = datetime.fromtimestamp(ts).astimezone(ColeDBInterface.tz)
-        assert 30000 < spy_price and spy_price < 70000
+        assert 30000 < spy_price and spy_price < 70000, spy_price
         assert ts_date.day == ob.ts.day
         assert ts_date.month == ob.ts.month
         assert ts_date.year == ob.ts.year
