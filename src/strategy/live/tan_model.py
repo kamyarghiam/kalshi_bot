@@ -1,5 +1,8 @@
 import time
 
+from rich.live import Live
+from rich.table import Table
+
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
@@ -18,6 +21,9 @@ def main(is_test_run: bool = True):
         assert False, "put a ticker in"
     # TODO: get this from Kalshi's platform
     portfolio = PortfolioHistory(Balance(balance))
+    num_spy_msgs = 0
+    num_snapshot_msgs = 0
+    num_delta_msgs = 0
     strat = TanModelINXZStrategy(ticker)
     databento = Databento(is_test_run)
     last_ob: Orderbook | None = None
@@ -28,24 +34,61 @@ def main(is_test_run: bool = True):
             orderbook_gen = sub.continuous_receive()
             spy_data_gen = databento.stream_data()
             gen = merge_generators(orderbook_gen, spy_data_gen)
-            while True:
-                data: OrderbookSnapshotWR | OrderbookDeltaWR | Cents = next(gen)
-                if isinstance(data, OrderbookSnapshotWR):
-                    last_ob = Orderbook.from_snapshot(data.msg)
-                elif isinstance(data, OrderbookDeltaWR):
-                    assert last_ob
-                    last_ob = last_ob.apply_delta(data.msg)
-                else:
-                    # Databento data
-                    last_spy_price = data
+            with Live(
+                generate_table(
+                    num_snapshot_msgs, num_delta_msgs, num_spy_msgs, portfolio
+                ),
+                refresh_per_second=1,
+            ) as live:
+                while True:
+                    data: OrderbookSnapshotWR | OrderbookDeltaWR | Cents = next(gen)
+                    if isinstance(data, OrderbookSnapshotWR):
+                        last_ob = Orderbook.from_snapshot(data.msg)
+                        num_snapshot_msgs += 1
+                    elif isinstance(data, OrderbookDeltaWR):
+                        assert last_ob
+                        num_delta_msgs += 1
+                        last_ob = last_ob.apply_delta(data.msg)
+                    else:
+                        # Databento data
+                        last_spy_price = data
+                        num_spy_msgs += 1
 
-                if last_ob and last_spy_price:
-                    orders = strat.consume_next_step(
-                        last_ob, last_spy_price, round(time.time()), portfolio
+                    if last_ob and last_spy_price:
+                        orders = strat.consume_next_step(
+                            last_ob, last_spy_price, round(time.time()), portfolio
+                        )
+                        for order in orders:
+                            if e.place_order(order):
+                                portfolio.place_order(order)
+                    live.update(
+                        generate_table(
+                            num_snapshot_msgs, num_delta_msgs, num_spy_msgs, portfolio
+                        )
                     )
-                    for order in orders:
-                        if e.place_order(order):
-                            portfolio.place_order(order)
+
+
+def generate_table(
+    num_snapshot_msgs: int,
+    num_delta_msgs: int,
+    num_spy_msgs: int,
+    portfolio: PortfolioHistory,
+) -> Table:
+    table = Table(show_header=True, header_style="bold", title="Tan Model Strat")
+
+    table.add_column("Snapshot msgs", style="cyan", width=12)
+    table.add_column("Delta msgs", style="cyan", width=12)
+    table.add_column("Spy msgs", style="cyan", width=12)
+    table.add_column("Portfolio", style="cyan", width=12)
+
+    table.add_row(
+        str(num_snapshot_msgs),
+        str(num_delta_msgs),
+        str(num_spy_msgs),
+        str(portfolio),
+    )
+
+    return table
 
 
 if __name__ == "__main__":
