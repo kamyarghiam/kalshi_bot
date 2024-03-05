@@ -83,7 +83,6 @@ class ExchangeInterface:
                 **price,  # type:ignore[arg-type]
             ),
         )
-        print(raw_resp)
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
         return resp.order.status == CreateOrderStatus.EXECUTED.value
 
