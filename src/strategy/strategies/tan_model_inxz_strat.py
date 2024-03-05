@@ -328,8 +328,6 @@ class TanModelINXZStrategy:
         order = self.get_orders(ob, spy_price, ts, portfolio)
         self.append_data(ob, spy_price, ts)
         self.count += 1
-        if self.count % 100 == 0:
-            print(self.count)
         if self.count % 10000 == 0:
             self.train_data()
         return order

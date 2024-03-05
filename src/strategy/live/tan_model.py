@@ -15,11 +15,9 @@ from strategy.utils import PortfolioHistory, merge_generators
 
 
 def main(is_test_run: bool = True):
-    ticker = MarketTicker("INXZ-24MAR04-T5137.08")
-    balance = Cents(4335)
-    if ticker == "":
-        assert False, "put a ticker in"
+    ticker = MarketTicker("INXZ-24MAR05-T5130.95")
     # TODO: get this from Kalshi's platform
+    balance = Cents(4335)
     portfolio = PortfolioHistory(Balance(balance))
     num_spy_msgs = 0
     num_snapshot_msgs = 0
