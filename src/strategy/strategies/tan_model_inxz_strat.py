@@ -61,9 +61,11 @@ class TanModelINXZStrategy:
         self.model_params = ModelParams()
         self.trained_once = False
         self.count = 0
+        # Used for monitoring
+        self.last_prediction: Cents | None = None
 
         # Hyperparams
-        self.max_order_quantity = 100
+        self.max_order_quantity = 10
         self.shift_amount = 62
         # How much info should we extract from our prediction vs actual price
         self.omega = 0.7
@@ -121,7 +123,7 @@ class TanModelINXZStrategy:
         spy_price: float,
         ts: int,
     ) -> Cents:
-        return Cents(
+        pred = Cents(
             (
                 self.tan_model(
                     (spy_price - self.price_threshold, ts - self.open_time_unix),
@@ -130,6 +132,8 @@ class TanModelINXZStrategy:
                 )
             )
         )
+        self.last_prediction = pred
+        return pred
 
     @staticmethod
     def extract_market_threshold(ticker: MarketTicker) -> Cents:

@@ -36,7 +36,13 @@ def main(is_test_run: bool = True):
             gen = merge_generators(orderbook_gen, spy_data_gen)
             with Live(
                 generate_table(
-                    num_snapshot_msgs, num_delta_msgs, num_spy_msgs, portfolio
+                    num_snapshot_msgs,
+                    num_delta_msgs,
+                    num_spy_msgs,
+                    portfolio,
+                    last_ob,
+                    last_spy_price,
+                    strat.last_prediction,
                 ),
                 refresh_per_second=1,
             ) as live:
@@ -63,7 +69,13 @@ def main(is_test_run: bool = True):
                                 portfolio.place_order(order)
                     live.update(
                         generate_table(
-                            num_snapshot_msgs, num_delta_msgs, num_spy_msgs, portfolio
+                            num_snapshot_msgs,
+                            num_delta_msgs,
+                            num_spy_msgs,
+                            portfolio,
+                            last_ob,
+                            last_spy_price,
+                            strat.last_prediction,
                         )
                     )
 
@@ -73,18 +85,27 @@ def generate_table(
     num_delta_msgs: int,
     num_spy_msgs: int,
     portfolio: PortfolioHistory,
+    ob: Orderbook | None,
+    spy_price: Cents | None,
+    prediction: Cents | None,
 ) -> Table:
     table = Table(show_header=True, header_style="bold", title="Tan Model Strat")
 
     table.add_column("Snapshot msgs", style="cyan", width=12)
     table.add_column("Delta msgs", style="cyan", width=12)
     table.add_column("Spy msgs", style="cyan", width=12)
+    table.add_column("SPY Price", style="cyan", width=12)
+    table.add_column("Kalshi BBO", style="cyan", width=12)
+    table.add_column("Strat prediction", style="cyan", width=12)
     table.add_column("Portfolio", style="cyan", width=12)
-
+    bbo = None if ob is None else ob.get_bbo()
     table.add_row(
         str(num_snapshot_msgs),
         str(num_delta_msgs),
         str(num_spy_msgs),
+        str(spy_price),
+        str(bbo),
+        str(prediction),
         str(portfolio),
     )
 
