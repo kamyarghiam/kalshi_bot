@@ -1,16 +1,19 @@
 import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from matplotlib import pyplot as plt
 
 from data.coledb.coledb import ColeDBInterface
-from exchange.interface import ExchangeInterface
+from helpers.types.api import ExternalApi
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price, get_opposite_side_price
 from helpers.types.orderbook import GetOrderbookRequest, Orderbook
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
+
+if TYPE_CHECKING:
+    from exchange.interface import ExchangeInterface
 
 
 class Position:
@@ -180,7 +183,7 @@ class PortfolioHistory:
     def has_open_positions(self):
         return len(self._positions) > 0
 
-    def get_unrealized_pnl(self, e: ExchangeInterface):
+    def get_unrealized_pnl(self, e: "ExchangeInterface"):
         """Gets you the unrealized pnl without fees.
         Does not include realized portion of pnl"""
         unrealized_pnl: Cents = Cents(0)
@@ -437,3 +440,8 @@ class PortfolioHistory:
         plt.plot(times, midpoints, color="blue")
 
         plt.show()
+
+
+class GetPortfolioBalanceResponse(ExternalApi):
+    balance: Cents
+    payout: Cents = Cents(0)

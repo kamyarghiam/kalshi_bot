@@ -17,6 +17,7 @@ from helpers.constants import (
     MARKETS_URL,
     ORDERBOOK_URL,
     PLACE_ORDER_URL,
+    PORTFOLIO_BALANCE,
     TRADES_URL,
 )
 from helpers.types.api import Cursor
@@ -39,7 +40,7 @@ from helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from helpers.types.money import Price
+from helpers.types.money import Cents, Price
 from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
 from helpers.types.orders import (
     CreateOrderRequest,
@@ -50,6 +51,7 @@ from helpers.types.orders import (
     QuantityDelta,
     Side,
 )
+from helpers.types.portfolio import GetPortfolioBalanceResponse
 from helpers.types.trades import ExternalTrade, GetTradesResponse
 from helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from helpers.types.websockets.request import (
@@ -126,6 +128,10 @@ def kalshi_test_exchange_factory():
     def exchange_status():
         """Returns a dummy exchange status"""
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
+
+    @router.get(PORTFOLIO_BALANCE)
+    def portfolio_balance():
+        return GetPortfolioBalanceResponse(balance=Cents(1000))
 
     @router.get(TRADES_URL)
     def get_trades(

@@ -13,6 +13,7 @@ LOGOUT_URL = URL("/logout")
 TRADES_URL = URL("/markets/trades")
 ORDERBOOK_URL = URL("/orderbook")
 PLACE_ORDER_URL = URL("/portfolio/orders")
+PORTFOLIO_BALANCE = URL("/portfolio/balance")
 
 # ENV VARS
 USERNAME_ENV_VAR = "KALSHI_API_USERNAME"

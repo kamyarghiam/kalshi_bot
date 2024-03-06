@@ -46,3 +46,9 @@ def test_get_unrealized_pnl(exchange_interface: ExchangeInterface):
     )
     # Make sure portfolio object didn't change
     assert previous_positions_value == portfolio.get_positions_value()
+
+
+def test_get_portfolio_balance(exchange_interface: ExchangeInterface):
+    port_balance = exchange_interface.get_portfolio_balance()
+    assert port_balance.balance > Cents(0)
+    assert port_balance.payout == Cents(0)

@@ -11,6 +11,7 @@ from helpers.constants import (
     MARKETS_URL,
     ORDERBOOK_URL,
     PLACE_ORDER_URL,
+    PORTFOLIO_BALANCE,
     TRADES_URL,
 )
 from helpers.types.common import URL
@@ -34,6 +35,7 @@ from helpers.types.orders import (
     Side,
     TradeType,
 )
+from helpers.types.portfolio import GetPortfolioBalanceResponse
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
 
@@ -163,6 +165,13 @@ class ExchangeInterface:
             if response.has_empty_cursor():
                 break
             request.cursor = response.cursor
+
+    def get_portfolio_balance(self) -> GetPortfolioBalanceResponse:
+        return GetPortfolioBalanceResponse.parse_obj(
+            self._connection.get(
+                url=PORTFOLIO_BALANCE,
+            )
+        )
 
     ######## Helpers ############
 
