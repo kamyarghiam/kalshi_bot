@@ -15,9 +15,6 @@ from strategy.utils import PortfolioHistory, merge_generators
 
 
 def main(is_test_run: bool = True):
-    # TODO: get this from Kalshi's platform
-    balance = Cents(4342)
-    portfolio = PortfolioHistory(Balance(balance))
     num_spy_msgs = 0
     num_snapshot_msgs = 0
     num_delta_msgs = 0
@@ -26,8 +23,10 @@ def main(is_test_run: bool = True):
     last_ob: Orderbook | None = None
     last_spy_price: Cents | None = None
     with ExchangeInterface(is_test_run=is_test_run) as e:
+        balance = e.get_portfolio_balance().balance
         ticker = get_current_inxz_ticker(e)
         strat = TanModelINXZStrategy(ticker)
+        portfolio = PortfolioHistory(Balance(balance))
         with e.get_websocket() as ws:
             sub = OrderbookSubscription(ws, [ticker])
             orderbook_gen = sub.continuous_receive()
