@@ -74,6 +74,7 @@ from helpers.types.websockets.response import (
     SubscriptionUpdatedWR,
     UnsubscribedWR,
 )
+from tests.utils import random_data
 
 
 @dataclass
@@ -233,11 +234,16 @@ def kalshi_test_exchange_factory():
             )
             for _ in range(100)
         ]
+        # For INXZ test
+        inxz_market = random_data(Market)
+        inxz_market.ticker = MarketTicker("INXZ-test")
+        inxz_market.status = MarketStatus.ACTIVE
+
         # We hardcode that there are 3 pages
         if cursor is None:
             return GetMarketsResponse(
                 cursor=Cursor("1"),
-                markets=markets,
+                markets=markets + [inxz_market],
             )
         elif cursor == Cursor("1"):
             return GetMarketsResponse(

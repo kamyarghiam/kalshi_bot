@@ -15,19 +15,19 @@ from strategy.utils import PortfolioHistory, merge_generators
 
 
 def main(is_test_run: bool = True):
-    # TODO: need to get ticker
-    ticker = MarketTicker("INXZ-24MAR06-T5078.65")
     # TODO: get this from Kalshi's platform
     balance = Cents(4342)
     portfolio = PortfolioHistory(Balance(balance))
     num_spy_msgs = 0
     num_snapshot_msgs = 0
     num_delta_msgs = 0
-    strat = TanModelINXZStrategy(ticker)
+
     databento = Databento(is_test_run)
     last_ob: Orderbook | None = None
     last_spy_price: Cents | None = None
     with ExchangeInterface(is_test_run=is_test_run) as e:
+        ticker = get_current_inxz_ticker(e)
+        strat = TanModelINXZStrategy(ticker)
         with e.get_websocket() as ws:
             sub = OrderbookSubscription(ws, [ticker])
             orderbook_gen = sub.continuous_receive()
@@ -77,6 +77,17 @@ def main(is_test_run: bool = True):
                             strat.last_prediction,
                         )
                     )
+
+
+def get_current_inxz_ticker(e: ExchangeInterface) -> MarketTicker:
+    print("Getting inxz ticker..")
+    active_markets = e.get_active_markets()
+    tickers = [market.ticker for market in active_markets]
+    inxz_tickers = [ticker for ticker in tickers if "INXZ" in ticker]
+    assert len(inxz_tickers) == 1, f"There is not just one inxz ticker: {inxz_tickers}"
+    ticker = inxz_tickers[0]
+    print("Ticker is", ticker)
+    return ticker
 
 
 def get_bbo_as_string(ob: Orderbook | None) -> str:
