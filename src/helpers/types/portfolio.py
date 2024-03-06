@@ -162,6 +162,10 @@ class PortfolioHistory:
         self.max_exposure: Cents = Cents(0)
 
     @property
+    def balance(self) -> Cents:
+        return self._cash_balance.balance
+
+    @property
     def current_exposure(self) -> Cents:
         return self.get_positions_value()
 

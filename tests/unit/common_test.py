@@ -10,7 +10,12 @@ from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price
 from helpers.types.orders import Quantity, Side, compute_fee
 from helpers.types.trades import ExternalTrade
-from helpers.utils import PendingMessages, compute_pnl, send_alert_email
+from helpers.utils import (
+    PendingMessages,
+    compute_pnl,
+    get_max_quantity_can_afford,
+    send_alert_email,
+)
 from strategy.utils import merge_generators
 
 
@@ -186,3 +191,16 @@ def test_merge_generators():
     gen = merge_generators(gen1(), gen2())
     for i in range(4):
         assert next(gen) == i
+
+
+def test_get_max_quantity_can_afford():
+    assert get_max_quantity_can_afford(portfolio_balance=Cents(0), price=Price(1)) == 0
+    assert (
+        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(1)) == 93
+    )
+    assert (
+        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(2)) == 46
+    )
+    assert (
+        get_max_quantity_can_afford(portfolio_balance=Cents(500), price=Price(11)) == 42
+    )

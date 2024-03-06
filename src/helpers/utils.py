@@ -6,8 +6,8 @@ from email.mime.text import MIMEText
 from typing import Generic, Iterable, Iterator, TypeVar
 
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Price
-from helpers.types.orders import Order, Quantity, Side, TradeType
+from helpers.types.money import Cents, Price
+from helpers.types.orders import Order, Quantity, Side, TradeType, compute_fee
 
 T = TypeVar("T")
 
@@ -85,3 +85,22 @@ def send_alert_email(message: str):
     finally:
         # Close the SMTP server connection
         server.quit()
+
+
+def get_max_quantity_can_afford(portfolio_balance: Cents, price: Price):
+    """Gets the max quantity we can afford to buy a contract
+    at a specific price (with fees)
+
+    Uses binary search"""
+    # Binary search for the maximum affordable quantity
+    low, high = 0, portfolio_balance // price  # Initial search range
+
+    while low <= high:
+        mid = (low + high) // 2
+        total_cost = price * mid + compute_fee(price, Quantity(int(mid)))
+        if total_cost <= portfolio_balance:
+            low = mid + 1  # type:ignore[assignment]
+        else:
+            high = mid - 1
+
+    return high

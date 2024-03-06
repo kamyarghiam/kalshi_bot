@@ -49,6 +49,10 @@ class Balance:
             raise ValueError(f"{initial_balance} negative balance")
         self._balance: Cents = Cents(initial_balance)
 
+    @property
+    def balance(self) -> Cents:
+        return self._balance
+
     def __add__(self, other):
         return Balance(self._balance + other)
 

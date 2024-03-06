@@ -15,6 +15,7 @@ from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side
 from helpers.types.portfolio import PortfolioHistory
+from helpers.utils import get_max_quantity_can_afford
 
 
 class Signal(Enum):
@@ -271,14 +272,19 @@ class TanModelINXZStrategy:
                 # Do nothing
                 pass
         if buy_order:
-            buy_order.quantity = Quantity(
-                min(buy_order.quantity, self.max_order_quantity)
+            max_quantity_can_afford = get_max_quantity_can_afford(
+                portfolio.balance, buy_order.price
             )
-            if portfolio.can_afford(buy_order):
-                buy_order.time_placed = datetime.fromtimestamp(ts).astimezone(
-                    ColeDBInterface.tz
+            buy_order.quantity = Quantity(
+                min(
+                    buy_order.quantity, self.max_order_quantity, max_quantity_can_afford
                 )
-                return [buy_order]
+            )
+            assert portfolio.can_afford(buy_order), (buy_order, portfolio)
+            buy_order.time_placed = datetime.fromtimestamp(ts).astimezone(
+                ColeDBInterface.tz
+            )
+            return [buy_order]
         return []
 
     def train_data(self):
