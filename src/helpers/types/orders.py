@@ -129,7 +129,7 @@ class CreateOrderRequest(ExternalApi):
     buy_max_cost: Cents | None = None
 
 
-class CreateOrderStatus(Enum):
+class CreateOrderStatus(str, Enum):
     RESTING = "resting"
     CANCELED = "canceled"
     EXECUTED = "executed"
@@ -141,8 +141,6 @@ class InnerCreateOrderResponse(BaseModel):
         extra = Extra.allow
         use_enum_values = True
 
-    # TODO: right now, this is parsed as a string
-    # in parse_obj, fix later
     status: CreateOrderStatus
 
 

@@ -86,7 +86,7 @@ class ExchangeInterface:
             ),
         )
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
-        return resp.order.status == CreateOrderStatus.EXECUTED.value
+        return resp.order.status == CreateOrderStatus.EXECUTED
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(
