@@ -65,12 +65,12 @@ class TanModelINXZStrategy:
         self.last_prediction: Cents | None = None
 
         # Hyperparams
-        self.max_order_quantity = 10
+        self.max_order_quantity = 100
         self.shift_amount = 62
         # How much info should we extract from our prediction vs actual price
-        self.omega = 0.7
+        self.omega = 0.6
         # How much of a difference should our price have from the actual price
-        self.threshold = Cents(4)
+        self.threshold = Cents(5)
 
         super().__init__()
 
@@ -206,7 +206,7 @@ class TanModelINXZStrategy:
         assert ts_date.day == close_date.day
         assert ts_date.month == close_date.month
         assert ts_date.year == close_date.year
-        assert close_date.hour == 16
+        assert close_date.hour == 16, close_date
         open_date = datetime.fromtimestamp(self.open_time_unix).astimezone(
             ColeDBInterface.tz
         )
@@ -328,6 +328,6 @@ class TanModelINXZStrategy:
         order = self.get_orders(ob, spy_price, ts, portfolio)
         self.append_data(ob, spy_price, ts)
         self.count += 1
-        if self.count % 10000 == 0:
+        if self.count % 50000 == 0:
             self.train_data()
         return order

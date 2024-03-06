@@ -15,9 +15,10 @@ from strategy.utils import PortfolioHistory, merge_generators
 
 
 def main(is_test_run: bool = True):
-    ticker = MarketTicker("INXZ-24MAR05-T5130.95")
+    # TODO: need to get ticker
+    ticker = MarketTicker("INXZ-24MAR06-T5078.65")
     # TODO: get this from Kalshi's platform
-    balance = Cents(4335)
+    balance = Cents(4342)
     portfolio = PortfolioHistory(Balance(balance))
     num_spy_msgs = 0
     num_snapshot_msgs = 0
