@@ -334,6 +334,12 @@ class TanModelINXZStrategy:
         order = self.get_orders(ob, spy_price, ts, portfolio)
         self.append_data(ob, spy_price, ts)
         self.count += 1
-        if self.count % 50000 == 0:
-            self.train_data()
+        if not self.trained_once:
+            # Delay first training for a long time (about 20 min?)
+            if self.count > 300000:
+                self.train_data()
+        else:
+            # Retrain frequently
+            if self.count % 20000 == 0:
+                self.train_data()
         return order
