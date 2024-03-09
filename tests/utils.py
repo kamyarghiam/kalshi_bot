@@ -4,6 +4,10 @@ from enum import Enum
 from polyfactory.factories import DataclassFactory, pydantic_factory
 from pydantic import BaseModel
 
+from exchange.interface import ExchangeInterface
+from helpers.types.orderbook import GetOrderbookRequest, OrderbookView
+from helpers.types.orders import Order, Quantity, Side
+
 # Dataclasses don't have native type hints
 BM = typing.TypeVar("BM", bound=BaseModel | typing.Any)
 
@@ -51,3 +55,29 @@ def almost_equal(x: float, y: float):
 
 def list_to_generator(list_: typing.List) -> typing.Generator:
     return (x for x in list_)
+
+
+def get_valid_order_on_demo_market(e: ExchangeInterface) -> Order:
+    """Useful for tests that place orders on demo exchange.
+
+    Returns an order that's valid on the market and can be placed.
+    Defaults quantity to 1"""
+    assert e.is_test_run
+    active_markets = e.get_active_markets(pages=1)
+    for market in active_markets:
+        if market.liquidity > 0:
+            o = e.get_market_orderbook(
+                GetOrderbookRequest(ticker=market.ticker, depth=1)
+            )
+            o = o.get_view(OrderbookView.ASK)
+            if not o.yes.is_empty():
+                order = o.buy_order(Side.YES)
+            else:
+                order = o.buy_order(Side.NO)
+            assert order is not None
+            order.quantity = Quantity(1)
+            return order
+    raise ValueError(
+        "Could not find a market with liquidity on demo."
+        + " Maybe increase num pages when getting active markets"
+    )

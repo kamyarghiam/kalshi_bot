@@ -200,10 +200,15 @@ class Orderbook:
     def from_lists(
         cls,
         ticker: MarketTicker,
-        yes: List,
-        no: List,
+        yes: List | None,
+        no: List | None,
         ts: datetime | None = None,
     ):
+        if yes is None:
+            yes = []
+        if no is None:
+            no = []
+
         ts = datetime.now() if ts is None else ts
 
         yes_side = OrderbookSide()
@@ -279,8 +284,8 @@ class Orderbook:
 
 
 class ApiOrderbook(ExternalApi):
-    yes: List[List] = []
-    no: List[List] = []
+    yes: List[List] | None = []
+    no: List[List] | None = []
 
     def to_internal_orderbook(self, ticker: MarketTicker) -> Orderbook:
         return Orderbook.from_lists(ticker, self.yes, self.no)

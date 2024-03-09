@@ -83,3 +83,10 @@ def local_only():
     """Run a test locally only. Functional tests run against kalshi demo"""
     if pytest.is_functional:
         pytest.skip("We don't want to run this against the real demo exchange ")
+
+
+@pytest.fixture()
+def functional_only():
+    """Run a test remote only against Kalshi exchange"""
+    if not pytest.is_functional:
+        pytest.skip("We only want to run this test remotely")

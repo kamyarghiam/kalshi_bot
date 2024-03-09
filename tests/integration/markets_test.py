@@ -1,7 +1,10 @@
+import pytest
+
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import Market, MarketStatus, MarketTicker
 
 
+@pytest.mark.usefixtures("local_only")
 def test_get_active_markets(exchange_interface: ExchangeInterface):
     open_markets = exchange_interface.get_active_markets(pages=2)
 

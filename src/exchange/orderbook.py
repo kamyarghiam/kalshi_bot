@@ -74,6 +74,7 @@ class OrderbookSubscription:
         ] = PendingMessages()
         self._send_order_fills = send_order_fills
         self._send_orderbook_updates = send_orderbook_updates
+        self._subscribe()
 
     def continuous_receive(
         self,
@@ -81,7 +82,6 @@ class OrderbookSubscription:
         """Returns messages from orderbook channel and makes sure
         that seq ids are consecutive"""
 
-        self._subscribe()
         while True:
             try:
                 response = self._get_next_message()

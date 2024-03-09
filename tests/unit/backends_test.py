@@ -11,9 +11,7 @@ def s3_bucket():
 
 
 def test_s3_sync(s3_bucket: str):
-    if not pytest.is_functional:
-        # TODO: remove this when I get S3 permissions
-        return
+    pytest.skip("I currently don't have S3 permissions")
     sync_local_p = pathlib.Path(__file__).parent.parent / "data"
     old_local_files = set(sync_local_p.rglob("*"))
     remote_path = S3Path.from_path_str(bucket=s3_bucket, path="test")

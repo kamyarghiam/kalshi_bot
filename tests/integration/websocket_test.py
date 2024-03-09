@@ -6,18 +6,20 @@ from mock import patch
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Price
+from helpers.types.money import Price, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide
-from helpers.types.orders import Quantity, QuantityDelta, Side
+from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 from helpers.types.websockets.common import Command, CommandId, Type, WebsocketError
 from helpers.types.websockets.request import Channel, SubscribeRP, WebsocketRequest
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookDeltaWR,
     OrderbookSnapshotWR,
+    OrderFillRM,
     OrderFillWR,
     WebsocketResponse,
 )
+from tests.utils import get_valid_order_on_demo_market
 
 
 def test_invalid_channel(exchange_interface: ExchangeInterface):
@@ -155,3 +157,44 @@ def test_orderbook_sub_order_fills_and_order_udpdates(
         assert isinstance(msg2, OrderbookDeltaWR)
         assert isinstance(msg3, OrderbookDeltaWR)
         assert isinstance(msg4, OrderFillWR)
+
+
+@pytest.mark.usefixtures("functional_only")
+def test_orderbook_fill_functional_only(exchange_interface: ExchangeInterface):
+    order = get_valid_order_on_demo_market(exchange_interface)
+    with exchange_interface.get_websocket() as ws:
+        sub = OrderbookSubscription(
+            ws, [order.ticker], send_order_fills=True, send_orderbook_updates=False
+        )
+        gen = sub.continuous_receive()
+        req: Order = Order(
+            price=Price(99),
+            quantity=Quantity(1),
+            trade=TradeType.BUY,
+            ticker=order.ticker,
+            side=order.side,
+        )
+        assert exchange_interface.place_order(req) is True
+        fill_msg = next(gen)
+        assert isinstance(fill_msg, OrderFillWR)
+        print(order.side)
+        assert fill_msg == OrderFillWR(
+            type=Type.FILL,
+            sid=fill_msg.sid,
+            msg=OrderFillRM(
+                trade_id=fill_msg.msg.trade_id,
+                order_id=fill_msg.msg.order_id,
+                market_ticker=order.ticker,
+                is_taker=True,
+                side=order.side,
+                count=Quantity(1),
+                action=TradeType.BUY,
+                ts=fill_msg.msg.ts,
+                yes_price=order.price
+                if order.side == Side.YES
+                else get_opposite_side_price(order.price),
+                no_price=order.price
+                if order.side == Side.NO
+                else get_opposite_side_price(order.price),
+            ),
+        )

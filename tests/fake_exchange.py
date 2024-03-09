@@ -220,14 +220,9 @@ def kalshi_test_exchange_factory():
 
     @router.post(PLACE_ORDER_URL)
     def create_order(order: CreateOrderRequest):
-        if order.ticker == MarketTicker("MOON-25DEC31"):
-            return CreateOrderResponse(
-                order=InnerCreateOrderResponse(status=CreateOrderStatus.EXECUTED),
-            )
-        else:
-            return CreateOrderResponse(
-                order=InnerCreateOrderResponse(status=CreateOrderStatus.PENDING),
-            )
+        return CreateOrderResponse(
+            order=InnerCreateOrderResponse(status=CreateOrderStatus.EXECUTED),
+        )
 
     @router.get(MARKETS_URL)
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):
@@ -240,6 +235,7 @@ def kalshi_test_exchange_factory():
                 else status,
                 ticker=MarketTicker("some_ticker"),
                 result=MarketResult.NOT_DETERMINED,
+                liquidity=1,
             )
             for _ in range(100)
         ]

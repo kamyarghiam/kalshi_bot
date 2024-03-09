@@ -37,6 +37,7 @@ def test_collect_orderbook_data(exchange_interface: ExchangeInterface):
     assert len(mock_cole_db.write.call_args_list) == 3
 
 
+@pytest.mark.usefixtures("local_only")
 def test_get_orderbook(exchange_interface: ExchangeInterface):
     request = GetOrderbookRequest(ticker=MarketTicker("TICKER"), depth=1)
     ob = exchange_interface.get_market_orderbook(request)

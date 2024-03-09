@@ -1,3 +1,4 @@
+# flake8: noqa directive
 """
 The goal of this model is to take in orderbook information from
 a market and to output a prediction of how much the price will
@@ -465,13 +466,13 @@ def train_models(base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/
         X_test = X_test.reshape(X_test.shape[0], 1, X_test.shape[1])
 
         # Build the LSTM model
-        model = Sequential()
+        model = Sequential()  # type:ignore
         model.add(
-            LSTM(
+            LSTM(  # type:ignore
                 50, activation="relu", input_shape=(X_train.shape[1], X_train.shape[2])
             )
         )
-        model.add(Dense(2, activation="linear"))
+        model.add(Dense(2, activation="linear"))  # type:ignore
         model.compile(
             optimizer="adam", loss="mse"
         )  # Use mean squared error as the loss function
@@ -491,7 +492,7 @@ def predict(base_path=LOCAL_STORAGE_FOLDER / "research/single_market_model/"):
     # Load the saved model
     model_name = "prediction_model_ask.h5"
     # assert False, "change the model name"
-    loaded_model = load_model(base_path / (model_name))
+    loaded_model = load_model(base_path / (model_name))  # type:ignore
     scaler = joblib.load(base_path / "ask-scaler.pkl")
 
     df = pd.read_csv((base_path / "INXD-23SEP14-B4437") / "input_vec.csv")

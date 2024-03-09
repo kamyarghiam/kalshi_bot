@@ -2,12 +2,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
 from strategy.research.orderbook_only.single_market_model import bbo_vec_to_output_vec
 
 
+@pytest.mark.usefixtures("local_only")
 def test_bbo_vec_to_output_vec(
     exchange_interface: ExchangeInterface,
     tmp_path: Path,

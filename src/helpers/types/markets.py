@@ -62,6 +62,7 @@ class Market(BaseModel):
     status: MarketStatus
     ticker: MarketTicker
     result: MarketResult
+    liquidity: int = 0
 
     class Config:
         extra = Extra.allow
