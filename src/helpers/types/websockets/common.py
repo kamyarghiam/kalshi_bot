@@ -10,6 +10,7 @@ class Type(str, Enum):
     ORDERBOOK_DELTA = "orderbook_delta"
     UNSUBSCRIBE = "unsubscribed"
     SUBSCRIPTION_UPDATED = "ok"
+    FILL = "fill"
 
     # Incorrect type, used for testing
     TEST_WRONG_TYPE = "WRONG_TYPE"

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -70,6 +71,8 @@ from helpers.types.websockets.response import (
     OrderbookDeltaWR,
     OrderbookSnapshotRM,
     OrderbookSnapshotWR,
+    OrderFillRM,
+    OrderFillWR,
     SubscribedRM,
     SubscribedWR,
     SubscriptionUpdatedRM,
@@ -322,6 +325,8 @@ def kalshi_test_exchange_factory():
             return await handle_unknown_channel(websocket, data)
         if channel == Channel.ORDER_BOOK_DELTA:
             return await handle_order_book_delta_channel(websocket, data)
+        if channel == Channel.FILL:
+            return await handle_order_fill_channel(websocket, data)
         raise ValueError(f"Invalid channel {channel}")
 
     async def subscribe(
@@ -398,6 +403,21 @@ def kalshi_test_exchange_factory():
             msg=ErrorRM(code=8, msg="Unknown channel name"),
         )
         await websocket.send_text(unknown_channel.json(exclude_none=True))
+
+    async def handle_order_fill_channel(
+        websocket: FastApiWebSocket, data: WebsocketRequest
+    ):
+        params: SubscribeRP = data.params
+        assert len(params.market_tickers) >= 1
+        market_ticker = params.market_tickers[0]
+        sid = await subscribe(websocket, data, Channel.FILL)
+        order_fill_rm: OrderFillRM = random_data(
+            OrderFillRM,
+            custom_args={Quantity: lambda: Quantity(random.randint(0, 100))},
+        )
+        order_fill_rm.market_ticker = market_ticker
+        order_fill_wr = OrderFillWR(type=Type.FILL, sid=sid, msg=order_fill_rm)
+        await websocket.send_text(order_fill_wr.json(exclude_none=True))
 
     async def handle_order_book_delta_channel(
         websocket: FastApiWebSocket, data: WebsocketRequest

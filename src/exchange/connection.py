@@ -40,6 +40,7 @@ from helpers.types.websockets.response import (
     ErrorWR,
     OrderbookDeltaWR,
     OrderbookSnapshotWR,
+    OrderFillWR,
     SubscribedWR,
     SubscriptionUpdatedWR,
     UnsubscribedWR,
@@ -250,6 +251,7 @@ class Websocket:
             Type.SUBSCRIBED: SubscribedWR,
             Type.UNSUBSCRIBE: UnsubscribedWR,
             Type.SUBSCRIPTION_UPDATED: SubscriptionUpdatedWR,
+            Type.FILL: OrderFillWR,
         }
         return response.convert(type_to_response[response.type])
 

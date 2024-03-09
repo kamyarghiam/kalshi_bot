@@ -22,20 +22,25 @@ from helpers.types.websockets.response import (
     OrderbookDeltaWR,
     OrderbookSnapshotWR,
     OrderFillWR,
+    SubscribedWR,
     SubscriptionUpdatedWR,
 )
 from helpers.utils import PendingMessages
 
 
 class OrderbookSubscription:
-    """Interface to allow for easy access to an orderbook subscription
+    """Interface to allow for easy access to an orderbook subscription and order fills
 
     To use this, first create a websocket with the Exchange interface
     then pass it in here with a list of market tickers you want to subscribe to"""
 
     # These are valid message types we can receive from the websocket client
     MESSAGE_TYPES_TO_RECEIVE: TypeAlias = (
-        OrderbookSnapshotWR | OrderbookDeltaWR | SubscriptionUpdatedWR | OrderFillWR
+        OrderbookSnapshotWR
+        | OrderbookDeltaWR
+        | SubscriptionUpdatedWR
+        | OrderFillWR
+        | SubscribedWR
     )
 
     # These are messages with the seq field that needs to be checked
@@ -48,7 +53,16 @@ class OrderbookSubscription:
         OrderbookSnapshotWR | OrderbookDeltaWR | OrderFillWR
     )
 
-    def __init__(self, ws: Websocket, market_tickers: List[MarketTicker]):
+    def __init__(
+        self,
+        ws: Websocket,
+        market_tickers: List[MarketTicker],
+        send_orderbook_updates: bool = True,
+        send_order_fills: bool = False,
+    ):
+        assert (
+            send_orderbook_updates or send_order_fills
+        ), "You should be subscribed to at least one channel"
         self._sid: SubscriptionId
         self._last_seq_id: SeqId | None = None
         self._ws = ws
@@ -58,6 +72,8 @@ class OrderbookSubscription:
         self._pending_msgs: PendingMessages[
             OrderbookSubscription.MESSAGE_TYPES_TO_RECEIVE
         ] = PendingMessages()
+        self._send_order_fills = send_order_fills
+        self._send_orderbook_updates = send_orderbook_updates
 
     def continuous_receive(
         self,
@@ -89,8 +105,9 @@ class OrderbookSubscription:
                     else:
                         self._resubscribe()
                 else:
-                    assert self._is_valid_return_type(response)
-                    yield response
+                    if isinstance(response, get_args(self.MESSAGE_TYPES_TO_RETURN)):
+                        assert self._is_valid_return_type(response), response
+                        yield response
 
     def _get_next_message(self) -> "OrderbookSubscription.MESSAGE_TYPES_TO_RECEIVE":
         """We either pull the next message from the pending message queue
@@ -157,11 +174,17 @@ class OrderbookSubscription:
         self._subscribe()
 
     def _get_subscription_request(self):
+        channels = []
+        if self._send_orderbook_updates:
+            channels.append(Channel.ORDER_BOOK_DELTA)
+        if self._send_order_fills:
+            channels.append(Channel.FILL)
+
         return WebsocketRequest(
             id=CommandId.get_new_id(),
             cmd=Command.SUBSCRIBE,
             params=SubscribeRP(
-                channels=[Channel.ORDER_BOOK_DELTA],
+                channels=channels,
                 market_tickers=self._market_tickers,
             ),
         )

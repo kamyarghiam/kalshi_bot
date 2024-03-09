@@ -11,10 +11,8 @@ from helpers.types.orderbook import GetOrderbookRequest, Orderbook
 from helpers.types.orders import Quantity
 
 
+@pytest.mark.usefixtures("local_only")
 def test_live_orderbook_reader(exchange_interface: ExchangeInterface):
-    if pytest.is_functional:
-        pytest.skip("Only works with local testing")
-
     reader = OrderbookReader.live(exchange_interface)
 
     msg1 = next(reader)

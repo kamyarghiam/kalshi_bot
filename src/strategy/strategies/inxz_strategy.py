@@ -1,5 +1,4 @@
 import collections
-import pdb
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -244,7 +243,6 @@ class INXZStrategy:
         spy_std_dev = self.get_spy_std_dev()
 
         def minimize_bids(x):
-            pdb.set_trace()
             params = SigmoidParams(m=x[0], b=x[1], shift_up=x[2], c=x[3], d=x[4])
             self.update_data_with_sigmoid_params(params, spy_std_dev)
             # Adjust below for bids (yes_ask_price)

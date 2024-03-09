@@ -1,3 +1,4 @@
+import random
 import ssl
 from unittest.mock import ANY, MagicMock
 
@@ -15,6 +16,7 @@ from helpers.types.orders import Quantity
 from helpers.types.websockets.common import (
     Command,
     CommandId,
+    SeqId,
     SubscriptionId,
     Type,
     WebsocketError,
@@ -30,7 +32,12 @@ from helpers.types.websockets.request import (
 from helpers.types.websockets.response import (
     ErrorRM,
     ErrorWR,
+    OrderbookDeltaRM,
+    OrderbookDeltaWR,
     OrderbookSnapshotRM,
+    OrderbookSnapshotWR,
+    OrderFillRM,
+    OrderFillWR,
     ResponseMessage,
     SubscribedWR,
     SubscriptionUpdatedWR,
@@ -55,21 +62,42 @@ def test_websocket_wrapper():
 def test_convert_websocket_response():
     # If this fails, it means we have to add a new object in the convert function
     # For websocket responses
-    assert len(Type.__members__.values()) == 7
+    assert len(Type.__members__.values()) == 8
     all_response_types = [
         SubscribedWR,
         ErrorWR,
-        # TODO: polyfactory can't translate the price field in the below two classes
-        # OrderbookSnapshotWR,
-        # OrderbookDeltaWR,
         UnsubscribedWR,
         SubscriptionUpdatedWR,
+        # For some reason, pydantic can't recurse
+        # with custom args into these types, so
+        # we convert them later to websocket responses
+        OrderbookSnapshotRM,
+        OrderbookDeltaRM,
+        OrderFillRM,
     ]
 
     for response_type in all_response_types:
         data = random_data(  # type:ignore
-            response_type  # type:ignore
+            response_type,  # type:ignore
+            custom_args={
+                Quantity: lambda: Quantity(random.randint(0, 100)),
+                Price: lambda: Price(random.randint(1, 99)),
+            },
         )
+        if isinstance(data, OrderFillRM):
+            data = OrderFillWR(type=Type.FILL, sid=SubscriptionId(1), msg=data)
+        elif isinstance(data, OrderbookSnapshotRM):
+            data = OrderbookSnapshotWR(
+                type=Type.ORDERBOOK_SNAPSHOT,
+                sid=SubscriptionId(1),
+                seq=SeqId(1),
+                msg=data,
+            )
+        elif isinstance(data, OrderbookDeltaRM):
+            data = OrderbookDeltaWR(
+                type=Type.ORDERBOOK_DELTA, sid=SubscriptionId(1), seq=SeqId(1), msg=data
+            )
+
         response_as_wr = WebsocketResponse(**data.dict())
         # Does not error
         result = response_as_wr.convert(data)

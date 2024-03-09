@@ -15,6 +15,7 @@ from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookDeltaWR,
     OrderbookSnapshotWR,
+    OrderFillWR,
     WebsocketResponse,
 )
 
@@ -33,12 +34,8 @@ def test_invalid_channel(exchange_interface: ExchangeInterface):
         assert error.match("code=8 msg='Unknown channel name'")
 
 
+@pytest.mark.usefixtures("local_only")
 def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface):
-    if pytest.is_functional:
-        pytest.skip(
-            "We don't want to run this against the real exchange "
-            + "since the ouptut data may be different"
-        )
     market_ticker = MarketTicker("bad_seq_id")
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, [market_ticker])
@@ -88,12 +85,8 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
         )
 
 
+@pytest.mark.usefixtures("local_only")
 def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterface):
-    if pytest.is_functional:
-        pytest.skip(
-            "We don't want to run this against the real exchange "
-            + "since the ouptut data may be different"
-        )
     with exchange_interface.get_websocket() as ws:
         market_ticker = MarketTicker("SHOULD_ERROR")
         sub = OrderbookSubscription(ws, [market_ticker])
@@ -109,12 +102,8 @@ def test_orderbook_subsciption_normal_error(exchange_interface: ExchangeInterfac
                 mock_resubscribe.assert_called_once_with()
 
 
+@pytest.mark.usefixtures("local_only")
 def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface):
-    if pytest.is_functional:
-        pytest.skip(
-            "We don't want to run this against the real exchange "
-            + "since the ouptut data may be different"
-        )
     with exchange_interface.get_websocket() as ws:
         market_ticker = MarketTicker("NORMAL_TICKER")
         sub = OrderbookSubscription(ws, [market_ticker])
@@ -134,3 +123,35 @@ def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface
             next(gen)
 
         assert sub._market_tickers == [MarketTicker("another_market")]
+
+
+@pytest.mark.usefixtures("local_only")
+def test_orderbook_sub_order_fills(exchange_interface: ExchangeInterface):
+    with exchange_interface.get_websocket() as ws:
+        market_ticker = MarketTicker("NORMAL_TICKER")
+        sub = OrderbookSubscription(
+            ws, [market_ticker], send_orderbook_updates=False, send_order_fills=True
+        )
+        gen = sub.continuous_receive()
+        msg = next(gen)
+        assert isinstance(msg, OrderFillWR)
+        assert msg.msg.market_ticker == market_ticker
+
+
+@pytest.mark.usefixtures("local_only")
+def test_orderbook_sub_order_fills_and_order_udpdates(
+    exchange_interface: ExchangeInterface,
+):
+    with exchange_interface.get_websocket() as ws:
+        market_ticker = MarketTicker("NORMAL_TICKER")
+        sub = OrderbookSubscription(ws, [market_ticker], send_order_fills=True)
+        gen = sub.continuous_receive()
+
+        msg1 = next(gen)
+        msg2 = next(gen)
+        msg3 = next(gen)
+        msg4 = next(gen)
+        assert isinstance(msg1, OrderbookSnapshotWR)
+        assert isinstance(msg2, OrderbookDeltaWR)
+        assert isinstance(msg3, OrderbookDeltaWR)
+        assert isinstance(msg4, OrderFillWR)

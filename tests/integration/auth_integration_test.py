@@ -39,9 +39,8 @@ def test_sign_in_and_out(fastapi_test_client: TestClient):
     assert not exchange._connection._auth.is_valid()
 
 
+@pytest.mark.usefixtures("local_only")
 def test_missing_or_invalid_auth_header(fastapi_test_client: TestClient):
-    if pytest.is_functional:
-        pytest.skip("Not necessary for integration testing")
     # We instantiate our own exchange interface so it does not interfere with
     # other tests while signing in and out
     exchange = ExchangeInterface(fastapi_test_client)

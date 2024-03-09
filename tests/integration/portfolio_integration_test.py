@@ -8,10 +8,8 @@ from helpers.utils import Side
 from strategy.utils import PortfolioHistory
 
 
+@pytest.mark.usefixtures("local_only")
 def test_get_unrealized_pnl(exchange_interface: ExchangeInterface):
-    if pytest.is_functional:
-        pytest.skip("Hard to test with actual exchange")
-
     determined_ticker = MarketTicker("DETERMINED-YES")
     not_determined_ticker = MarketTicker("NOT-DETERMINED")
 

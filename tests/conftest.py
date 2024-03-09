@@ -76,3 +76,10 @@ def cole_db(tmp_path_factory: TempPathFactory):
 def real_readonly_coledb():
     db = ReadonlyColeDB()
     yield db
+
+
+@pytest.fixture()
+def local_only():
+    """Run a test locally only. Functional tests run against kalshi demo"""
+    if pytest.is_functional:
+        pytest.skip("We don't want to run this against the real demo exchange ")

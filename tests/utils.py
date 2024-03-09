@@ -37,7 +37,6 @@ def random_data(
         @classmethod
         def get_provider_map(cls) -> typing.Dict[typing.Type, typing.Any]:
             providers_map = super().get_provider_map()
-
             return {
                 **custom_args,
                 **providers_map,
