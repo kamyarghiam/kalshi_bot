@@ -11,7 +11,12 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookView
-from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
+from helpers.types.websockets.response import (
+    OrderbookDeltaRM,
+    OrderbookDeltaWR,
+    OrderbookSnapshotRM,
+    OrderbookSnapshotWR,
+)
 
 
 class OrderbookReader(Generator[Orderbook, None, None]):
@@ -77,7 +82,8 @@ def live_data_reader(
         sub = OrderbookSubscription(ws, market_tickers)
         gen = sub.continuous_receive()
         for msg in gen:
-            yield msg.msg
+            if isinstance(msg, (OrderbookSnapshotWR, OrderbookDeltaWR)):
+                yield msg.msg
 
 
 # Currently pretty hard to test this

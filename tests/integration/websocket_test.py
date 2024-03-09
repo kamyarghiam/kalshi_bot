@@ -54,6 +54,7 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
         assert Orderbook.from_snapshot(first_message.msg) == expected_snapshot
 
         second_message = next(gen)
+        assert isinstance(second_message, OrderbookDeltaWR)
         expected_delta = OrderbookDeltaRM(
             market_ticker=market_ticker,
             price=Price(10),
@@ -77,6 +78,7 @@ def test_orderbook_subsciption_bad_seq_id(exchange_interface: ExchangeInterface)
         assert Orderbook.from_snapshot(fourth_message.msg) == expected_snapshot
 
         fifth_message = next(gen)
+        assert isinstance(fifth_message, OrderbookDeltaWR)
         assert fifth_message.msg == OrderbookDeltaRM(
             market_ticker=market_ticker,
             price=Price(10),
@@ -119,7 +121,7 @@ def test_orderbook_sub_update_subscription(exchange_interface: ExchangeInterface
         gen = sub.continuous_receive()
         next(gen)
         sub.update_subscription([MarketTicker("another_market")])
-        msgs: List[OrderbookSubscription.MESSAGE_TYPE] = []
+        msgs: List[OrderbookSubscription.MESSAGE_TYPES_TO_RECEIVE] = []
         for msg in sub._pending_msgs:
             msg: type[WebsocketResponse]  # type:ignore[no-redef]
             msgs.append(msg)

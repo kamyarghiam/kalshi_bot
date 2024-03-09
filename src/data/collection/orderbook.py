@@ -54,12 +54,13 @@ def collect_orderbook_data(
             generate_table(num_snapshot_msgs, num_delta_msgs), refresh_per_second=1
         ) as live:
             while True:
-                data: OrderbookSnapshotWR | OrderbookDeltaWR = next(gen)
+                data: OrderbookSubscription.MESSAGE_TYPES_TO_RETURN = next(gen)
                 if isinstance(data, OrderbookSnapshotWR):
                     num_snapshot_msgs += 1
-                else:
-                    assert isinstance(data, OrderbookDeltaWR)
+                elif isinstance(data, OrderbookDeltaWR):
                     num_delta_msgs += 1
+                else:
+                    continue
                 live.update(generate_table(num_snapshot_msgs, num_delta_msgs))
                 db.write(data.msg)
 

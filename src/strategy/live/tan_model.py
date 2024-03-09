@@ -8,7 +8,11 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Cents
 from helpers.types.orderbook import Orderbook
-from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
+from helpers.types.websockets.response import (
+    OrderbookDeltaWR,
+    OrderbookSnapshotWR,
+    OrderFillWR,
+)
 from strategy.live.databento.live_reader import Databento
 from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 from strategy.utils import PortfolioHistory, merge_generators
@@ -45,7 +49,9 @@ def main(is_test_run: bool = True):
                 refresh_per_second=1,
             ) as live:
                 while True:
-                    data: OrderbookSnapshotWR | OrderbookDeltaWR | Cents = next(gen)
+                    data: OrderbookSubscription.MESSAGE_TYPES_TO_RETURN | Cents = next(
+                        gen
+                    )
                     if isinstance(data, OrderbookSnapshotWR):
                         last_ob = Orderbook.from_snapshot(data.msg)
                         num_snapshot_msgs += 1
@@ -53,10 +59,15 @@ def main(is_test_run: bool = True):
                         assert last_ob
                         num_delta_msgs += 1
                         last_ob = last_ob.apply_delta(data.msg)
-                    else:
+                    elif isinstance(data, Cents):
                         # Databento data
                         last_spy_price = data
                         num_spy_msgs += 1
+                    elif isinstance(data, OrderFillWR):
+                        # TODO: fill out
+                        pass
+                    else:
+                        print("Received unknown data type: ", data)
 
                     if last_ob and last_spy_price:
                         orders = strat.consume_next_step(
