@@ -197,6 +197,7 @@ class OrderFillRM(ResponseMessage):
             trade=self.action,
             ticker=self.market_ticker,
             side=self.side,
+            is_taker=self.is_taker,
         )
 
 

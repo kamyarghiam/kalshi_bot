@@ -66,7 +66,9 @@ class ExchangeInterface:
         order is partially filled"""
 
         price = (
-            {"yes_price": order.price}
+            {}
+            if order.order_type == OrderType.MARKET
+            else {"yes_price": order.price}
             if order.side == Side.YES
             else {"no_price": order.price}
         )
@@ -75,13 +77,13 @@ class ExchangeInterface:
             CreateOrderRequest(
                 ticker=order.ticker,
                 action=order.trade,
-                type=OrderType.LIMIT,
+                type=order.order_type,
                 client_order_id=str(hash(order)),
                 count=order.quantity,
                 side=order.side,
                 expiration_ts=int(time.time()),  # Some time in the past to trigger IOC
                 sell_position_floor=Quantity(0)
-                if order.trade == TradeType.SELL
+                if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
                 else None,
                 **price,  # type:ignore[arg-type]
             ),

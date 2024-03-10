@@ -78,6 +78,7 @@ class Order:
     side: Side
     time_placed: datetime = field(default_factory=datetime.now, compare=False)
     is_taker: bool = field(default_factory=lambda: True)
+    order_type: OrderType = field(default_factory=lambda: OrderType.LIMIT)
 
     @property
     def fee(self) -> Cents:
