@@ -1,4 +1,5 @@
 import pickle
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Tuple
@@ -10,7 +11,15 @@ from helpers.types.api import ExternalApi
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price, get_opposite_side_price
 from helpers.types.orderbook import GetOrderbookRequest, Orderbook
-from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
+from helpers.types.orders import (
+    Order,
+    OrderId,
+    Quantity,
+    QuantityDelta,
+    Side,
+    TradeType,
+)
+from helpers.types.websockets.response import OrderFillRM
 
 if TYPE_CHECKING:
     from exchange.interface import ExchangeInterface
@@ -148,6 +157,17 @@ class PortfolioError(Exception):
     """Some issue with buying or selling"""
 
 
+@dataclass
+class ReservedOrder:
+    """When we reserve an order, we requested to place the
+    order on the exchange, but we haven't received the ack yet.
+    They order can be filled in multiple steps, so we need to
+    keep track of the quantity and money left per order"""
+
+    qty_left: Quantity
+    money_left: Cents
+
+
 class PortfolioHistory:
     _pickle_file = Path("last_portfolio.pickle")
 
@@ -156,14 +176,16 @@ class PortfolioHistory:
         balance: Balance,
     ):
         self._cash_balance: Balance = balance
+        self._reserved_cash: Balance = Balance(0)
         self._positions: Dict[MarketTicker, Position] = {}
+        self._reserved_orders: Dict[OrderId, ReservedOrder]
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
 
     @property
     def balance(self) -> Cents:
-        return self._cash_balance.balance
+        return self._cash_balance.balance - self._reserved_cash.balance
 
     @property
     def current_exposure(self) -> Cents:
@@ -183,6 +205,13 @@ class PortfolioHistory:
     @property
     def positions(self):
         return self._positions
+
+    def reserve(self, amount: Cents):
+        """This function can be used to reserve or free up reserved cash
+
+        Reserved cash is good for setting aside some money until an order
+        goes through, for example. Pass in negative amount to free up cash"""
+        self._reserved_cash += amount
 
     def has_open_positions(self):
         return len(self._positions) > 0
@@ -237,6 +266,7 @@ class PortfolioHistory:
             + f"Fees paid: {self.fees_paid}\n"
             + f"Realized PnL (with fees): {self.realized_pnl_after_fees}\n"
             + f"Cash left: {self._cash_balance}\n"
+            + f"Reserved cash: {self._reserved_cash}\n"
             + f"Max exposure: {self.max_exposure}\n"
             + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
         )
@@ -251,6 +281,7 @@ class PortfolioHistory:
     def __eq__(self, other):
         return isinstance(other, PortfolioHistory) and (
             self._cash_balance == other._cash_balance
+            and self._reserved_cash == other._reserved_cash
             and self._positions == other._positions
             and self.orders == other.orders
         )
@@ -259,7 +290,7 @@ class PortfolioHistory:
         return self._positions[ticker] if ticker in self._positions else None
 
     def can_afford(self, order: Order) -> bool:
-        return self._cash_balance >= order.cost + order.fee
+        return self.balance >= order.cost + order.fee
 
     def can_buy(self, order: Order) -> bool:
         if order.ticker in self._positions:
@@ -281,6 +312,39 @@ class PortfolioHistory:
             self.buy(order)
         else:
             self.sell(order)
+
+    def reserve_order(self, order: Order, order_id: OrderId):
+        """Does not market the order as placed, but reserves funds for it"""
+        # TODO: test me
+        if order.trade == TradeType.BUY:
+            total_cost = order.cost + order.fee
+            self.reserve(total_cost)
+            self._reserved_orders[order_id] = ReservedOrder(
+                qty_left=order.quantity, money_left=total_cost
+            )
+
+    def receive_fill_message(self, fill: OrderFillRM):
+        """Unreserve cash and place order in portfolio"""
+        # TODO: test me
+        o = fill.to_order()
+        if fill.action == TradeType.BUY:
+            # Need to unreserve cash
+            total_cost = o.cost
+            if fill.is_taker:
+                total_cost += o.fee
+            if fill.order_id in self._reserved_orders:
+                self.reserve(Cents(-1 * total_cost))
+                self._reserved_orders[fill.order_id].qty_left -= o.quantity
+                self._reserved_orders[fill.order_id].money_left -= total_cost
+
+                if self._reserved_orders[fill.order_id].qty_left == 0:
+                    # Unlock remaining funds
+                    self.reserve(
+                        Cents(-1 * self._reserved_orders[fill.order_id].money_left)
+                    )
+                    # Remove reserved order
+                    del self._reserved_orders[fill.order_id]
+        self.place_order(o)
 
     def buy(self, order: Order):
         """Adds position to portfolio. Raises OutOfMoney error if we ran out of money"""

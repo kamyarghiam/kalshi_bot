@@ -8,7 +8,14 @@ from pydantic import BaseModel, Extra, Field, validator
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import OrderbookView
-from helpers.types.orders import Quantity, QuantityDelta, Side, TradeType
+from helpers.types.orders import (
+    Order,
+    OrderId,
+    Quantity,
+    QuantityDelta,
+    Side,
+    TradeType,
+)
 from helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Type
 from helpers.types.websockets.request import Channel
 
@@ -163,7 +170,7 @@ class OrderFillRM(ResponseMessage):
     trade_id: str
     # Unique identifier for orders.
     # This is what you use to differentiate fills for different orders
-    order_id: str
+    order_id: OrderId
     # Unique identifier for markets.
     # This is what you use to differentiate fills for different markets
     market_ticker: MarketTicker
@@ -172,15 +179,24 @@ class OrderFillRM(ResponseMessage):
     # Side of your fill. Either "yes" or "no"
     side: Side
     # Price for the yes side of the fill. Between 1 and 99 (inclusive)
-    yes_price: int
+    yes_price: Price
     # Price for the no side of the fill. Between 1 and 99 (inclusive)
-    no_price: int
+    no_price: Price
     # Number of contracts filled
     count: Quantity
     # Action that initiated the fill. Either "buy" or "sell"
     action: TradeType
     # Unix timestamp for when the update happened (in seconds)
     ts: int
+
+    def to_order(self) -> Order:
+        return Order(
+            price=self.yes_price if self.side == Side.YES else self.no_price,
+            quantity=self.count,
+            trade=self.action,
+            ticker=self.market_ticker,
+            side=self.side,
+        )
 
 
 class OrderFillWR(WebsocketResponse):

@@ -633,12 +633,14 @@ def test_portfolio_print():
             time_placed=ts,
         )
     )
+    portfolio.reserve(Cents(250))
     assert (
         str(portfolio)
         == """Realized PnL (no fees): $-1.50
 Fees paid: $1.63
 Realized PnL (with fees): $-3.13
 Cash left: $38.87
+Reserved cash: $2.50
 Max exposure: $17.00
 Current positions ($8.00):
   Ticker1: NO | 100 @ 5¢
@@ -736,3 +738,20 @@ def test_place_order():
     with patch.object(portfolio, "sell") as mock_sell:
         portfolio.place_order(sell_o)
         mock_sell.assert_called_once_with(sell_o)
+
+
+def test_portfolio_reserve():
+    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    buy_o = Order(
+        price=Price(10),
+        quantity=Quantity(100),
+        trade=TradeType.BUY,
+        ticker=MarketTicker("determined_profit"),
+        side=Side.NO,
+    )
+    portfolio.reserve(Cents(5000))
+    with pytest.raises(PortfolioError):
+        portfolio.place_order(buy_o)
+    portfolio.reserve(Cents(-5000))
+    # No error
+    portfolio.place_order(buy_o)

@@ -174,10 +174,9 @@ def test_orderbook_fill_functional_only(exchange_interface: ExchangeInterface):
             ticker=order.ticker,
             side=order.side,
         )
-        assert exchange_interface.place_order(req) is True
+        assert exchange_interface.place_order(req) is not None
         fill_msg = next(gen)
         assert isinstance(fill_msg, OrderFillWR)
-        print(order.side)
         assert fill_msg == OrderFillWR(
             type=Type.FILL,
             sid=fill_msg.sid,

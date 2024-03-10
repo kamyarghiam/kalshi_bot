@@ -30,6 +30,7 @@ from helpers.types.orders import (
     CreateOrderResponse,
     CreateOrderStatus,
     Order,
+    OrderId,
     OrderType,
     Quantity,
     Side,
@@ -59,8 +60,8 @@ class ExchangeInterface:
         self.is_test_run = is_test_run
         self._connection = Connection(test_client, is_test_run)
 
-    def place_order(self, order: Order) -> bool:
-        """Attempts to place IOC order. Returns whether order is executed.
+    def place_order(self, order: Order) -> OrderId | None:
+        """Attempts to place IOC order. If order executed, returns OrderID
         NOTE: I haven't looked into the semantics of what happens if the
         order is partially filled"""
 
@@ -87,7 +88,9 @@ class ExchangeInterface:
         )
 
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
-        return resp.order.status == CreateOrderStatus.EXECUTED
+        if resp.order.status == CreateOrderStatus.EXECUTED:
+            return resp.order.order_id
+        return None
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.parse_obj(

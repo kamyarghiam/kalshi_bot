@@ -48,6 +48,7 @@ from helpers.types.orders import (
     CreateOrderResponse,
     CreateOrderStatus,
     InnerCreateOrderResponse,
+    OrderId,
     Quantity,
     QuantityDelta,
     Side,
@@ -221,7 +222,9 @@ def kalshi_test_exchange_factory():
     @router.post(PLACE_ORDER_URL)
     def create_order(order: CreateOrderRequest):
         return CreateOrderResponse(
-            order=InnerCreateOrderResponse(status=CreateOrderStatus.EXECUTED),
+            order=InnerCreateOrderResponse(
+                status=CreateOrderStatus.EXECUTED, order_id=OrderId("some_order_id")
+            ),
         )
 
     @router.get(MARKETS_URL)
@@ -409,7 +412,10 @@ def kalshi_test_exchange_factory():
         sid = await subscribe(websocket, data, Channel.FILL)
         order_fill_rm: OrderFillRM = random_data(
             OrderFillRM,
-            custom_args={Quantity: lambda: Quantity(random.randint(0, 100))},
+            custom_args={
+                Quantity: lambda: Quantity(random.randint(0, 100)),
+                Price: lambda: Price(random.randint(1, 99)),
+            },
         )
         order_fill_rm.market_ticker = market_ticker
         order_fill_wr = OrderFillWR(type=Type.FILL, sid=sid, msg=order_fill_rm)

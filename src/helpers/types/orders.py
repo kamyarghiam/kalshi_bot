@@ -60,6 +60,10 @@ def compute_fee(price: Price, quantity: Quantity) -> Cents:
     )
 
 
+class OrderId(str):
+    """Id for an order that we placed"""
+
+
 # Unsafe hash is for CreateOrderRequest to create unique id for order
 @dataclass(unsafe_hash=True)
 class Order:
@@ -142,6 +146,7 @@ class InnerCreateOrderResponse(BaseModel):
         use_enum_values = True
 
     status: CreateOrderStatus
+    order_id: OrderId
 
 
 class CreateOrderResponse(ExternalApi):

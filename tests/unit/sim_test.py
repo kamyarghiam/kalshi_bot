@@ -62,7 +62,7 @@ def test_active_ioc_strategy_simulator_simple():
 
     assert portfolio_history.fees_paid == 8
     assert portfolio_history.realized_pnl_after_fees == -18
-    assert portfolio_history._cash_balance == 82
+    assert portfolio_history.balance == 82
     assert portfolio_history.orders == orders
 
 

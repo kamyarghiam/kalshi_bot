@@ -64,8 +64,7 @@ def main(is_test_run: bool = True):
                         last_spy_price = data
                         num_spy_msgs += 1
                     elif isinstance(data, OrderFillWR):
-                        # TODO: fill out
-                        pass
+                        portfolio.receive_fill_message(data.msg)
                     else:
                         print("Received unknown data type: ", data)
 
@@ -74,8 +73,8 @@ def main(is_test_run: bool = True):
                             last_ob, last_spy_price, round(time.time()), portfolio
                         )
                         for order in orders:
-                            if e.place_order(order):
-                                portfolio.place_order(order)
+                            if order_id := e.place_order(order):
+                                portfolio.reserve_order(order, order_id)
                     live.update(
                         generate_table(
                             num_snapshot_msgs,
