@@ -63,6 +63,10 @@ class TanModelINXZStrategy:
         self.last_prediction: Cents | None = None
         self.last_spy_price: Cents | None = None
 
+        self.current_signal = Signal.NONE
+        # Number of times we've seen this signal in a row
+        self.current_signal_count: int = 0
+
         # Hyperparams
         self.max_order_quantity = 10
         self.shift_amount = 62
@@ -74,6 +78,8 @@ class TanModelINXZStrategy:
         self.first_training_count = 5000 if self.is_test_run else 300000
         # How often do we train after the first training?
         self.subsequent_training_count = 5000 if self.is_test_run else 20000
+        # How many signal counts do we need before we buy?
+        self.num_signals_before_buy = 10
 
         super().__init__()
 
@@ -156,6 +162,30 @@ class TanModelINXZStrategy:
         spy_price: Cents,
         ts: int,
     ) -> Signal:
+        """Main function to get the signal. Make sure we see signal a few times in a row
+        before submitting"""
+        raw_signal = self.get_raw_signal(ob, spy_price, ts)
+        if raw_signal != Signal.NONE:
+            if raw_signal == self.current_signal:
+                self.current_signal_count += 1
+            else:
+                self.current_signal = raw_signal
+                self.current_signal_count = 0
+            if self.current_signal_count >= self.num_signals_before_buy:
+                # Reset
+                self.current_signal_count = 0
+                signal = self.current_signal
+                self.current_signal = Signal.NONE
+                return signal
+        return Signal.NONE
+
+    def get_raw_signal(
+        self,
+        ob: Orderbook,
+        spy_price: Cents,
+        ts: int,
+    ) -> Signal:
+        """Gets the signal given the current context, ignoring previous context"""
         if not self.trained_once:
             return Signal.NONE
         spread = ob.get_spread()
