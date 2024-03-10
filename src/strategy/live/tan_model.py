@@ -136,7 +136,7 @@ def generate_table(
         str(spy_price),
         str(get_bbo_as_string(ob)),
         str(prediction),
-        str(portfolio),
+        str(portfolio.orders_as_str()),
     )
 
     return table

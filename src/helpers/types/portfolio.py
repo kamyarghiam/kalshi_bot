@@ -272,9 +272,11 @@ class PortfolioHistory:
             + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
         )
         if print_orders:
-            orders_str = "\n".join(["  " + str(order) for order in self.orders])
-            str_ += f"Orders:\n{orders_str}"
+            str_ += f"Orders:\n{self.orders_as_str()}"
         return str_
+
+    def orders_as_str(self) -> str:
+        return "\n".join(["  " + str(order) for order in self.orders])
 
     def __str__(self):
         return self.as_str()
