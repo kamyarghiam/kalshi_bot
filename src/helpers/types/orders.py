@@ -64,6 +64,10 @@ class OrderId(str):
     """Id for an order that we placed"""
 
 
+class TradeId(str):
+    """Id for trades placed. A trade is a confirmed order"""
+
+
 # Unsafe hash is for CreateOrderRequest to create unique id for order
 @dataclass(unsafe_hash=True)
 class Order:
@@ -73,10 +77,25 @@ class Order:
     ticker: MarketTicker
     side: Side
     time_placed: datetime = field(default_factory=datetime.now, compare=False)
+    is_taker: bool = field(default_factory=lambda: True)
 
     @property
     def fee(self) -> Cents:
-        return compute_fee(self.price, self.quantity)
+        if self.is_taker:
+            return compute_fee(self.price, self.quantity)
+        # No fee on marker side
+        return Cents(0)
+
+    @property
+    def worst_case_fee(self) -> Cents:
+        """When we submit an order for matching, the fee is computed based on the
+        trades that it matches with.
+
+        In the worst case, each order matches separately at a price closest to 50¢,
+        where the fee is maximized"""
+
+        price_closest_to_50 = min(Price(50), self.price)
+        return Cents(compute_fee(price_closest_to_50, Quantity(1)) * self.quantity)
 
     @property
     def cost(self) -> Cents:

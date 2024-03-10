@@ -8,8 +8,17 @@ from exchange.interface import ExchangeInterface
 from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide
-from helpers.types.orders import Order, Quantity, Side, TradeType, compute_fee
+from helpers.types.orders import (
+    Order,
+    OrderId,
+    Quantity,
+    Side,
+    TradeId,
+    TradeType,
+    compute_fee,
+)
 from helpers.types.portfolio import PortfolioError, PortfolioHistory, Position
+from helpers.types.websockets.response import OrderFillRM
 from tests.fake_exchange import Price
 from tests.utils import almost_equal
 
@@ -201,7 +210,8 @@ def test_add_duplicate_price_point():
 
 
 def test_portfolio_buy():
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    original_balance = Balance(Cents(5000))
+    portfolio = PortfolioHistory(original_balance)
     portfolio.buy(
         Order(
             ticker=MarketTicker("hi"),
@@ -212,7 +222,7 @@ def test_portfolio_buy():
         )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - fees_paid
+    assert portfolio._cash_balance._balance == original_balance - 5 * 100 - fees_paid
     assert portfolio.fees_paid == fees_paid
     portfolio.buy(
         Order(
@@ -224,7 +234,10 @@ def test_portfolio_buy():
         )
     )
     fees_paid += compute_fee(Price(10), Quantity(10))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - 10 * 10 - fees_paid
+    assert (
+        portfolio._cash_balance._balance
+        == original_balance - 5 * 100 - 10 * 10 - fees_paid
+    )
     assert portfolio.fees_paid == fees_paid
     portfolio.buy(
         Order(
@@ -238,7 +251,7 @@ def test_portfolio_buy():
     fees_paid += compute_fee(Price(15), Quantity(5))
     assert (
         portfolio._cash_balance._balance
-        == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - fees_paid
+        == original_balance - 5 * 100 - 10 * 10 - 15 * 5 - fees_paid
     )
     assert portfolio.fees_paid == fees_paid
     portfolio.buy(
@@ -253,7 +266,7 @@ def test_portfolio_buy():
     fees_paid += compute_fee(Price(20), Quantity(25))
     assert (
         portfolio._cash_balance._balance
-        == 5000 - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25 - fees_paid
+        == original_balance - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25 - fees_paid
     )
     assert portfolio.fees_paid == fees_paid
 
@@ -278,7 +291,7 @@ def test_portfolio_buy():
         Order(
             ticker=MarketTicker("hi2"),
             price=Price(1),
-            quantity=Quantity(money_remaining - 250),  # subtract some fee
+            quantity=Quantity(money_remaining - 2000),  # subtract some fee
             side=Side.YES,
             trade=TradeType.BUY,
         )
@@ -746,7 +759,7 @@ def test_portfolio_reserve():
         price=Price(10),
         quantity=Quantity(100),
         trade=TradeType.BUY,
-        ticker=MarketTicker("determined_profit"),
+        ticker=MarketTicker("some_ticker"),
         side=Side.NO,
     )
     portfolio.reserve(Cents(5000))
@@ -755,3 +768,200 @@ def test_portfolio_reserve():
     portfolio.reserve(Cents(-5000))
     # No error
     portfolio.place_order(buy_o)
+
+
+def test_portfolio_order_reserve():
+    # Should not reserve on sells
+    original_balance = Balance(Cents(5000))
+    portfolio = PortfolioHistory(original_balance)
+    sell_o = Order(
+        price=Price(10),
+        quantity=Quantity(100),
+        trade=TradeType.SELL,
+        ticker=MarketTicker("some_ticker"),
+        side=Side.NO,
+    )
+    portfolio.reserve_order(sell_o, OrderId("some_id"))
+    assert portfolio.balance == original_balance
+    # If order is buy, reserve money to buy order
+    order_id_1 = OrderId("some_id_1")
+    buy_o_1 = Order(
+        price=Price(10),
+        quantity=Quantity(100),
+        trade=TradeType.BUY,
+        ticker=MarketTicker("some_ticker1"),
+        side=Side.NO,
+    )
+    portfolio.reserve_order(buy_o_1, order_id_1)
+    new_balance_1 = (
+        original_balance
+        - Cents(10 * 100)
+        - compute_fee(Price(10), Quantity(1)) * Quantity(100)
+    )
+    assert portfolio.balance == new_balance_1
+
+    # Place another order
+    order_id_2 = OrderId("some_id_2")
+    buy_o_2 = Order(
+        price=Price(5),
+        quantity=Quantity(50),
+        trade=TradeType.BUY,
+        ticker=MarketTicker("some_ticker2"),
+        side=Side.YES,
+    )
+    portfolio.reserve_order(buy_o_2, order_id_2)
+    # Using worst case fee
+    new_balance_2 = (
+        new_balance_1
+        - Cents(5 * 50)
+        - compute_fee(Price(5), Quantity(1)) * Quantity(50)
+    )
+    assert portfolio.balance == new_balance_2, (
+        portfolio.balance,
+        new_balance_2.balance,
+    )
+
+    assert len(portfolio._reserved_orders) == 2
+    reserved_cash_1 = original_balance - portfolio.balance
+    assert portfolio._reserved_cash == reserved_cash_1
+    # Let's say part of the first order is filled
+    fill1 = OrderFillRM(
+        trade_id=TradeId(1),
+        order_id=order_id_1,
+        market_ticker=MarketTicker("some_ticker1"),
+        is_taker=True,
+        side=Side.NO,
+        yes_price=Price(90),
+        no_price=Price(10),
+        count=Quantity(50),
+        action=TradeType.BUY,
+        ts=123,
+    )
+    portfolio.receive_fill_message(fill1)
+    # Overall balance shouldn't change (netted on both sides)
+    assert portfolio.balance == new_balance_2
+    reserved_cash_2 = (
+        reserved_cash_1 - Cents(10 * 50) - compute_fee(Price(10), Quantity(50))
+    )
+    assert portfolio._reserved_cash == reserved_cash_2
+
+    # Let the entire second order pass through at a diff price
+    fill2 = OrderFillRM(
+        trade_id=TradeId(1),
+        order_id=order_id_2,
+        market_ticker=MarketTicker("some_ticker2"),
+        is_taker=True,
+        side=Side.YES,
+        yes_price=Price(4),
+        no_price=Price(96),
+        count=Quantity(50),
+        action=TradeType.BUY,
+        ts=123,
+    )
+    balance_before_fill = portfolio.balance
+    portfolio.receive_fill_message(fill2)
+    # Order should be unlocked
+    assert len(portfolio._reserved_orders) == 1
+    # We're going to add back in the original amount and then remove away the new cost
+    # new_balance_1 was the balance before reserving the second order
+    new_balance_3 = new_balance_1 - Cents(4 * 50) - compute_fee(Price(4), Quantity(50))
+    assert portfolio.balance == new_balance_3
+    # Since we got a better price and fees, the balance should be more than we expected
+    assert portfolio.balance > balance_before_fill
+
+    # Let's fill the rest of order 1
+    fill3 = OrderFillRM(
+        trade_id=TradeId(2),
+        order_id=order_id_1,
+        market_ticker=MarketTicker("some_ticker1"),
+        is_taker=True,
+        side=Side.NO,
+        yes_price=Price(90),
+        no_price=Price(10),
+        count=Quantity(50),
+        action=TradeType.BUY,
+        ts=123,
+    )
+    balance_before_fill = portfolio.balance
+    portfolio.receive_fill_message(fill3)
+    assert len(portfolio._reserved_orders) == 0
+    # Since we got better fees, balance should be greater
+    assert portfolio.balance > balance_before_fill
+
+    # Test work case fees come to fruition
+    buy_o_3 = Order(
+        price=Price(51),
+        quantity=Quantity(5),
+        trade=TradeType.BUY,
+        ticker=MarketTicker("some_ticker3"),
+        side=Side.YES,
+    )
+    order_id_3 = OrderId("some_order_id_3")
+    portfolio.reserve_order(buy_o_3, order_id_3)
+
+    balance_before_fills = portfolio.balance
+    # Fill using worst case
+    for i in range(buy_o_3.quantity):
+        fill = OrderFillRM(
+            trade_id=TradeId(i),
+            order_id=order_id_3,
+            market_ticker=MarketTicker("some_ticker3"),
+            is_taker=True,
+            side=Side.YES,
+            yes_price=Price(51),
+            no_price=Price(49),
+            count=Quantity(1),
+            action=TradeType.BUY,
+            ts=123,
+        )
+        portfolio.receive_fill_message(fill)
+
+    # Since we filled at worst case and matched at same price, balance should be same
+    # Note this only works because the price we set the order for (51 cents) has the
+    # same worst case fee at quantity 1 as 50 cents
+    assert portfolio.balance == balance_before_fills
+
+
+def test_reserve_order_manual_intervention():
+    original_balance = Balance(Cents(5000))
+    portfolio = PortfolioHistory(original_balance)
+
+    # Test manual intervention (we place a trade on the website and receive fill)
+    order_id_1 = OrderId(1)
+    fill1 = OrderFillRM(
+        trade_id=TradeId(1),
+        order_id=order_id_1,
+        market_ticker=MarketTicker("some_ticker3"),
+        is_taker=True,
+        side=Side.YES,
+        yes_price=Price(51),
+        no_price=Price(49),
+        count=Quantity(10),
+        action=TradeType.BUY,
+        ts=123,
+    )
+    portfolio.receive_fill_message(fill1)
+    # Should just place the order normally
+    balance_after_manual_buy = (
+        original_balance - Cents(51 * 10) - compute_fee(Price(51), Quantity(10))
+    )
+    assert portfolio.balance == balance_after_manual_buy
+
+    new_balance = portfolio.balance
+    # And we can manually sell
+    fill2 = OrderFillRM(
+        trade_id=TradeId(1),
+        order_id=order_id_1,
+        market_ticker=MarketTicker("some_ticker3"),
+        is_taker=True,
+        side=Side.YES,
+        yes_price=Price(52),
+        no_price=Price(48),
+        count=Quantity(10),
+        action=TradeType.SELL,
+        ts=123,
+    )
+    portfolio.receive_fill_message(fill2)
+    assert portfolio.balance == new_balance + Cents(52 * 10) - compute_fee(
+        Price(52), Quantity(10)
+    )

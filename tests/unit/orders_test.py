@@ -86,3 +86,43 @@ def test_order_get_predicted_pnl():
         o.get_predicted_pnl(Price(10))
 
     assert err.match("Order must be a buy order")
+
+
+def test_order_fee_maker():
+    o = Order(
+        ticker=MarketTicker("Ticker1"),
+        price=Price(5),
+        quantity=Quantity(100),
+        side=Side.NO,
+        trade=TradeType.BUY,
+        is_taker=True,
+    )
+    assert o.fee == compute_fee(Price(5), Quantity(100))
+
+    # When we're not the taker, the fee is zero
+    o.is_taker = False
+    assert o.fee == Cents(0)
+
+
+def test_worst_case_fee():
+    # Price below 50
+    o = Order(
+        ticker=MarketTicker("Ticker1"),
+        price=Price(5),
+        quantity=Quantity(100),
+        side=Side.NO,
+        trade=TradeType.BUY,
+        is_taker=True,
+    )
+    assert o.worst_case_fee == Cents(100)
+
+    # Price about 50
+    o = Order(
+        ticker=MarketTicker("Ticker1"),
+        price=Price(95),
+        quantity=Quantity(100),
+        side=Side.NO,
+        trade=TradeType.BUY,
+        is_taker=True,
+    )
+    assert o.worst_case_fee == Cents(200)

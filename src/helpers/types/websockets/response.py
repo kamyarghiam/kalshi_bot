@@ -14,6 +14,7 @@ from helpers.types.orders import (
     Quantity,
     QuantityDelta,
     Side,
+    TradeId,
     TradeType,
 )
 from helpers.types.websockets.common import CommandId, SeqId, SubscriptionId, Type
@@ -167,7 +168,7 @@ class SubscriptionUpdatedWR(WebsocketResponse):
 class OrderFillRM(ResponseMessage):
     # Unique identifier for fills.
     # This is what you use to differentiate fills
-    trade_id: str
+    trade_id: TradeId
     # Unique identifier for orders.
     # This is what you use to differentiate fills for different orders
     order_id: OrderId

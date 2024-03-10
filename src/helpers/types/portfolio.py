@@ -178,7 +178,7 @@ class PortfolioHistory:
         self._cash_balance: Balance = balance
         self._reserved_cash: Balance = Balance(0)
         self._positions: Dict[MarketTicker, Position] = {}
-        self._reserved_orders: Dict[OrderId, ReservedOrder]
+        self._reserved_orders: Dict[OrderId, ReservedOrder] = {}
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
@@ -290,7 +290,7 @@ class PortfolioHistory:
         return self._positions[ticker] if ticker in self._positions else None
 
     def can_afford(self, order: Order) -> bool:
-        return self.balance >= order.cost + order.fee
+        return self.balance >= order.cost + order.worst_case_fee
 
     def can_buy(self, order: Order) -> bool:
         if order.ticker in self._positions:
@@ -308,6 +308,7 @@ class PortfolioHistory:
         return True
 
     def place_order(self, order: Order):
+        """Updates balance and order history. Does not touch reserved cash."""
         if order.trade == TradeType.BUY:
             self.buy(order)
         else:
@@ -317,7 +318,7 @@ class PortfolioHistory:
         """Does not market the order as placed, but reserves funds for it"""
         # TODO: test me
         if order.trade == TradeType.BUY:
-            total_cost = order.cost + order.fee
+            total_cost = order.cost + order.worst_case_fee
             self.reserve(total_cost)
             self._reserved_orders[order_id] = ReservedOrder(
                 qty_left=order.quantity, money_left=total_cost
@@ -329,9 +330,7 @@ class PortfolioHistory:
         o = fill.to_order()
         if fill.action == TradeType.BUY:
             # Need to unreserve cash
-            total_cost = o.cost
-            if fill.is_taker:
-                total_cost += o.fee
+            total_cost = o.cost + o.fee
             if fill.order_id in self._reserved_orders:
                 self.reserve(Cents(-1 * total_cost))
                 self._reserved_orders[fill.order_id].qty_left -= o.quantity
