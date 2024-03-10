@@ -1,4 +1,3 @@
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -42,10 +41,8 @@ class ModelParams:
 
 
 class TanModelINXZStrategy:
-    def __init__(
-        self,
-        ticker: MarketTicker,
-    ):
+    def __init__(self, ticker: MarketTicker, is_test_run: bool = True):
+        self.is_test_run = is_test_run
         # TODO: we also need to submit passive orders
         self.ticker = ticker
         self.spy_price_threshold = TanModelINXZStrategy.extract_market_threshold(ticker)
@@ -64,14 +61,21 @@ class TanModelINXZStrategy:
         self.count = 0
         # Used for monitoring
         self.last_prediction: Cents | None = None
+        self.last_spy_price: Cents | None = None
 
         # Hyperparams
-        self.max_order_quantity = 100
+        self.max_order_quantity = 10
         self.shift_amount = 62
         # How much info should we extract from our prediction vs actual price
         self.omega = 0.6
         # How much of a difference should our price have from the actual price
         self.threshold = Cents(5)
+        # How much can a spy price jump between each update? This is to catch extremes
+        self.spy_differential_tolerance = Cents(10)
+        # After how many updates do we first train?
+        self.first_training_count = 5000 if self.is_test_run else 300000
+        # How often do we train after the first training?
+        self.subsequent_training_count = 5000 if self.is_test_run else 20000
 
         super().__init__()
 
@@ -104,7 +108,6 @@ class TanModelINXZStrategy:
             9,
             30,
             0,
-            tzinfo=ColeDBInterface.tz,
         )
         # 4 PM
         close_time = datetime(
@@ -114,9 +117,10 @@ class TanModelINXZStrategy:
             16,
             0,
             0,
-            tzinfo=ColeDBInterface.tz,
         )
-        return time.mktime(open_time.timetuple()), time.mktime(close_time.timetuple())
+        open_time = open_time.astimezone(ColeDBInterface.tz)
+        close_time = close_time.astimezone(ColeDBInterface.tz)
+        return open_time.timestamp(), close_time.timestamp()
 
     def get_yes_bid_prediction(
         self,
@@ -326,6 +330,13 @@ class TanModelINXZStrategy:
         ):
             return []
 
+        if self.last_spy_price is None:
+            self.last_spy_price = spy_price
+        elif abs(spy_price - self.last_spy_price) > self.spy_differential_tolerance:
+            # Skip message because spy price jumped too much
+            self.last_spy_price = spy_price
+            return []
+
         # TODO: remove these training wheels
         ############# TRAINING WHEELS #############
         self.training_wheels(ob, spy_price, ts)
@@ -334,12 +345,13 @@ class TanModelINXZStrategy:
         order = self.get_orders(ob, spy_price, ts, portfolio)
         self.append_data(ob, spy_price, ts)
         self.count += 1
+
         if not self.trained_once:
             # Delay first training for a long time (about 20 min?)
-            if self.count > 300000:
+            if self.count > self.first_training_count:
                 self.train_data()
         else:
             # Retrain frequently
-            if self.count % 20000 == 0:
+            if self.count % self.subsequent_training_count == 0:
                 self.train_data()
         return order

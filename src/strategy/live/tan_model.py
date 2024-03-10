@@ -29,7 +29,7 @@ def main(is_test_run: bool = True):
     with ExchangeInterface(is_test_run=is_test_run) as e:
         balance = e.get_portfolio_balance().balance
         ticker = get_current_inxz_ticker(e)
-        strat = TanModelINXZStrategy(ticker)
+        strat = TanModelINXZStrategy(ticker, is_test_run)
         portfolio = PortfolioHistory(Balance(balance))
         with e.get_websocket() as ws:
             sub = OrderbookSubscription(ws, [ticker])
