@@ -7,7 +7,7 @@ from typing import Generic, Iterable, Iterator, TypeVar
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price
-from helpers.types.orders import Order, Quantity, Side, TradeType, compute_fee
+from helpers.types.orders import Order, Quantity, Side, TradeType
 
 T = TypeVar("T")
 
@@ -97,7 +97,11 @@ def get_max_quantity_can_afford(portfolio_balance: Cents, price: Price):
 
     while low <= high:
         mid = (low + high) // 2
-        total_cost = price * mid + compute_fee(price, Quantity(int(mid)))
+        # We use this dummy order to compute the total_cost
+        order = Order(
+            price, Quantity(int(mid)), TradeType.BUY, MarketTicker(""), Side.YES
+        )
+        total_cost = order.cost + order.worst_case_fee
         if total_cost <= portfolio_balance:
             low = mid + 1  # type:ignore[assignment]
         else:

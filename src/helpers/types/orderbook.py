@@ -187,6 +187,12 @@ class Orderbook:
 
         return BBO(bid=bid_side_bbo, ask=ask_side_bbo)
 
+    def get_spread(self) -> Cents | None:
+        bbo = self.get_bbo()
+        if bbo.ask and bbo.bid:
+            return Cents(bbo.ask.price - bbo.bid.price)
+        return None
+
     @classmethod
     def from_snapshot(cls, orderbook_snapshot: "OrderbookSnapshotRM"):
         return cls.from_lists(

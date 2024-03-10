@@ -68,8 +68,6 @@ class TanModelINXZStrategy:
         self.shift_amount = 62
         # How much info should we extract from our prediction vs actual price
         self.omega = 0.6
-        # How much of a difference should our price have from the actual price
-        self.threshold = Cents(5)
         # How much can a spy price jump between each update? This is to catch extremes
         self.spy_differential_tolerance = Cents(10)
         # After how many updates do we first train?
@@ -160,6 +158,9 @@ class TanModelINXZStrategy:
     ) -> Signal:
         if not self.trained_once:
             return Signal.NONE
+        spread = ob.get_spread()
+        if spread is None:
+            return Signal.NONE
 
         pred = self.get_yes_bid_prediction(
             self.model_params,
@@ -172,9 +173,9 @@ class TanModelINXZStrategy:
         kalshi_price = bbo.bid.price
 
         predicted_price = pred * self.omega + (1 - self.omega) * kalshi_price
-        if predicted_price > kalshi_price + self.threshold:
+        if predicted_price > kalshi_price + spread:
             return Signal.BUY
-        elif predicted_price < kalshi_price - self.threshold:
+        elif predicted_price < kalshi_price - spread:
             return Signal.SELL
         return Signal.NONE
 
@@ -221,11 +222,9 @@ class TanModelINXZStrategy:
     def get_orders(
         self, ob: Orderbook, spy_price: Cents, ts: int, portfolio: PortfolioHistory
     ) -> List[Order]:
-        # TODO: this only holds one position at a time and doesn't
-        # sell for a loss
-        if self.ticker not in portfolio.positions:
-            return self.get_buy_orders(ob, spy_price, ts, portfolio)
-        elif self.ticker in portfolio.positions:
+        if buy_orders := self.get_buy_orders(ob, spy_price, ts, portfolio):
+            return buy_orders
+        if self.ticker in portfolio.positions:
             return self.get_sell_orders(ob, ts, spy_price, portfolio)
         return []
 
@@ -253,18 +252,19 @@ class TanModelINXZStrategy:
                     order.quantity,
                 )
             )
+            order.time_placed = datetime.fromtimestamp(ts).astimezone(
+                ColeDBInterface.tz
+            )
+            # If profitable, sell
             pnl, fees = portfolio.potential_pnl(order)
-            # TODO: only sell for profit? What about stop loss
             if pnl - fees > 0:
-                order.time_placed = datetime.fromtimestamp(ts).astimezone(
-                    ColeDBInterface.tz
-                )
                 return [order]
+            # TODO: add stop loss mechanism
         return []
 
     def get_buy_orders(
         self, ob: Orderbook, spy_price: Cents, ts: int, portfolio: PortfolioHistory
-    ):
+    ) -> List[Order]:
         signal = self.get_signal(ob, spy_price, ts)
         buy_order: Order | None = None
         match signal:
@@ -276,6 +276,13 @@ class TanModelINXZStrategy:
                 # Do nothing
                 pass
         if buy_order:
+            if self.ticker in portfolio.positions:
+                # Don't buy an order on the opposite side
+                if portfolio.positions[self.ticker].side != buy_order.side:
+                    return []
+                # Don't buy at the same price (limit num orders at price level)
+                if portfolio.positions[self.ticker].prices[-1] == buy_order.price:
+                    return []
             max_quantity_can_afford = get_max_quantity_can_afford(
                 portfolio.balance, buy_order.price
             )

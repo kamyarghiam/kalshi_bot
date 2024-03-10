@@ -196,11 +196,14 @@ def test_merge_generators():
 def test_get_max_quantity_can_afford():
     assert get_max_quantity_can_afford(portfolio_balance=Cents(0), price=Price(1)) == 0
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(1)) == 93
+        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(1)) == 50
     )
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(2)) == 46
+        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(2)) == 33
     )
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(500), price=Price(11)) == 42
+        get_max_quantity_can_afford(portfolio_balance=Cents(500), price=Price(11)) == 41
+    )
+    assert (
+        get_max_quantity_can_afford(portfolio_balance=Cents(1000), price=Price(99)) == 9
     )
