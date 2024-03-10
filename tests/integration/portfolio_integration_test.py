@@ -59,6 +59,9 @@ def test_get_portfolio_balance(exchange_interface: ExchangeInterface):
 
 @pytest.mark.usefixtures("functional_only")
 def test_reserve_order_portfolio(exchange_interface: ExchangeInterface):
+    # TODO: this test takes a long time because it takes a while to get a valid order
+    # on the demo market. And it does not work when we run it in parallel because
+    # the balance might change on demo
     req: Order = get_valid_order_on_demo_market(exchange_interface)
     balance_on_demo = exchange_interface.get_portfolio_balance().balance
     portfolio = PortfolioHistory(Balance(balance_on_demo))
@@ -77,11 +80,6 @@ def test_reserve_order_portfolio(exchange_interface: ExchangeInterface):
                 portfolio.receive_fill_message(fill_msg.msg)
                 # We sleep 1 second to give Kalshi some time to update their books
                 sleep(1)
-                # TODO: one problem with this test is that if you buy a position on the
-                # opposite side, then when you buy the position, it will actually just
-                # sell the other side. So the portfolio balance won't match.
-                # Alternatively, it could also be mecnetting and giving you more money.
-                # To fix, don't trade on demo markets where you're holding a position
                 assert (
                     portfolio.balance
                     == exchange_interface.get_portfolio_balance().balance
@@ -90,6 +88,14 @@ def test_reserve_order_portfolio(exchange_interface: ExchangeInterface):
                 # Cleanup, undo order
                 req.order_type = OrderType.MARKET
                 req.trade = TradeType.SELL
-                exchange_interface.place_order(req)
+                assert exchange_interface.place_order(req)
         else:
             raise pytest.fail("Could not place order on exchange")
+
+
+def test_get_positions(exchange_interface: ExchangeInterface):
+    positions = exchange_interface.get_positions()
+    if not pytest.is_functional:
+        assert len(positions) == 15
+    else:
+        assert len(positions) >= 0

@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from matplotlib import pyplot as plt
+from pydantic import Extra
 
 from data.coledb.coledb import ColeDBInterface
-from helpers.types.api import ExternalApi
+from helpers.types.api import Cursor, ExternalApi
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import Balance, Cents, Dollars, Price, get_opposite_side_price
 from helpers.types.orderbook import GetOrderbookRequest, Orderbook
@@ -512,3 +513,27 @@ class PortfolioHistory:
 class GetPortfolioBalanceResponse(ExternalApi):
     balance: Cents
     payout: Cents = Cents(0)
+
+
+class GetMarketPositionsRequest(ExternalApi):
+    cursor: Cursor | None = None
+
+
+class ApiMarketPosition(ExternalApi):
+    """Class to represent position from perspective of API"""
+
+    ticker: MarketTicker
+
+    class Config:
+        extra = Extra.allow
+
+
+class GetMarketPositionsResponse(ExternalApi):
+    market_positions: List[ApiMarketPosition]
+    cursor: Cursor
+
+    class Config:
+        extra = Extra.allow
+
+    def has_empty_cursor(self) -> bool:
+        return len(self.cursor) == 0

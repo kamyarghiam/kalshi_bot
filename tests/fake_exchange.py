@@ -18,7 +18,8 @@ from helpers.constants import (
     MARKETS_URL,
     ORDERBOOK_URL,
     PLACE_ORDER_URL,
-    PORTFOLIO_BALANCE,
+    PORTFOLIO_BALANCE_URL,
+    POSITION_URL,
     TRADES_URL,
 )
 from helpers.types.api import Cursor
@@ -53,7 +54,11 @@ from helpers.types.orders import (
     QuantityDelta,
     Side,
 )
-from helpers.types.portfolio import GetPortfolioBalanceResponse
+from helpers.types.portfolio import (
+    ApiMarketPosition,
+    GetMarketPositionsResponse,
+    GetPortfolioBalanceResponse,
+)
 from helpers.types.trades import ExternalTrade, GetTradesResponse
 from helpers.types.websockets.common import SeqId, SubscriptionId, Type
 from helpers.types.websockets.request import (
@@ -133,7 +138,7 @@ def kalshi_test_exchange_factory():
         """Returns a dummy exchange status"""
         return ExchangeStatusResponse(exchange_active=True, trading_active=True)
 
-    @router.get(PORTFOLIO_BALANCE)
+    @router.get(PORTFOLIO_BALANCE_URL)
     def portfolio_balance():
         return GetPortfolioBalanceResponse(balance=Cents(1000))
 
@@ -262,6 +267,30 @@ def kalshi_test_exchange_factory():
             return GetMarketsResponse(
                 cursor=Cursor(""),
                 markets=markets,
+            )
+
+    @router.get(POSITION_URL)
+    def get_positions(cursor: Cursor | None = None):
+        """Returns all markets on the exchange"""
+        positions: List[ApiMarketPosition] = [
+            ApiMarketPosition(ticker=MarketTicker("some_market")) for _ in range(5)
+        ]
+
+        # We hardcode that there are 3 pages
+        if cursor is None:
+            return GetMarketPositionsResponse(
+                cursor=Cursor("1"),
+                market_positions=positions,
+            )
+        elif cursor == Cursor("1"):
+            return GetMarketPositionsResponse(
+                cursor=Cursor("2"),
+                market_positions=positions,
+            )
+        elif cursor == Cursor("2"):
+            return GetMarketPositionsResponse(
+                cursor=Cursor(""),
+                market_positions=positions,
             )
 
     @app.websocket(URL("ws").add(api_version).add_slash())

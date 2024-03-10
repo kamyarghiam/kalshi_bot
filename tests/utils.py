@@ -1,3 +1,4 @@
+import random
 import typing
 from enum import Enum
 
@@ -63,20 +64,24 @@ def get_valid_order_on_demo_market(e: ExchangeInterface) -> Order:
     Returns an order that's valid on the market and can be placed.
     Defaults quantity to 1"""
     assert e.is_test_run
-    active_markets = e.get_active_markets(pages=1)
+    active_markets = e.get_active_markets(pages=50)
+    positions = e.get_positions()
+    market_tickers_with_positions = set([m.ticker for m in positions])
     for market in active_markets:
-        if market.liquidity > 0:
+        if market.ticker in market_tickers_with_positions:
+            # We don't want to place an order on a market where we have a position
+            continue
+        if market.liquidity >= 50:
             o = e.get_market_orderbook(
                 GetOrderbookRequest(ticker=market.ticker, depth=1)
             )
             o = o.get_view(OrderbookView.ASK)
-            if not o.yes.is_empty():
-                order = o.buy_order(Side.YES)
-            else:
-                order = o.buy_order(Side.NO)
-            assert order is not None
-            order.quantity = Quantity(1)
-            return order
+            if not o.yes.is_empty() and not o.no.is_empty():
+                side = Side.YES if random.randint(0, 1) == 0 else Side.NO
+                order = o.buy_order(side)
+                assert order is not None
+                order.quantity = Quantity(1)
+                return order
     raise ValueError(
         "Could not find a market with liquidity on demo."
         + " Maybe increase num pages when getting active markets"

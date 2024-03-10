@@ -11,7 +11,8 @@ from helpers.constants import (
     MARKETS_URL,
     ORDERBOOK_URL,
     PLACE_ORDER_URL,
-    PORTFOLIO_BALANCE,
+    PORTFOLIO_BALANCE_URL,
+    POSITION_URL,
     TRADES_URL,
 )
 from helpers.types.common import URL
@@ -36,7 +37,12 @@ from helpers.types.orders import (
     Side,
     TradeType,
 )
-from helpers.types.portfolio import GetPortfolioBalanceResponse
+from helpers.types.portfolio import (
+    ApiMarketPosition,
+    GetMarketPositionsRequest,
+    GetMarketPositionsResponse,
+    GetPortfolioBalanceResponse,
+)
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
 
@@ -175,11 +181,34 @@ class ExchangeInterface:
     def get_portfolio_balance(self) -> GetPortfolioBalanceResponse:
         return GetPortfolioBalanceResponse.parse_obj(
             self._connection.get(
-                url=PORTFOLIO_BALANCE,
+                url=PORTFOLIO_BALANCE_URL,
             )
         )
 
+    def get_positions(self, pages: int | None = None) -> List[ApiMarketPosition]:
+        response = self._get_positions(GetMarketPositionsRequest())
+        positions: List[ApiMarketPosition] = response.market_positions
+
+        while (
+            pages is None or (pages := pages - 1)
+        ) and not response.has_empty_cursor():
+            response = self._get_positions(
+                GetMarketPositionsRequest(cursor=response.cursor)
+            )
+            positions.extend(response.market_positions)
+        return positions
+
     ######## Helpers ############
+
+    def _get_positions(
+        self, request: GetMarketPositionsRequest
+    ) -> GetMarketPositionsResponse:
+        return GetMarketPositionsResponse.parse_obj(
+            self._connection.get(
+                url=POSITION_URL,
+                params=request.dict(exclude_none=True),
+            )
+        )
 
     def _get_markets(self, request: GetMarketsRequest) -> GetMarketsResponse:
         return GetMarketsResponse.parse_obj(
