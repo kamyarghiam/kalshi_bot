@@ -22,7 +22,7 @@ class Databento:
     def stream_data(self) -> Generator[Cents, None, None]:
         """Gives the next price"""
         for msg in self._client:
-            if isinstance(msg, db.SymbolMappingMsg):
+            if isinstance(msg, (db.SymbolMappingMsg, db.SystemMsg)):
                 continue
             elif isinstance(msg, db.MBP1Msg):
                 price = round((msg.price / 1e7))

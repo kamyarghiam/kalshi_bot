@@ -123,7 +123,8 @@ class Order:
     def __str__(self):
         return (
             f"{self.ticker}: {self.trade.name} {self.side.name} "
-            + f"| {self.quantity} @ {self.price} ({self.time_placed})"
+            + f"| {self.quantity} @ {self.price} "
+            + f"({self.time_placed.strftime('%H:%M:%S')})"
         )
 
 

@@ -32,7 +32,7 @@ def main(is_test_run: bool = True):
         strat = TanModelINXZStrategy(ticker, is_test_run)
         portfolio = PortfolioHistory(Balance(balance))
         with e.get_websocket() as ws:
-            sub = OrderbookSubscription(ws, [ticker])
+            sub = OrderbookSubscription(ws, [ticker], send_order_fills=True)
             orderbook_gen = sub.continuous_receive()
             spy_data_gen = databento.stream_data()
             gen = merge_generators(orderbook_gen, spy_data_gen)
@@ -128,7 +128,7 @@ def generate_table(
     table.add_column("SPY Price", style="cyan", width=12)
     table.add_column("Kalshi BBO", style="cyan", width=12)
     table.add_column("Strat prediction", style="cyan", width=12)
-    table.add_column("Portfolio", style="cyan", width=12)
+    table.add_column("Portfolio", style="cyan")
     table.add_row(
         str(num_snapshot_msgs),
         str(num_delta_msgs),

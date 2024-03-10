@@ -659,9 +659,9 @@ Current positions ($8.00):
   Ticker1: NO | 100 @ 5¢
   Ticker2: NO | 50 @ 6¢
 Orders:
-  Ticker1: BUY NO | 100 @ 5¢ (2023-11-01 07:23:00)
-  Ticker2: BUY NO | 200 @ 6¢ (2023-11-01 07:23:00)
-  Ticker2: SELL NO | 150 @ 5¢ (2023-11-01 07:23:00)"""
+  Ticker1: BUY NO | 100 @ 5¢ (07:23:00)
+  Ticker2: BUY NO | 200 @ 6¢ (07:23:00)
+  Ticker2: SELL NO | 150 @ 5¢ (07:23:00)"""
     )
 
 

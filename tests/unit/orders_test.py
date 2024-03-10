@@ -16,7 +16,7 @@ def test_order_str():
         trade=TradeType.BUY,
         time_placed=datetime(2023, 8, 31, 7, 31, 32),
     )
-    assert str(o) == "Ticker: BUY NO | 200 @ 15¢ (2023-08-31 07:31:32)"
+    assert str(o) == "Ticker: BUY NO | 200 @ 15¢ (07:31:32)"
 
 
 def test_order_cost_and_revenue():
