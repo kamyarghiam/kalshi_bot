@@ -1,5 +1,6 @@
 import datetime
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from data.coledb.coledb import ColeDBInterface
@@ -12,7 +13,7 @@ from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 
 def main():
     # Load historical data
-    date = "2023-11-30"
+    date = "2023-11-28"
     db = ColeDBInterface()
     end_time = "16:00:00"  # 4 pm
     end_datetime_str = f"{date} {end_time}"
@@ -45,7 +46,21 @@ def main():
     # The next values
     next_ob = next(ob)
     _, next_spy = next(spy_iter)
+    times = []
+    pred = []
+    prices = []
     while True:
+        if strat.trained_once:
+            bbo = top_ob.get_bbo()
+            if bbo.bid:
+                times.append(ts)
+                pred.append(
+                    strat.get_yes_bid_prediction(
+                        strat.model_params, top_spy.spy_price, ts
+                    )
+                    - strat.kalshi_price_intercept_adjustment
+                )
+                prices.append(bbo.bid.price)
         orders = strat.consume_next_step(top_ob, top_spy.spy_price, ts, portfolio)
         if orders:
             print(orders)
@@ -68,6 +83,9 @@ def main():
         with ExchangeInterface(is_test_run=False) as e:
             print("Unrealized pnl: ", portfolio.get_unrealized_pnl(e))
     portfolio.pta_analysis_chart(ticker)
+    plt.scatter(times, pred, color="red")
+    plt.scatter(times, prices, color="blue")
+    plt.show()
 
 
 def load_spy_data(

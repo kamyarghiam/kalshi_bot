@@ -10,7 +10,7 @@ from traitlets import Tuple
 
 from data.coledb.coledb import ColeDBInterface
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Cents
+from helpers.types.money import Cents, Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side
 from helpers.types.portfolio import PortfolioHistory
@@ -60,6 +60,7 @@ class TanModelINXZStrategy:
         self.trained_once = False
         self.count = 0
         # Used for monitoring
+        self.last_kalshi_price: Price | None = None
         self.last_prediction: Cents | None = None
         self.last_spy_price: Cents | None = None
 
@@ -68,12 +69,14 @@ class TanModelINXZStrategy:
         self.current_signal_count: int = 0
         # Don't trade until we're after the cool down
         self.cool_down_until: int = self.open_time_unix
+        # Every time there is a price change in Kalshi, we re-align or predictions
+        self.kalshi_price_intercept_adjustment = Cents(0)
 
         # Hyperparams
         self.max_order_quantity = 10
         self.shift_amount = 62
         # How much info should we extract from our prediction vs actual price
-        self.omega = 0.6
+        self.omega = 0.8
         # How much can a spy price jump between each update? This is to catch extremes
         self.spy_differential_tolerance = Cents(10)
         # After how many updates do we first train?
@@ -81,9 +84,11 @@ class TanModelINXZStrategy:
         # How often do we train after the first training?
         self.subsequent_training_count = 5000 if self.is_test_run else 20000
         # How many signal counts do we need before we buy?
-        self.num_signals_before_buy = 12
+        self.num_signals_before_buy = 10
         # How long should we wait after a sell to get back in?
         self.cool_down = timedelta(seconds=120)
+        # Minimum distance price and prediction have to be before we trigger a signal
+        self.pred_to_price_threshold = Cents(3)
 
         super().__init__()
 
@@ -176,11 +181,7 @@ class TanModelINXZStrategy:
                 self.current_signal = raw_signal
                 self.current_signal_count = 0
             if self.current_signal_count >= self.num_signals_before_buy:
-                # Reset
-                self.current_signal_count = 0
-                signal = self.current_signal
-                self.current_signal = Signal.NONE
-                return signal
+                return self.current_signal
         return Signal.NONE
 
     def get_raw_signal(
@@ -196,22 +197,29 @@ class TanModelINXZStrategy:
         if spread is None:
             return Signal.NONE
 
-        pred = self.get_yes_bid_prediction(
+        raw_pred = self.get_yes_bid_prediction(
             self.model_params,
             spy_price,
             ts,
         )
+        # Price adjustment based on intercept
+        pred = raw_pred - self.kalshi_price_intercept_adjustment
+
         bbo = ob.get_bbo()
         if not bbo.bid:
             return Signal.NONE
         kalshi_price = bbo.bid.price
 
+        signal = Signal.NONE
         predicted_price = pred * self.omega + (1 - self.omega) * kalshi_price
-        if predicted_price > kalshi_price + spread:
-            return Signal.BUY
-        elif predicted_price < kalshi_price - spread:
-            return Signal.SELL
-        return Signal.NONE
+        if predicted_price > kalshi_price + max(spread, self.pred_to_price_threshold):
+            signal = Signal.BUY
+        elif predicted_price < kalshi_price - max(spread, self.pred_to_price_threshold):
+            signal = Signal.SELL
+        if kalshi_price != self.last_kalshi_price:
+            self.last_kalshi_price = kalshi_price
+            self.kalshi_price_intercept_adjustment = raw_pred - kalshi_price
+        return signal
 
     def append_data(self, ob: Orderbook, spy_price: Cents, ts: int):
         """Adds spy and kalshi price data to our knowledge base"""
@@ -272,6 +280,12 @@ class TanModelINXZStrategy:
     ) -> List[Order]:
         side = portfolio.positions[self.ticker].side
         order = ob.sell_order(side=side)
+        signal = self.get_signal(ob, spy_price, ts)
+        # Don't sell if we still think we're going to make profit
+        if (signal == Signal.BUY and side == side.YES) or (
+            signal == Signal.SELL and side == side.NO
+        ):
+            return []
         if order:
             order.quantity = Quantity(
                 min(
@@ -286,10 +300,16 @@ class TanModelINXZStrategy:
             pnl, fees = portfolio.potential_pnl(order)
             if pnl - fees > 0:
                 return [order]
-            # Stop loss mechanism
-            signal = self.get_signal(ob, spy_price, ts)
+            # Stop loss mechanisms
             if (signal == Signal.SELL and side == Side.YES) or (
                 signal == Signal.BUY and side == Side.NO
+            ):
+                return [order]
+            spread = ob.get_spread()
+            if (
+                spread
+                and portfolio.positions[self.ticker].prices[-1] - order.price
+                >= 2 * spread
             ):
                 return [order]
         return []
@@ -383,7 +403,11 @@ class TanModelINXZStrategy:
         self.training_wheels(ob, spy_price, ts)
         ################################################
 
-        order = self.get_orders(ob, spy_price, ts, portfolio)
+        orders = self.get_orders(ob, spy_price, ts, portfolio)
+        if orders:
+            # Reset signals
+            self.current_signal_count = 0
+            self.current_signal = Signal.NONE
         self.append_data(ob, spy_price, ts)
         self.count += 1
 
@@ -395,4 +419,4 @@ class TanModelINXZStrategy:
             # Retrain frequently
             if self.count % self.subsequent_training_count == 0:
                 self.train_data()
-        return order
+        return orders
