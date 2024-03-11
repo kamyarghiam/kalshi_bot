@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Iterable, List
 
@@ -66,6 +66,8 @@ class TanModelINXZStrategy:
         self.current_signal = Signal.NONE
         # Number of times we've seen this signal in a row
         self.current_signal_count: int = 0
+        # Don't trade until we're after the cool down
+        self.cool_down_until: int = self.open_time_unix
 
         # Hyperparams
         self.max_order_quantity = 10
@@ -79,7 +81,9 @@ class TanModelINXZStrategy:
         # How often do we train after the first training?
         self.subsequent_training_count = 5000 if self.is_test_run else 20000
         # How many signal counts do we need before we buy?
-        self.num_signals_before_buy = 10
+        self.num_signals_before_buy = 12
+        # How long should we wait after a sell to get back in?
+        self.cool_down = timedelta(seconds=120)
 
         super().__init__()
 
@@ -252,28 +256,21 @@ class TanModelINXZStrategy:
     def get_orders(
         self, ob: Orderbook, spy_price: Cents, ts: int, portfolio: PortfolioHistory
     ) -> List[Order]:
-        if buy_orders := self.get_buy_orders(ob, spy_price, ts, portfolio):
-            return buy_orders
-        if self.ticker in portfolio.positions:
-            return self.get_sell_orders(ob, ts, spy_price, portfolio)
+        # Don't trade until after cooldown
+        if ts <= self.cool_down_until:
+            return []
+        # TODO: this only holds one position at a time
+        if self.ticker not in portfolio.positions:
+            return self.get_buy_orders(ob, spy_price, ts, portfolio)
+        if sell_orders := self.get_sell_orders(ob, ts, spy_price, portfolio):
+            self.cool_down_until = ts + int(self.cool_down.total_seconds())
+            return sell_orders
         return []
 
     def get_sell_orders(
         self, ob: Orderbook, ts: int, spy_price: Cents, portfolio: PortfolioHistory
     ) -> List[Order]:
         side = portfolio.positions[self.ticker].side
-        signal = self.get_signal(ob, spy_price, ts)
-        # Do not sell if we still think it's going up
-        match signal:
-            case Signal.BUY:
-                if side == Side.YES:
-                    return []
-            case Signal.SELL:
-                if side == Side.NO:
-                    return []
-            case Signal.NONE:
-                # Do nothing
-                pass
         order = ob.sell_order(side=side)
         if order:
             order.quantity = Quantity(
@@ -289,7 +286,12 @@ class TanModelINXZStrategy:
             pnl, fees = portfolio.potential_pnl(order)
             if pnl - fees > 0:
                 return [order]
-            # TODO: add stop loss mechanism
+            # Stop loss mechanism
+            signal = self.get_signal(ob, spy_price, ts)
+            if (signal == Signal.SELL and side == Side.YES) or (
+                signal == Signal.BUY and side == Side.NO
+            ):
+                return [order]
         return []
 
     def get_buy_orders(
@@ -311,7 +313,7 @@ class TanModelINXZStrategy:
                 if portfolio.positions[self.ticker].side != buy_order.side:
                     return []
                 # Don't buy at the same price (limit num orders at price level)
-                if portfolio.positions[self.ticker].prices[-1] == buy_order.price:
+                if buy_order.price in portfolio.positions[self.ticker].prices:
                     return []
             max_quantity_can_afford = get_max_quantity_can_afford(
                 portfolio.balance, buy_order.price
@@ -321,6 +323,8 @@ class TanModelINXZStrategy:
                     buy_order.quantity, self.max_order_quantity, max_quantity_can_afford
                 )
             )
+            if buy_order.quantity == 0:
+                return []
             assert portfolio.can_afford(buy_order), (buy_order, portfolio)
             buy_order.time_placed = datetime.fromtimestamp(ts).astimezone(
                 ColeDBInterface.tz

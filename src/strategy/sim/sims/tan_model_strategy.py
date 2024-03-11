@@ -12,7 +12,7 @@ from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 
 def main():
     # Load historical data
-    date = "2023-10-18"
+    date = "2023-11-30"
     db = ColeDBInterface()
     end_time = "16:00:00"  # 4 pm
     end_datetime_str = f"{date} {end_time}"
@@ -64,10 +64,10 @@ def main():
                 break
             ts = ob_ts
     print(portfolio)
-    portfolio.pta_analysis_chart(ticker)
     if portfolio.has_open_positions():
         with ExchangeInterface(is_test_run=False) as e:
             print("Unrealized pnl: ", portfolio.get_unrealized_pnl(e))
+    portfolio.pta_analysis_chart(ticker)
 
 
 def load_spy_data(
