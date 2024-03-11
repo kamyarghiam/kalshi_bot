@@ -73,6 +73,7 @@ def main(is_test_run: bool = True):
                             last_ob, last_spy_price, round(time.time()), portfolio
                         )
                         for order in orders:
+                            print("Placing order: ", order)
                             if order_id := e.place_order(order):
                                 portfolio.reserve_order(order, order_id)
                     live.update(
