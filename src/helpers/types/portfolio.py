@@ -207,6 +207,10 @@ class PortfolioHistory:
     def positions(self):
         return self._positions
 
+    @property
+    def reserved_orders(self) -> Dict[OrderId, ReservedOrder]:
+        return self._reserved_orders
+
     def reserve(self, amount: Cents):
         """This function can be used to reserve or free up reserved cash
 

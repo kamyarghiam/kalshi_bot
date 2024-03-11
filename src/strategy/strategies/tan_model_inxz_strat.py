@@ -269,7 +269,10 @@ class TanModelINXZStrategy:
             return []
         # TODO: this only holds one position at a time
         if self.ticker not in portfolio.positions:
-            return self.get_buy_orders(ob, spy_price, ts, portfolio)
+            # Make sure no orders are in flight (without this, we would duplicate orders
+            # until we receive the ack from the exchange)
+            if len(portfolio.reserved_orders) == 0:
+                return self.get_buy_orders(ob, spy_price, ts, portfolio)
         if sell_orders := self.get_sell_orders(ob, ts, spy_price, portfolio):
             self.cool_down_until = ts + int(self.cool_down.total_seconds())
             return sell_orders
