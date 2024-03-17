@@ -13,7 +13,7 @@ from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 
 def main():
     # Load historical data
-    date = "2023-11-28"
+    date = "2024-03-13"
     db = ColeDBInterface()
     end_time = "16:00:00"  # 4 pm
     end_datetime_str = f"{date} {end_time}"
@@ -69,7 +69,11 @@ def main():
         ob_ts = next_ob.ts.timestamp()
         if next_spy.ts < ob_ts:
             top_spy = next_spy
-            _, next_spy = next(spy_iter)
+            try:
+                _, next_spy = next(spy_iter)
+            except StopIteration:
+                print(ts)
+                break
             ts = top_spy.ts
         else:
             top_ob = next_ob
