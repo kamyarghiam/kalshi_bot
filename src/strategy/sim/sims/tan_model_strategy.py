@@ -92,7 +92,7 @@ def load_spy_data(
     date: str, start_time: datetime.datetime, end_time: datetime.datetime
 ) -> pd.DataFrame:
     date_no_hyphen = date.replace("-", "")
-    file = f"src/data/local/databento/xnas-itch/spy/xnas-itch-{date_no_hyphen}.mbo.csv"
+    file = f"src/data/local/databento/xnas-itch/spy/{date_no_hyphen}.csv"
     spy_df = pd.read_csv(file)
     spy_df = spy_df[(spy_df.action == "T") | (spy_df.action == "F")][
         ["price", "ts_recv"]

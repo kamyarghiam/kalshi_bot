@@ -93,4 +93,4 @@ def hist_spy_feature(es_file: pathlib.Path) -> ObservationCursor:
 
 
 def hist_spy_local_path(date: datetime.date) -> pathlib.Path:
-    return _DATA_LOCAL_PATH / f"xnas-itch-{date.strftime('%Y%m%d')}.mbo.csv"
+    return _DATA_LOCAL_PATH / f"{date.strftime('%Y%m%d')}.csv"
