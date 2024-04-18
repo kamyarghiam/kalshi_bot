@@ -27,10 +27,12 @@ import tqdm.autonotebook as tqdm
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import MarketTicker
 from helpers.types.markets import EventTicker
+from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
 from helpers.types.portfolio import PortfolioHistory
 
 if TYPE_CHECKING:
+    from strategy.features.base.kalshi import SPYRangedKalshiMarket
     from strategy.features.derived.derived_feature import DerivedFeature
 
 
@@ -374,6 +376,20 @@ class Strategy(ABC):
     @abstractmethod
     def consume_next_step(
         self, update: ObservationSet, portfolio: PortfolioHistory
+    ) -> Iterable[Order]:
+        pass
+
+
+class SpyStrategy(ABC):
+    @abstractmethod
+    def consume_next_step(
+        self,
+        obs: List[Orderbook],
+        spy_price: int,
+        ticker_changed: MarketTicker | None,
+        ts: int,
+        portfolio: PortfolioHistory,
+        metadata: List["SPYRangedKalshiMarket"],
     ) -> Iterable[Order]:
         pass
 

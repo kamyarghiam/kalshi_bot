@@ -512,7 +512,7 @@ class PortfolioHistory:
         plt.scatter(times, bids, color="purple")
         plt.scatter(times, asks, color="orange")
         plt.plot(times, midpoints, color="blue")
-
+        plt.title(ticker)
         plt.show()
 
 

@@ -18,7 +18,9 @@ from strategy.utils import (
 
 def test_daily_spy_range_kalshi_markets(real_readonly_coledb):
     d = datetime.date(2023, 10, 18)
-    assert daily_spy_range_kalshi_markets(date=d, cole=real_readonly_coledb) == [
+    assert daily_spy_range_kalshi_markets(
+        date=d, cole=real_readonly_coledb, series_ticker="INXD"
+    ) == [
         SPYRangedKalshiMarket(
             ticker=MarketTicker("INXD-23OCT18-T4250"),
             spy_min=None,
