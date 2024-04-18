@@ -91,8 +91,8 @@ def load_spy_data(
     date_str = date.strftime("%Y%m%d")
     file = f"src/data/local/databento/spy/{date_str}.csv"
     spy_df = pd.read_csv(file)
-    spy_df.bid_px_00 /= 10000000
-    spy_df.ask_px_00 /= 10000000
+    spy_df.bid_px_00 /= 100000000
+    spy_df.ask_px_00 /= 100000000
     spy_df["wmp"] = (
         spy_df.bid_px_00 * spy_df.bid_sz_00 + spy_df.ask_px_00 * spy_df.ask_sz_00
     ) / (spy_df.bid_sz_00 + spy_df.ask_sz_00)

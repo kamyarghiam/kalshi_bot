@@ -386,7 +386,7 @@ class SpyStrategy(ABC):
         self,
         obs: List[Orderbook],
         spy_price: Cents,
-        ticker_changed: MarketTicker | None,
+        changed_ticker: MarketTicker | None,
         ts: int,
         portfolio: PortfolioHistory,
     ) -> Iterable[Order]:
