@@ -5,7 +5,7 @@ from strategy.sim.sims.bucket_strategy import BucketStrategy
 
 
 def main():
-    date = datetime(2024, 4, 12)
+    date = datetime(2024, 4, 10)
     strat = BucketStrategy(date)
     run_spy_sim(date, strat)
 
