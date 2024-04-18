@@ -39,14 +39,17 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
     # The next values
     next_obs = [next(ob) for ob in obs]
     _, next_spy = next(spy_iter)
+    print_count = 0
     while True:
+        if print_count % 100000 == 0:
+            print("ts: ", datetime.fromtimestamp(ts))
+        print_count += 1
         orders = strategy.consume_next_step(
             top_obs,
             top_spy.spy_price,
             last_ticker_changed,
             ts,
             portfolio,
-            kalshi_markets,
         )
         if orders:
             print(orders)
@@ -100,5 +103,6 @@ def load_spy_data(
     spy_df = spy_df[
         (spy_df.ts >= start_time.timestamp()) & (spy_df.ts <= end_time.timestamp())
     ]
+    spy_df = spy_df.dropna()
 
     return spy_df
