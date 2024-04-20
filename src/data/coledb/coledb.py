@@ -51,7 +51,7 @@ import io
 import pickle
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
@@ -124,7 +124,7 @@ class ColeBytes:
     """Bytes object used to read the binary files from db"""
 
     # Number of bytes to read per chunk
-    chunk_read_size_bytes = 4096  # 2^12
+    chunk_read_size_bytes = 8  # 2^6
 
     def __init__(self, bytes_io: io.BytesIO | io.BufferedReader):
         self._bio = bytes_io
@@ -692,9 +692,8 @@ class ColeDBInterface:
 
         # Timestamp. We divide by 10 to get the sub-second precision
         timestamp_delta = (b.read(timestamp_bits_length)) / 10
-        ts = datetime.fromtimestamp(
-            chunk_start_timestamp.timestamp() + timestamp_delta
-        ).astimezone(ColeDBInterface.tz)
+        ts = chunk_start_timestamp + timedelta(seconds=timestamp_delta)
+        ts = ts.astimezone(ColeDBInterface.tz)
         num_bits_read += timestamp_bits_length
 
         # Quantity delta
@@ -719,7 +718,8 @@ class ColeDBInterface:
         if padding > 0:
             b.read(padding)
 
-        return OrderbookDeltaRM(
+        # Construct does not do validation, faster
+        return OrderbookDeltaRM.construct(
             market_ticker=ticker,
             price=Price(price),
             delta=QuantityDelta(delta),
@@ -749,12 +749,13 @@ class ColeDBInterface:
 
         # Timestamp. We divide by 10 to get the sub-second precision
         timestamp_delta = (b.read(timestamp_bits_length)) / 10
-        ts = datetime.fromtimestamp(
-            chunk_start_timestamp.timestamp() + timestamp_delta
-        ).astimezone(ColeDBInterface.tz)
+        ts = chunk_start_timestamp + timedelta(seconds=timestamp_delta)
+        ts = ts.astimezone(ColeDBInterface.tz)
         num_bits_read += timestamp_bits_length
 
-        snapshot_rm = OrderbookSnapshotRM(market_ticker=ticker, ts=ts, yes=[], no=[])
+        snapshot_rm = OrderbookSnapshotRM.construct(
+            market_ticker=ticker, ts=ts, yes=[], no=[]
+        )
 
         for price in range(1, 100):
             # Tells us if it's a yes/no/both/neither
