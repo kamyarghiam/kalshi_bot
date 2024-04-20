@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Tuple
 
+import pytz
+
 from helpers.types.api import ExternalApi
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
@@ -137,7 +139,10 @@ class Orderbook:
     # Initially all orderbooks are in the maker (aka sell view) view from the websocket
     view: OrderbookView = field(default_factory=lambda: OrderbookView.BID)
     # The timestamp of when the message was received from the exchange
-    ts: datetime = field(default_factory=datetime.now, compare=False)
+    ts: datetime = field(
+        default_factory=lambda: datetime.now().astimezone(pytz.timezone("US/Eastern")),
+        compare=False,
+    )
 
     def __post_init__(self):
         if not self._is_valid_orderbook():

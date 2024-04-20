@@ -1,23 +1,44 @@
-from datetime import datetime
+from datetime import datetime, time
+from typing import Generator
 
 import pandas as pd
 
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
+from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance
+from helpers.types.orderbook import Orderbook
 from helpers.types.portfolio import PortfolioHistory
 from helpers.utils import Cents
 from strategy.features.base.kalshi import daily_spy_range_kalshi_markets
 from strategy.utils import SpyStrategy
 
 
-def run_spy_sim(date: datetime, strategy: SpyStrategy):
+def next_ob(orderbook_gen: Generator[Orderbook, None, None]) -> Orderbook:
+    try:
+        return next(orderbook_gen)
+    except StopIteration:
+        return Orderbook(MarketTicker(""))
+
+
+def run_spy_sim(
+    date: datetime,
+    strategy: SpyStrategy,
+    pta_on: bool = False,
+    start_time: time = time(9, 30),
+    end_time: time = time(16, 0),
+) -> Cents:
+    exchange_interface = ExchangeInterface(is_test_run=False)
     db = ColeDBInterface()
     kalshi_markets = daily_spy_range_kalshi_markets(date, db)
-    start_dt_object = date.replace(hour=9, minute=30).astimezone(
+    start_dt_object = date.replace(
+        hour=start_time.hour, minute=start_time.minute
+    ).astimezone(
         ColeDBInterface.tz
     )  # 9:30 am
-    end_dt_object = date.replace(hour=16).astimezone(ColeDBInterface.tz)  # 4 pm
+    end_dt_object = date.replace(hour=end_time.hour, minute=end_time.minute).astimezone(
+        ColeDBInterface.tz
+    )
 
     spy_df: pd.DataFrame = load_spy_data(date, start_dt_object, end_dt_object)
     spy_iter = spy_df.itertuples()
@@ -26,7 +47,7 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
     portfolio = PortfolioHistory(Balance(Cents(100000)))
 
     # The top values
-    top_obs = [next(ob) for ob in obs]
+    top_obs = [next_ob(ob) for ob in obs]
     top_spy = next(spy_iter)
     top_ob_ts = [ob.ts.timestamp() for ob in top_obs]
     min_top_ob_ts = min(top_ob_ts)
@@ -37,7 +58,7 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
         last_ticker_changed = top_obs[top_ob_ts.index(ts)].market_ticker
 
     # The next values
-    next_obs = [next(ob) for ob in obs]
+    next_obs = [next_ob(ob) for ob in obs]
     next_obs_ts = [next_ob.ts.timestamp() for next_ob in next_obs]
     next_spy = next(spy_iter)
     print_count = 0
@@ -54,6 +75,7 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
         )
         if orders:
             print(orders)
+
         for order in orders:
             portfolio.place_order(order)
         smallest_ob_ts = min(next_obs_ts)
@@ -71,21 +93,20 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
             ob_changed_index = next_obs_ts.index(smallest_ob_ts)
             last_ticker_changed = top_obs[ob_changed_index].market_ticker
             top_obs[ob_changed_index] = next_obs[ob_changed_index]
-            try:
-                next_obs[ob_changed_index] = next(obs[ob_changed_index])
-                next_obs_ts[ob_changed_index] = next_obs[
-                    ob_changed_index
-                ].ts.timestamp()
-            except StopIteration:
-                break
+            next_obs[ob_changed_index] = next_ob(obs[ob_changed_index])
+            next_obs_ts[ob_changed_index] = next_obs[ob_changed_index].ts.timestamp()
             ts = top_obs[ob_changed_index].ts
     print(portfolio)
+    unrealized_pnl = Cents(0)
     if portfolio.has_open_positions():
-        with ExchangeInterface(is_test_run=False) as e:
-            print("Unrealized pnl: ", portfolio.get_unrealized_pnl(e))
+        unrealized_pnl = portfolio.get_unrealized_pnl(exchange_interface)
+        print("Unrealized pnl: ", unrealized_pnl)
 
-    for market in kalshi_markets:
-        portfolio.pta_analysis_chart(market.ticker)
+    if pta_on:
+        for market in kalshi_markets:
+            portfolio.pta_analysis_chart(market.ticker)
+
+    return portfolio.realized_pnl_after_fees + unrealized_pnl
 
 
 def load_spy_data(

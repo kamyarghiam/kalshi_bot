@@ -18,9 +18,13 @@ from strategy.utils import SpyStrategy
 class BucketStrategy(SpyStrategy):
     """Buys buckets around the current bucket until we reach a $1"""
 
-    def __init__(self, date):
+    def __init__(self, date, max_prob_sum: int):
         self.max_order_quantity = Quantity(100)
+        self.max_probability_sum = Price(
+            max_prob_sum
+        )  # The lower, the more profit we demand
         self.stop_loss_price = Price(51)
+        self.min_number_of_buckets = 6
         self.metadata: List[SPYRangedKalshiMarket] = daily_spy_range_kalshi_markets(
             date, ColeDBInterface()
         )
@@ -55,47 +59,52 @@ class BucketStrategy(SpyStrategy):
                     return orders
 
         else:
-            # Confirm that it's a Kalshi price change
-            if changed_ticker is not None:
-                # Case if there is profit
-                sell_orders = []
-                current_yes_prices = []
-                for position in portfolio.positions.values():
-                    idx = self.tickers.index(position.ticker)
-                    ob = obs[idx]
-                    bbo = ob.get_bbo()
-                    if bbo.ask:
-                        current_yes_prices.append(bbo.ask.price)
-                    sell_order = self.get_sell_order(ob, portfolio, ts)
-                    if sell_order is None:
-                        break
-                    sell_orders.append(sell_order)
-                else:
-                    # All sell orders are not none
-                    # TODO: allow partial sells (not all or none)
-                    total_pnl = 0
-                    for order in sell_orders:
-                        pnl, fees = portfolio.potential_pnl(order)
-                        total_pnl += pnl - fees
-                    if total_pnl > 0:
-                        print(f"Selling with pnl: {total_pnl}")
-                        return sell_orders
+            # In sims, it seems like holding it to the end makes the most sense
+            return []
+            # # Confirm that it's a Kalshi price change
+            # if changed_ticker is not None:
+            #     # Case if there is profit
+            #     sell_orders = []
+            #     current_yes_prices = []
+            #     for position in portfolio.positions.values():
+            #         idx = self.tickers.index(position.ticker)
+            #         ob = obs[idx]
+            #         bbo = ob.get_bbo()
+            #         if bbo.ask:
+            #             current_yes_prices.append(bbo.ask.price)
+            #         sell_order = self.get_sell_order(ob, portfolio, ts)
+            #         if sell_order is None:
+            #             break
+            #         sell_orders.append(sell_order)
+            #     else:
+            #         # All sell orders are not none
+            #         # TODO: allow partial sells (not all or none)
+            #         total_pnl = 0
+            #         for order in sell_orders:
+            #             pnl, fees = portfolio.potential_pnl(order)
+            #             total_pnl += pnl - fees
+            #         if total_pnl > 0:
+            #             print(f"Selling with pnl: {total_pnl}")
+            #             return sell_orders
 
-                    # Stop loss case
-                    if len(current_yes_prices) == len(sell_orders):
-                        # This means there were prices on all the markets
-                        if sum(current_yes_prices) < self.stop_loss_price:
-                            return sell_orders
+            #         # Stop loss case
+            #         if len(current_yes_prices) == len(sell_orders):
+            #             # This means there were prices on all the markets
+            #             if sum(current_yes_prices) < self.stop_loss_price:
+            #                 return sell_orders
 
         return []
 
     def buy_around_idx(
         self, idx: int, obs: List[Orderbook], spy_price: Cents, ts: datetime.datetime
-    ):
+    ) -> List[Order]:
         """First, buys at the idx. Then we buy above and below the index until
         we hit 99 cents"""
         # First add the order at the index we're at
         orders = self.get_buy_order(obs, idx, ts)
+        if len(orders) == 0:
+            # No orders to buy at the index we want
+            return []
 
         # Then figure out of we should get the market above first, or the market below
         metadata_at_idx = self.metadata[idx]
@@ -109,47 +118,54 @@ class BucketStrategy(SpyStrategy):
             metadata_at_idx.spy_max,
         )
 
-        offset = (
+        direction = (
             1
             if (metadata_at_idx.spy_max - spy_price)
             < (spy_price - metadata_at_idx.spy_min)
             else -1
         )
-        direction = 1
+        offset = 1
+        should_increment_offset = False
         while prob_passed := self.check_total_probability(orders):
             # Buy above and below by offset
             market_orders = self.get_buy_order(obs, idx + direction * offset, ts)
+
             if len(market_orders) == 0:
                 # in this case, for some reason, we couldn't buy around the idx.
                 # So let's cancel the transaction
                 orders = []
                 break
-            orders.extend(market_orders)
-            if direction == -1:
-                offset += 1
 
+            orders.extend(market_orders)
+            if should_increment_offset:
+                offset += 1
+            should_increment_offset = not should_increment_offset
             direction *= -1
             # Check that we are not out of bounds
             if idx - offset < 0 and idx + offset >= len(obs):
                 break
-        if len(orders) < 2 or sum([o.price for o in orders]) < self.stop_loss_price:
-            # We need at least two buckets and large enough price sum
-            return []
         if not prob_passed and len(orders) > 0:
             # We know the last order added exceeded the probability
             orders = orders[:-1]
             assert self.check_total_probability(orders)
+        if (
+            len(orders) < self.min_number_of_buckets
+            or sum([o.price for o in orders]) < self.stop_loss_price
+        ):
+            # We need at least some buckets and large enough price sum
+            return []
+
         return orders
 
     def check_total_probability(self, orders: List[Order]):
         """Makes sure that the sum of the prices are less than a certain threshold"""
         prices = [o.price for o in orders]
-        return sum(prices) < Price(99)
+        return sum(prices) < self.max_probability_sum
 
     def get_buy_order(
         self, obs: List[Orderbook], idx: int, ts: datetime.datetime
     ) -> List[Order]:
-        if idx < 0 or idx > len(obs):
+        if idx < 0 or idx >= len(obs):
             return []
         order = obs[idx].buy_order(Side.YES)
         if order:
