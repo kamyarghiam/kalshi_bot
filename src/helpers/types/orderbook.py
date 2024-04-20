@@ -25,12 +25,28 @@ class OrderbookSide:
     # or make it a named tuple. Also make the representation more compact
     levels: Dict[Price, Quantity] = field(default_factory=dict)
 
+    # Cached values
+    _cached_min: Tuple[Price, Quantity] | None = field(
+        default_factory=lambda: None, compare=False
+    )
+    _cached_max: Tuple[Price, Quantity] | None = field(
+        default_factory=lambda: None, compare=False
+    )
+    _cached_sum: Quantity = field(default_factory=lambda: Quantity(0), compare=False)
+
+    def _reset_cache(self):
+        self._cached_min = None
+        self._cached_max = None
+        self._cached_sum = Quantity(0)
+
     def add_level(self, price: Price, quantity: Quantity):
         if price in self.levels:
             raise ValueError(
                 f"Price {price} to quantity {quantity} already exists in {self.levels}"
             )
         self.levels[price] = quantity
+
+        self._reset_cache()
 
     def apply_delta(self, price: Price, delta: QuantityDelta):
         """Destructively applies an orderbook delta to the orderbook side"""
@@ -41,23 +57,35 @@ class OrderbookSide:
         if self.levels[price] == 0:
             self._remove_level(price)
 
+        self._reset_cache()
+
     def is_empty(self):
         return len(self.levels) == 0
 
     def get_largest_price_level(self) -> Tuple[Price, Quantity] | None:
+        if self._cached_max:
+            return self._cached_max
         if self.is_empty():
             return None
-
-        return max(self.levels.items())
+        max_level = max(self.levels.items())
+        self._cached_max = max_level
+        return max_level
 
     def get_smallest_price_level(self) -> Tuple[Price, Quantity] | None:
+        if self._cached_min:
+            return self._cached_min
         if self.is_empty():
             return None
-
-        return min(self.levels.items())
+        min_level = min(self.levels.items())
+        self._cached_min = min_level
+        return min_level
 
     def get_total_quantity(self) -> Quantity:
-        return Quantity(sum(quantity for quantity in self.levels.values()))
+        if self._cached_sum:
+            return self._cached_sum
+        sum_ = Quantity(sum(quantity for quantity in self.levels.values()))
+        self._cached_sum = sum_
+        return sum_
 
     def invert_prices(self) -> "OrderbookSide":
         """Non-destructively inverts prices on orderbook side
