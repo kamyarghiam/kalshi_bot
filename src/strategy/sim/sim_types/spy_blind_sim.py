@@ -28,17 +28,17 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
     # The top values
     top_obs = [next(ob) for ob in obs]
     top_spy = next(spy_iter)
-    top_ob_ts = [ob.ts for ob in top_obs]
+    top_ob_ts = [ob.ts.timestamp() for ob in top_obs]
     min_top_ob_ts = min(top_ob_ts)
-    ts = min(min_top_ob_ts, top_spy.ts)
+    ts = min(top_obs[top_ob_ts.index(min_top_ob_ts)].ts, top_spy.ts)
 
     last_ticker_changed = None
-    if min_top_ob_ts < top_spy.ts:
+    if min_top_ob_ts < top_spy.ts_int:
         last_ticker_changed = top_obs[top_ob_ts.index(ts)].market_ticker
 
     # The next values
     next_obs = [next(ob) for ob in obs]
-    next_obs_ts = [next_ob.ts for next_ob in next_obs]
+    next_obs_ts = [next_ob.ts.timestamp() for next_ob in next_obs]
     next_spy = next(spy_iter)
     print_count = 0
     while True:
@@ -57,7 +57,8 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
         for order in orders:
             portfolio.place_order(order)
         smallest_ob_ts = min(next_obs_ts)
-        if next_spy.ts < smallest_ob_ts:
+        # Use ints for comparison because comparing pd timestamp to datetime is slow
+        if next_spy.ts_int < smallest_ob_ts:
             last_ticker_changed = None
             top_spy = next_spy
             try:
@@ -73,10 +74,12 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
             top_obs[ob_changed_index] = next_obs[ob_changed_index]
             try:
                 next_obs[ob_changed_index] = next(obs[ob_changed_index])
-                next_obs_ts[ob_changed_index] = next_obs[ob_changed_index].ts
+                next_obs_ts[ob_changed_index] = next_obs[
+                    ob_changed_index
+                ].ts.timestamp()
             except StopIteration:
                 break
-            ts = smallest_ob_ts
+            ts = top_obs[ob_changed_index].ts
     print(portfolio)
     if portfolio.has_open_positions():
         with ExchangeInterface(is_test_run=False) as e:
@@ -101,6 +104,7 @@ def load_spy_data(
     spy_df = spy_df.rename(columns={"wmp": "spy_price", "ts_recv": "ts"})
     spy_df = spy_df.sort_values(by="ts")
     spy_df.ts /= 10**9
+    spy_df["ts_int"] = spy_df.ts
     spy_df.ts = pd.to_datetime(spy_df.ts, unit="s", utc=True)
     spy_df = spy_df[(spy_df.ts >= start_time) & (spy_df.ts <= end_time)]
     spy_df = spy_df.dropna()
