@@ -99,12 +99,9 @@ class Position:
                 f"Selling too much. You have {self.total_quantity} "
                 + f"but you want to sell {quantity_to_sell}"
             )
-        remaining_prices: List[Price] = []
-        remaining_quantities: List[Quantity] = []
-        remaining_fees: List[Cents] = []
-
         total_purchase_amount_cents: Cents = Cents(0)
         total_purchase_fees_paid: Cents = Cents(0)
+        i = 0
         for price, quantity_holding, fees in zip(
             self.prices, self.quantities, self.fees
         ):
@@ -117,16 +114,18 @@ class Position:
                 total_purchase_fees_paid += fees_paid
                 quantity_holding -= QuantityDelta(quantity_to_sell)
                 total_purchase_amount_cents += Cents(price * quantity_to_sell)
-                remaining_prices.append(price)
-                remaining_quantities.append(quantity_holding)
-                remaining_fees.append(fees - fees_paid)
-                quantity_to_sell = Quantity(0)
+                if not for_info:
+                    self.prices[i] = price
+                    self.quantities[i] = quantity_holding
+                    self.fees[i] = fees - fees_paid
+                break
+            i += 1
         total_sell_fees_paid = order.fee
         if not for_info:
             # If it's not just for information, we lock in sell
-            self.prices = remaining_prices
-            self.quantities = remaining_quantities
-            self.fees = remaining_fees
+            self.prices = self.prices[i:]
+            self.quantities = self.quantities[i:]
+            self.fees = self.fees[i:]
         return (
             total_purchase_amount_cents,
             total_purchase_fees_paid,
