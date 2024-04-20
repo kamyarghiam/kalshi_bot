@@ -28,7 +28,7 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
     # The top values
     top_obs = [next(ob) for ob in obs]
     top_spy = next(spy_iter)
-    top_ob_ts = [ob.ts.timestamp() for ob in top_obs]
+    top_ob_ts = [ob.ts for ob in top_obs]
     min_top_ob_ts = min(top_ob_ts)
     ts = min(min_top_ob_ts, top_spy.ts)
 
@@ -38,12 +38,12 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
 
     # The next values
     next_obs = [next(ob) for ob in obs]
-    next_obs_ts = [next_ob.ts.timestamp() for next_ob in next_obs]
+    next_obs_ts = [next_ob.ts for next_ob in next_obs]
     next_spy = next(spy_iter)
     print_count = 0
     while True:
         if print_count % 100000 == 0:
-            print("ts: ", datetime.fromtimestamp(ts))
+            print("ts: ", ts.astimezone(ColeDBInterface.tz))
         print_count += 1
         orders = strategy.consume_next_step(
             top_obs,
@@ -73,9 +73,7 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
             top_obs[ob_changed_index] = next_obs[ob_changed_index]
             try:
                 next_obs[ob_changed_index] = next(obs[ob_changed_index])
-                next_obs_ts[ob_changed_index] = next_obs[
-                    ob_changed_index
-                ].ts.timestamp()
+                next_obs_ts[ob_changed_index] = next_obs[ob_changed_index].ts
             except StopIteration:
                 break
             ts = smallest_ob_ts
@@ -103,9 +101,8 @@ def load_spy_data(
     spy_df = spy_df.rename(columns={"wmp": "spy_price", "ts_recv": "ts"})
     spy_df = spy_df.sort_values(by="ts")
     spy_df.ts /= 10**9
-    spy_df = spy_df[
-        (spy_df.ts >= start_time.timestamp()) & (spy_df.ts <= end_time.timestamp())
-    ]
+    spy_df.ts = pd.to_datetime(spy_df.ts, unit="s", utc=True)
+    spy_df = spy_df[(spy_df.ts >= start_time) & (spy_df.ts <= end_time)]
     spy_df = spy_df.dropna()
 
     return spy_df

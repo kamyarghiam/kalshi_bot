@@ -387,7 +387,7 @@ class SpyStrategy(ABC):
         obs: List[Orderbook],
         spy_price: Cents,
         changed_ticker: MarketTicker | None,
-        ts: int,
+        ts: datetime.datetime,
         portfolio: PortfolioHistory,
     ) -> Iterable[Order]:
         pass

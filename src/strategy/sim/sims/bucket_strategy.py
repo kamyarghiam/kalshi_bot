@@ -39,7 +39,7 @@ class BucketStrategy(SpyStrategy):
         obs: List[Orderbook],
         spy_price: Cents,
         changed_ticker: MarketTicker | None,
-        ts: int,
+        ts: datetime.datetime,
         portfolio: PortfolioHistory,
     ) -> Iterable[Order]:
         if not portfolio.has_open_positions():
@@ -87,7 +87,9 @@ class BucketStrategy(SpyStrategy):
 
         return []
 
-    def buy_around_idx(self, idx: int, obs: List[Orderbook], spy_price: Cents, ts: int):
+    def buy_around_idx(
+        self, idx: int, obs: List[Orderbook], spy_price: Cents, ts: datetime.datetime
+    ):
         """First, buys at the idx. Then we buy above and below the index until
         we hit 99 cents"""
         # First add the order at the index we're at
@@ -142,7 +144,9 @@ class BucketStrategy(SpyStrategy):
         prices = [o.price for o in orders]
         return sum(prices) < Price(99)
 
-    def get_buy_order(self, obs: List[Orderbook], idx: int, ts: int) -> List[Order]:
+    def get_buy_order(
+        self, obs: List[Orderbook], idx: int, ts: datetime.datetime
+    ) -> List[Order]:
         if idx < 0 or idx > len(obs):
             return []
         order = obs[idx].buy_order(Side.YES)
@@ -151,13 +155,11 @@ class BucketStrategy(SpyStrategy):
             if order.quantity < self.max_order_quantity:
                 return []
             order.quantity = self.max_order_quantity
-            order.time_placed = datetime.datetime.fromtimestamp(ts).astimezone(
-                ColeDBInterface.tz
-            )
+            order.time_placed = ts
         return [] if order is None else [order]
 
     def get_sell_order(
-        self, ob: Orderbook, portfolio: PortfolioHistory, ts: int
+        self, ob: Orderbook, portfolio: PortfolioHistory, ts: datetime.datetime
     ) -> Order | None:
         order = ob.sell_order(Side.YES)
         if order:
@@ -165,7 +167,5 @@ class BucketStrategy(SpyStrategy):
             if order.quantity < portfolio.positions[order.ticker].total_quantity:
                 return None
             order.quantity = Quantity(portfolio.positions[order.ticker].total_quantity)
-            order.time_placed = datetime.datetime.fromtimestamp(ts).astimezone(
-                ColeDBInterface.tz
-            )
+            order.time_placed = ts
         return order
