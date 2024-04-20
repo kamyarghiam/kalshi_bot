@@ -137,7 +137,7 @@ class Orderbook:
             # Ditto on equality, see comment above
             return yes_price + no_price >= Cents(100)
 
-    def apply_delta(self, delta: "OrderbookDeltaRM") -> "Orderbook":
+    def apply_delta(self, delta: "OrderbookDeltaRM", in_place=False) -> "Orderbook":
         """Non-destructively applies an orderbook delta to an orderbook snapshot"""
         if delta.market_ticker != self.market_ticker:
             raise ValueError(
@@ -145,7 +145,7 @@ class Orderbook:
             )
         if self.view != OrderbookView.BID:
             raise ValueError("Can only apply delta on bid view")
-        new_orderbook = copy.deepcopy(self)
+        new_orderbook = self if in_place else copy.deepcopy(self)
         if delta.side == Side.NO:
             new_orderbook.no.apply_delta(delta.price, delta.delta)
         else:

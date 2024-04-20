@@ -871,7 +871,7 @@ class ColeDBInterface:
                         orderbook = Orderbook.from_snapshot(msg)
                     else:
                         assert isinstance(msg, OrderbookDeltaRM)
-                        orderbook = orderbook.apply_delta(msg)
+                        orderbook.apply_delta(msg, in_place=True)
 
 
 class ReadonlyColeDB(ColeDBInterface):

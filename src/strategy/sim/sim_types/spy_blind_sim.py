@@ -20,14 +20,14 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
     end_dt_object = date.replace(hour=16).astimezone(ColeDBInterface.tz)  # 4 pm
 
     spy_df: pd.DataFrame = load_spy_data(date, start_dt_object, end_dt_object)
-    spy_iter = spy_df.iterrows()
+    spy_iter = spy_df.itertuples()
     obs = [db.read(m.ticker, start_dt_object, end_dt_object) for m in kalshi_markets]
 
     portfolio = PortfolioHistory(Balance(Cents(100000)))
 
     # The top values
     top_obs = [next(ob) for ob in obs]
-    _, top_spy = next(spy_iter)
+    top_spy = next(spy_iter)
     top_ob_ts = [ob.ts.timestamp() for ob in top_obs]
     min_top_ob_ts = min(top_ob_ts)
     ts = min(min_top_ob_ts, top_spy.ts)
@@ -38,7 +38,8 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
 
     # The next values
     next_obs = [next(ob) for ob in obs]
-    _, next_spy = next(spy_iter)
+    next_obs_ts = [next_ob.ts.timestamp() for next_ob in next_obs]
+    next_spy = next(spy_iter)
     print_count = 0
     while True:
         if print_count % 100000 == 0:
@@ -55,24 +56,26 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
             print(orders)
         for order in orders:
             portfolio.place_order(order)
-        obs_ts = [next_ob.ts.timestamp() for next_ob in next_obs]
-        smallest_ob_ts = min(obs_ts)
+        smallest_ob_ts = min(next_obs_ts)
         if next_spy.ts < smallest_ob_ts:
             last_ticker_changed = None
             top_spy = next_spy
             try:
-                _, next_spy = next(spy_iter)
+                next_spy = next(spy_iter)
             except StopIteration:
                 print(ts)
                 break
             ts = top_spy.ts
         else:
             # Find OB that changed
-            ob_changed_index = obs_ts.index(smallest_ob_ts)
+            ob_changed_index = next_obs_ts.index(smallest_ob_ts)
             last_ticker_changed = top_obs[ob_changed_index].market_ticker
             top_obs[ob_changed_index] = next_obs[ob_changed_index]
             try:
                 next_obs[ob_changed_index] = next(obs[ob_changed_index])
+                next_obs_ts[ob_changed_index] = next_obs[
+                    ob_changed_index
+                ].ts.timestamp()
             except StopIteration:
                 break
             ts = smallest_ob_ts
