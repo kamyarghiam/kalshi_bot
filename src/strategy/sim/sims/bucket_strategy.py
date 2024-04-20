@@ -42,6 +42,8 @@ class BucketStrategy(SpyStrategy):
         ts: datetime.datetime,
         portfolio: PortfolioHistory,
     ) -> Iterable[Order]:
+        # Remember to turn off prints in the sim
+        # self.debugging_print_price(spy_price, portfolio, obs)
         if not portfolio.has_open_positions():
             idx = self.get_market_from_stock_price(spy_price)
             if idx != 0 and idx != len(obs) - 1:
@@ -169,3 +171,48 @@ class BucketStrategy(SpyStrategy):
             order.quantity = Quantity(portfolio.positions[order.ticker].total_quantity)
             order.time_placed = ts
         return order
+
+    def debugging_print_price(
+        self, spy_price: Cents, portfolio: PortfolioHistory, obs: List[Orderbook]
+    ):
+        """Prints out buckets, what we're holding, and where spy is"""
+
+        ranges = []
+        for metadata in self.metadata:
+            ranges.append(f"     {metadata.spy_min}-{metadata.spy_max}     ")
+        range_num_spaces = len(ranges[0])
+        holding = [" " * range_num_spaces for _ in range(len(ranges))]
+        prices = [" " * range_num_spaces for _ in range(len(ranges))]
+        for position in portfolio.positions.values():
+            idx = self.tickers.index(position.ticker)
+            holding[idx] = (
+                (" " * (range_num_spaces // 2)) + "X" + (" " * (range_num_spaces // 2))
+            )
+            if ask := obs[idx].get_bbo().ask:
+                price = ask.price
+                num_spaces_around = range_num_spaces - len(str(price))
+                prices[idx] = (
+                    (" " * (num_spaces_around // 2))
+                    + str(price)
+                    + (" " * (num_spaces_around // 2 + num_spaces_around % 2))
+                )
+
+        ranges_str = "|".join(ranges)
+        holding_str = " ".join(holding)
+        prices_str = " ".join(prices)
+        bottom_range = self.metadata[1].spy_min
+        top_range = self.metadata[-2].spy_max
+        assert top_range is not None and bottom_range is not None
+        total_range = top_range - bottom_range
+        percent_of_range = (spy_price - bottom_range) / total_range
+
+        num_spaces_after_bottom = int(
+            ((len(ranges) - 2) * range_num_spaces) * percent_of_range
+        )
+
+        spy_price_print = " " * int(range_num_spaces + num_spaces_after_bottom) + "SPY"
+        UP = "\x1B[5A"  # adjust this number to cursor ups. See https://stackoverflow.com/questions/39455022/python-3-print-update-on-multiple-lines
+        CLR = "\x1B[0K"
+        print(
+            f"{UP}{spy_price_print}{CLR}\n{ranges_str}{CLR}\n{holding_str}{CLR}\n{prices_str}{CLR}\n"
+        )

@@ -64,7 +64,6 @@ def run_spy_sim(date: datetime, strategy: SpyStrategy):
             try:
                 next_spy = next(spy_iter)
             except StopIteration:
-                print(ts)
                 break
             ts = top_spy.ts
         else:
