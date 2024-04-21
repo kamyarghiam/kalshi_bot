@@ -223,10 +223,13 @@ class BucketStrategy(SpyStrategy):
         percent_of_range = (spy_price - bottom_range) / total_range
 
         num_spaces_after_bottom = int(
-            ((len(ranges) - 2) * range_num_spaces) * percent_of_range
+            ((len(ranges) - 2) * (range_num_spaces + 1)) * percent_of_range
         )
 
-        spy_price_print = " " * int(range_num_spaces + num_spaces_after_bottom) + "SPY"
+        spy_price_print = (
+            " " * int(range_num_spaces + num_spaces_after_bottom)
+            + f"• SPY ({int(spy_price)})"
+        )
         UP = "\x1B[5A"  # adjust this number to cursor ups. See https://stackoverflow.com/questions/39455022/python-3-print-update-on-multiple-lines
         CLR = "\x1B[0K"
         print(
