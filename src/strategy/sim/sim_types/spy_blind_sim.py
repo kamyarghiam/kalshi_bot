@@ -27,6 +27,7 @@ def run_spy_sim(
     pta_on: bool = False,
     start_time: time = time(9, 30),
     end_time: time = time(16, 0),
+    print_on: bool = True,
 ) -> Cents:
     exchange_interface = ExchangeInterface(is_test_run=False)
     db = ColeDBInterface()
@@ -63,7 +64,7 @@ def run_spy_sim(
     next_spy = next(spy_iter)
     print_count = 0
     while True:
-        if print_count % 100000 == 0:
+        if print_count % 100000 == 0 and print_on:
             print("ts: ", ts.astimezone(ColeDBInterface.tz))
         print_count += 1
         orders = strategy.consume_next_step(
@@ -73,7 +74,7 @@ def run_spy_sim(
             ts,
             portfolio,
         )
-        if orders:
+        if orders and print_on:
             print(orders)
 
         for order in orders:
