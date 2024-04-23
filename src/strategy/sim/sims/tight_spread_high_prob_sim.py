@@ -17,6 +17,7 @@ def main():
         datetime(2024, 4, 9),
         datetime(2024, 4, 11),
         datetime(2024, 4, 12),
+        datetime(2024, 4, 22),
         datetime(2024, 3, 12),
         datetime(2024, 3, 13),
         datetime(2024, 3, 15),
