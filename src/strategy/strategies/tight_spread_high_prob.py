@@ -15,9 +15,12 @@ class TightSpreadHighProb(SpyStrategy):
     Hypothesis: tight spread means that the confidence is high"""
 
     def __init__(self):
-        self.spread_max_width = Cents(2)
-        self.market_min_price = Cents(60)
+        self.spread_max_width = Cents(1)
+        self.market_min_price = Cents(61)
+        # How low can the price go before we sell at a loss
+        self.stop_loss_diff = Cents(30)
         self.max_quantity = Quantity(10)
+        self.min_profit = Cents(100)
 
     def consume_next_step(
         self,
@@ -50,8 +53,12 @@ class TightSpreadHighProb(SpyStrategy):
                 if order := ob.sell_order(Side.YES):
                     order.quantity = min(order.quantity, position.total_quantity)
                     pnl, fees = portfolio.potential_pnl(order)
-                    if pnl - fees > 0:
+                    # Profit
+                    if pnl - fees > self.min_profit:
                         order.time_placed = ts
+                        return [order]
+                    # Stop loss
+                    if position.prices[0] - order.price >= self.stop_loss_diff:
                         return [order]
         return []
 
