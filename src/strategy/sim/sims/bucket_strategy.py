@@ -204,6 +204,7 @@ class BucketStrategy(SpyStrategy):
             holding[idx] = (
                 (" " * (range_num_spaces // 2)) + "X" + (" " * (range_num_spaces // 2))
             )
+        for idx in range(len(self.tickers)):
             if ask := obs[idx].get_bbo().ask:
                 price = ask.price
                 num_spaces_around = range_num_spaces - len(str(price))

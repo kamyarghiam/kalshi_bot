@@ -34,7 +34,7 @@ def main():
 
     date = datetime(2024, 3, 19)
     start = time.time()
-    print(run_spy_sim(date, BucketStrategy(date, 92)))
+    print(run_spy_sim(date, BucketStrategy(date, 92), print_on=False))
     print(time.time() - start)
 
 
