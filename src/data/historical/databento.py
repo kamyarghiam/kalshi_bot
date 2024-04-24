@@ -7,6 +7,7 @@ from typing import List
 import databento as db
 import pytz
 
+from data.coledb.coledb import ColeDBInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.auth import Auth
 
@@ -26,6 +27,18 @@ class HistoricalDatabento:
         self.output_dir = LOCAL_STORAGE_FOLDER / "databento/spy"
         self._auth = Auth(is_test_run=False)
         self._client = db.Historical(self._auth.databento_api_key)
+
+    def list_dates_stored(self):
+        """List the dates that we have downloaded"""
+        files = [
+            str(file.name)
+            for file in self.output_dir.glob("**/*.csv")
+            if file.is_file()
+        ]
+        return [
+            datetime.strptime(file, "%Y%m%d.csv").astimezone(ColeDBInterface.tz)
+            for file in files
+        ]
 
     def download_historical_spy_data(self, days: List[datetime]):
         """Downloaded historical data from databento to the specified output dir"""

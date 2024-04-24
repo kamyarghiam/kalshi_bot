@@ -11,20 +11,8 @@ def spy_sim_wrapper(date: datetime):
 
 
 def main():
-    # dates = [
-    #     datetime(2024, 4, 4),
-    #     datetime(2024, 4, 5),
-    #     datetime(2024, 4, 8),
-    #     datetime(2024, 4, 9),
-    #     datetime(2024, 4, 11),
-    #     datetime(2024, 4, 12),
-    #     datetime(2024, 3, 12),
-    #     datetime(2024, 3, 13),
-    #     datetime(2024, 3, 15),
-    #     datetime(2024, 3, 18),
-    #     datetime(2024, 3, 19),
-    #     datetime(2024, 3, 22),
-    # ]
+    # h = HistoricalDatabento()
+    # dates = h.list_dates_stored()
     # with Pool(cpu_count() - 1) as p:
     #     results = p.map(spy_sim_wrapper, dates)
     #     print(results)
