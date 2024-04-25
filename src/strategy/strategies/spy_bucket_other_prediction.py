@@ -23,9 +23,11 @@ class SpyBucketOtherPrediction(SpyStrategy):
 
     def __init__(self, date: datetime):
         # How low can the price go before we sell at a loss
+        self.last_sold_bucket: MarketTicker | None = None
         self.stop_loss_diff = Cents(10)
         self.max_quantity = Quantity(10)
-        self.min_profit = Cents(1)
+        self.min_profit = self.max_quantity * Cents(1)
+        self.min_spy_diff = Cents(20)
         self.metadata: List[SPYRangedKalshiMarket] = daily_spy_range_kalshi_markets(
             date, ColeDBInterface()
         )
@@ -55,13 +57,16 @@ class SpyBucketOtherPrediction(SpyStrategy):
             if ask := obs[spy_sits_idx].get_bbo().ask:
                 spy_bucket_price = ask.price
                 for ob in obs:
-                    bbo = ob.get_bbo()
-                    if bbo.ask:
-                        if bbo.ask.price > spy_bucket_price:
-                            if order := ob.buy_order(Side.YES):
-                                order.time_placed = ts
-                                order.quantity = min(order.quantity, self.max_quantity)
-                                return [order]
+                    if ob.market_ticker != self.last_sold_bucket:
+                        bbo = ob.get_bbo()
+                        if bbo.ask:
+                            if (bbo.ask.price - spy_bucket_price) >= self.min_spy_diff:
+                                if order := ob.buy_order(Side.YES):
+                                    order.time_placed = ts
+                                    order.quantity = min(
+                                        order.quantity, self.max_quantity
+                                    )
+                                    return [order]
         else:
             if changed_ticker in portfolio.positions:
                 position = portfolio.positions[changed_ticker]
@@ -73,9 +78,12 @@ class SpyBucketOtherPrediction(SpyStrategy):
                     # Profit
                     if pnl - fees > self.min_profit:
                         order.time_placed = ts
+                        self.last_sold_bucket = order.ticker
                         return [order]
                     # Stop loss
                     if position.prices[0] - order.price >= self.stop_loss_diff:
+                        order.time_placed = ts
+                        self.last_sold_bucket = order.ticker
                         return [order]
         return []
 

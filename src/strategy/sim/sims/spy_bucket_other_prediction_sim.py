@@ -9,19 +9,21 @@ def spy_sim_wrapper(date: datetime):
 
 
 def main():
-    # from multiprocessing import Pool, cpu_count
-    # h = HistoricalDatabento()
-    # from data.historical.databento import HistoricalDatabento
-    # dates = h.list_dates_stored()
-    # with Pool(cpu_count() - 1) as p:
-    #     results = p.map(spy_sim_wrapper, dates)
-    #     print(results)
-    #     print("RESULTS")
-    #     for i, product in enumerate(dates):
-    #         print(product, ":", results[i])
+    from multiprocessing import Pool, cpu_count
 
-    date = datetime(2024, 3, 19)
-    print("Total pnl: ", run_spy_sim(date, SpyBucketOtherPrediction(date)))
+    from data.historical.databento import HistoricalDatabento
+
+    h = HistoricalDatabento()
+    dates = h.list_dates_stored()
+    with Pool(cpu_count() - 1) as p:
+        results = p.map(spy_sim_wrapper, dates)
+        print(results)
+        print("RESULTS")
+        for i, product in enumerate(dates):
+            print(product, ":", results[i])
+
+    # date = datetime(2024, 3, 19)
+    # print("Total pnl: ", run_spy_sim(date, SpyBucketOtherPrediction(date)))
 
 
 if __name__ == "__main__":
