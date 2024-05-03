@@ -43,8 +43,7 @@ def flush_buffer_to_file(result_buffer):
     try:
         # Append all results in the buffer to the output file
         with open(output_file, "a") as file:
-            for result in result_buffer:
-                file.write(result + "\n")  # Append result with a newline
+            file.write("\n".join(result_buffer) + "\n")
 
         print(f"Appended {len(result_buffer)} results to {output_file}")
 
