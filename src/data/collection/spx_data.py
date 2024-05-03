@@ -19,7 +19,7 @@ output_file = f"/Users/kamyarghiam/Desktop/kalshi_bot/src/data/local/spx/{today_
 result_buffer: List[str] = []
 
 
-def hit_endpoint_and_append_result(endpoint_url, result_buffer, max_buffer_size=500):
+def hit_endpoint_and_append_result(endpoint_url, result_buffer, max_buffer_size=50):
     try:
         # Make a GET request to the endpoint
         response = requests.get(endpoint_url)
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     try:
         while True:
             hit_endpoint_and_append_result(endpoint_url, result_buffer)
-            time.sleep(3)  # Wait for 3 seconds before the next request
+            time.sleep(2)  # Wait for 2 seconds before the next request
 
     except KeyboardInterrupt:
         # Handle keyboard interrupt (Ctrl+C) during the main loop
