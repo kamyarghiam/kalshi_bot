@@ -69,7 +69,7 @@ if __name__ == "__main__":
     try:
         while True:
             hit_endpoint_and_append_result(endpoint_url, result_buffer)
-            time.sleep(0.5)  # Wait for 0.5 seconds before the next request
+            time.sleep(3)  # Wait for 0.5 seconds before the next request
 
     except KeyboardInterrupt:
         # Handle keyboard interrupt (Ctrl+C) during the main loop
