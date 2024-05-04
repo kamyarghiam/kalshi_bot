@@ -24,7 +24,7 @@ class BucketStrategy(SpyStrategy):
             max_prob_sum
         )  # The lower, the more profit we demand
         self.stop_loss_price = Price(51)
-        self.min_number_of_buckets = 6
+        self.min_number_of_buckets = 4
         self.metadata: List[SPYRangedKalshiMarket] = daily_spy_range_kalshi_markets(
             date, ColeDBInterface()
         )
@@ -59,9 +59,9 @@ class BucketStrategy(SpyStrategy):
                     return orders
 
         else:
-            # In sims, it seems like holding it to the end makes the most sense
+            # TODO: revive selling midday
             return []
-            # # Confirm that it's a Kalshi price change
+            # Confirm that it's a Kalshi price change
             # if changed_ticker is not None:
             #     # Case if there is profit
             #     sell_orders = []
@@ -83,7 +83,7 @@ class BucketStrategy(SpyStrategy):
             #         for order in sell_orders:
             #             pnl, fees = portfolio.potential_pnl(order)
             #             total_pnl += pnl - fees
-            #         if total_pnl > 0:
+            #         if total_pnl > 100:
             #             print(f"Selling with pnl: {total_pnl}")
             #             return sell_orders
 
@@ -181,10 +181,9 @@ class BucketStrategy(SpyStrategy):
     ) -> Order | None:
         order = ob.sell_order(Side.YES)
         if order:
-            # Make sure we can sell all at once
-            if order.quantity < portfolio.positions[order.ticker].total_quantity:
-                return None
-            order.quantity = Quantity(portfolio.positions[order.ticker].total_quantity)
+            order.quantity = Quantity(
+                min(order.quantity, portfolio.positions[order.ticker].total_quantity)
+            )
             order.time_placed = ts
         return order
 

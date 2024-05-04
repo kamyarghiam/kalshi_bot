@@ -20,7 +20,7 @@ def main():
     #     for i, product in enumerate(dates):
     #         print(product, ":", results[i])
 
-    date = datetime(2024, 3, 19)
+    date = datetime(2024, 5, 3)
     start = time.time()
     print(run_spy_sim(date, BucketStrategy(date, 92), print_on=False))
     print(time.time() - start)

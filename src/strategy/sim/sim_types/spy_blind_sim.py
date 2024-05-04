@@ -41,7 +41,7 @@ def run_spy_sim(
         ColeDBInterface.tz
     )
 
-    spy_df: pd.DataFrame = load_spy_data(date, start_dt_object, end_dt_object)
+    spy_df: pd.DataFrame = load_spx_data(date, start_dt_object, end_dt_object)
     spy_iter = spy_df.itertuples()
     obs = [db.read(m.ticker, start_dt_object, end_dt_object) for m in kalshi_markets]
 
@@ -56,7 +56,7 @@ def run_spy_sim(
 
     last_ticker_changed = None
     if min_top_ob_ts < top_spy.ts_int:
-        last_ticker_changed = top_obs[top_ob_ts.index(ts)].market_ticker
+        last_ticker_changed = top_obs[top_ob_ts.index(ts.timestamp())].market_ticker
 
     # The next values
     next_obs = [next_ob(ob) for ob in obs]
@@ -131,3 +131,17 @@ def load_spy_data(
     spy_df = spy_df.dropna()
 
     return spy_df
+
+
+def load_spx_data(
+    date: datetime,
+    start_time: datetime,
+    end_time: datetime,
+):
+    date_str = date.strftime("%Y-%m-%d")
+    df = pd.read_csv(
+        f"/Users/kamyarghiam/Desktop/kalshi_bot/src/data/local/spx/{date_str}"
+    )
+    df["ts"] = pd.to_datetime(df.ts_int, unit="s", utc=True)
+    df = df[(df.ts >= start_time) & (df.ts <= end_time)]
+    return df
