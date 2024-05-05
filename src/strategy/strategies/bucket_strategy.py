@@ -19,7 +19,8 @@ class BucketStrategy(SpyStrategy):
     """Buys buckets around the current bucket until we reach a $1"""
 
     def __init__(self, date, max_prob_sum: int):
-        self.max_order_quantity = Quantity(100)
+        self.max_order_quantity = Quantity(10)
+        self.min_pnl_to_sell = Cents(1)
         self.max_probability_sum = Price(
             max_prob_sum
         )  # The lower, the more profit we demand
@@ -89,7 +90,7 @@ class BucketStrategy(SpyStrategy):
                     for order in sell_orders:
                         pnl, fees = portfolio.potential_pnl(order)
                         total_pnl += pnl - fees
-                    if total_pnl > 500:
+                    if total_pnl > self.min_pnl_to_sell:
                         print(f"Selling with pnl: {total_pnl}")
                         return sell_orders
 
