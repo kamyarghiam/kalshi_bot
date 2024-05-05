@@ -321,6 +321,31 @@ class Orderbook:
             trade=TradeType.SELL,
         )
 
+    def sell_max_quantity(self, side: Side, quantity_to_sell: Quantity) -> List[Order]:
+        """Return a list of orders that attempts to sell up to quantity contracts"""
+        ob = self.get_view(OrderbookView.BID)
+        level_book = ob.yes if side == Side.YES else ob.no
+
+        orders: List[Order] = []
+        # Walk down from bbo (sorted from max to min by prices)
+        for price, quantity in sorted(
+            level_book.levels.items(), reverse=True, key=lambda x: x[0]
+        ):
+            order_quantity = min(quantity, quantity_to_sell)
+            quantity_to_sell -= order_quantity
+            orders.append(
+                Order(
+                    ticker=ob.market_ticker,
+                    side=side,
+                    price=price,
+                    quantity=order_quantity,
+                    trade=TradeType.SELL,
+                )
+            )
+            if quantity_to_sell == 0:
+                break
+        return orders
+
 
 class ApiOrderbook(ExternalApi):
     yes: List[List] | None = []

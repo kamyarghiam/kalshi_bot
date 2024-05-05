@@ -59,39 +59,45 @@ class BucketStrategy(SpyStrategy):
                     return orders
 
         else:
-            # TODO: revive selling midday
-            return []
             # Confirm that it's a Kalshi price change
-            # if changed_ticker is not None:
-            #     # Case if there is profit
-            #     sell_orders = []
-            #     current_yes_prices = []
-            #     for position in portfolio.positions.values():
-            #         idx = self.tickers.index(position.ticker)
-            #         ob = obs[idx]
-            #         bbo = ob.get_bbo()
-            #         if bbo.ask:
-            #             current_yes_prices.append(bbo.ask.price)
-            #         sell_order = self.get_sell_order(ob, portfolio, ts)
-            #         if sell_order is None:
-            #             break
-            #         sell_orders.append(sell_order)
-            #     else:
-            #         # All sell orders are not none
-            #         # TODO: allow partial sells (not all or none)
-            #         total_pnl = 0
-            #         for order in sell_orders:
-            #             pnl, fees = portfolio.potential_pnl(order)
-            #             total_pnl += pnl - fees
-            #         if total_pnl > 100:
-            #             print(f"Selling with pnl: {total_pnl}")
-            #             return sell_orders
+            if changed_ticker is not None:
+                # Case if there is profit
+                sell_orders = []
+                current_yes_prices = []
+                for position in portfolio.positions.values():
+                    idx = self.tickers.index(position.ticker)
+                    ob = obs[idx]
+                    bbo = ob.get_bbo()
+                    if bbo.ask:
+                        current_yes_prices.append(bbo.ask.price)
+                    else:
+                        break
+                    orders_for_this_ticker = self.get_sell_orders(ob, portfolio, ts)
+                    total_quantity_to_sell = 0
+                    for order in orders_for_this_ticker:
+                        total_quantity_to_sell += order.quantity
+                    if (
+                        portfolio.positions[position.ticker].total_quantity
+                        != total_quantity_to_sell
+                    ):
+                        break
+                    sell_orders.extend(orders_for_this_ticker)
+                else:
+                    # All sell orders are not none
+                    # TODO: allow partial sells (not all or none)
+                    total_pnl = 0
+                    for order in sell_orders:
+                        pnl, fees = portfolio.potential_pnl(order)
+                        total_pnl += pnl - fees
+                    if total_pnl > 500:
+                        print(f"Selling with pnl: {total_pnl}")
+                        return sell_orders
 
-            #         # Stop loss case
-            #         if len(current_yes_prices) == len(sell_orders):
-            #             # This means there were prices on all the markets
-            #             if sum(current_yes_prices) < self.stop_loss_price:
-            #                 return sell_orders
+                    # Stop loss case
+                    # if len(current_yes_prices) == len(sell_orders):
+                    #     # This means there were prices on all the markets
+                    #     if sum(current_yes_prices) < self.stop_loss_price:
+                    #         return sell_orders
 
         return []
 
@@ -176,16 +182,15 @@ class BucketStrategy(SpyStrategy):
             order.time_placed = ts
         return [] if order is None else [order]
 
-    def get_sell_order(
+    def get_sell_orders(
         self, ob: Orderbook, portfolio: PortfolioHistory, ts: datetime.datetime
-    ) -> Order | None:
-        order = ob.sell_order(Side.YES)
-        if order:
-            order.quantity = Quantity(
-                min(order.quantity, portfolio.positions[order.ticker].total_quantity)
-            )
+    ) -> List[Order]:
+        orders = ob.sell_max_quantity(
+            Side.YES, portfolio.positions[ob.market_ticker].total_quantity
+        )
+        for order in orders:
             order.time_placed = ts
-        return order
+        return orders
 
     def debugging_print_price(
         self, spy_price: Cents, portfolio: PortfolioHistory, obs: List[Orderbook]

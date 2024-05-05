@@ -538,3 +538,100 @@ def test_get_bbo():
 
     assert bbo.bid == SideBBO(price=Price(90), quantity=Quantity(10))
     assert bbo.ask == SideBBO(price=Price(94), quantity=Quantity(50))
+
+
+def test_sell_max_quantity():
+    o = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+    )
+    o = o.get_view(OrderbookView.ASK)
+    assert o.sell_max_quantity(Side.YES, Quantity(90)) == [
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(2),
+            quantity=Quantity(90),
+            trade=TradeType.SELL,
+        )
+    ]
+    assert o.sell_max_quantity(Side.YES, Quantity(100)) == [
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(2),
+            quantity=Quantity(100),
+            trade=TradeType.SELL,
+        )
+    ]
+    assert o.sell_max_quantity(Side.YES, Quantity(150)) == [
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(2),
+            quantity=Quantity(100),
+            trade=TradeType.SELL,
+        ),
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(1),
+            quantity=Quantity(50),
+            trade=TradeType.SELL,
+        ),
+    ]
+    assert o.sell_max_quantity(Side.YES, Quantity(300)) == [
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(2),
+            quantity=Quantity(100),
+            trade=TradeType.SELL,
+        ),
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(1),
+            quantity=Quantity(200),
+            trade=TradeType.SELL,
+        ),
+    ]
+    assert o.sell_max_quantity(Side.YES, Quantity(301)) == [
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(2),
+            quantity=Quantity(100),
+            trade=TradeType.SELL,
+        ),
+        Order(
+            ticker=o.market_ticker,
+            side=Side.YES,
+            price=Price(1),
+            quantity=Quantity(200),
+            trade=TradeType.SELL,
+        ),
+    ]
+    assert o.sell_max_quantity(Side.NO, Quantity(550)) == [
+        Order(
+            ticker=o.market_ticker,
+            side=Side.NO,
+            price=Price(95),
+            quantity=Quantity(500),
+            trade=TradeType.SELL,
+        ),
+        Order(
+            ticker=o.market_ticker,
+            side=Side.NO,
+            price=Price(94),
+            quantity=Quantity(50),
+            trade=TradeType.SELL,
+        ),
+    ]

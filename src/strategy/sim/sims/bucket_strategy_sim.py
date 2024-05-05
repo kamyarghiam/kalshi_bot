@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 
 from helpers.types.money import Price
@@ -21,9 +20,7 @@ def main():
     #         print(product, ":", results[i])
 
     date = datetime(2024, 5, 3)
-    start = time.time()
-    print(run_spy_sim(date, BucketStrategy(date, 92), print_on=False))
-    print(time.time() - start)
+    print("Total pnl: ", run_spy_sim(date, BucketStrategy(date, 85), print_on=False))
 
 
 if __name__ == "__main__":
