@@ -20,7 +20,7 @@ def main():
     #         print(product, ":", results[i])
 
     date = datetime(2024, 5, 3)
-    print("Total pnl: ", run_spy_sim(date, BucketStrategy(date, 85), print_on=False))
+    print("Total pnl: ", run_spy_sim(date, BucketStrategy(date, 90), print_on=False))
 
 
 if __name__ == "__main__":
