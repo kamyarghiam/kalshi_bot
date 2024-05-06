@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -126,6 +127,9 @@ class Order:
             + f"| {self.quantity} @ {self.price} "
             + f"({self.time_placed.strftime('%H:%M:%S')})"
         )
+
+    def copy(self):
+        return dataclasses.replace(self)
 
 
 class CreateOrderRequest(ExternalApi):

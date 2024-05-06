@@ -171,10 +171,14 @@ class ReservedOrder:
 class PortfolioHistory:
     _pickle_file = Path("last_portfolio.pickle")
 
-    def __init__(
-        self,
-        balance: Balance,
-    ):
+    def __init__(self, balance: Balance, allow_side_cross: bool = False):
+        """This class allows us to keep track of a portfolio
+        in real time as well as historical information about the portfolio.
+
+        allow_side_cross: When set to true, if we are holding a contract on one side,
+        we are allowed to buy contracts on the opposite side before selling on the
+        side we're holding"""
+
         self._cash_balance: Balance = balance
         self._reserved_cash: Balance = Balance(0)
         self._positions: Dict[MarketTicker, Position] = {}
@@ -182,6 +186,7 @@ class PortfolioHistory:
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
+        self.allow_side_cross = allow_side_cross
 
     @property
     def balance(self) -> Cents:
@@ -298,12 +303,10 @@ class PortfolioHistory:
     def can_afford(self, order: Order) -> bool:
         return self.balance >= order.cost + order.worst_case_fee
 
-    def can_buy(self, order: Order) -> bool:
+    def holding_other_side(self, order: Order):
         if order.ticker in self._positions:
             holding = self._positions[order.ticker]
-            if order.side != holding.side:
-                return False
-        return self.can_afford(order)
+            return order.side != holding.side
 
     def can_sell(self, order: Order) -> bool:
         if order.ticker not in self._positions:
@@ -352,12 +355,31 @@ class PortfolioHistory:
 
     def buy(self, order: Order):
         """Adds position to portfolio. Raises OutOfMoney error if we ran out of money"""
-        if not self.can_buy(order):
+        if not self.can_afford(order):
             raise PortfolioError(
-                "Either not enough balance or already holding position on other side"
+                f"Can't afford buy order: {str(order)}",
             )
-        self._cash_balance -= order.cost + order.fee
+        if self.holding_other_side(order):
+            if not self.allow_side_cross:
+                raise PortfolioError(
+                    f"Holding other side of position while trying to buy: {str(order)}"
+                )
+            # Get however much we can to sell
+            quantity_holding = self._positions[order.ticker].total_quantity
+            sell_order = order.copy()
+            sell_order.trade = TradeType.SELL
+            sell_order.quantity = min(quantity_holding, order.quantity)
+            side_holding = sell_order.side.get_other_side()
+            sell_order.side = side_holding
+            quantity_remaining = order.quantity - sell_order.quantity
+            self.sell(sell_order)
+            if quantity_remaining == Quantity(0):
+                return
+            # Continue processing rest of order if there is quantity
+            order.quantity = quantity_remaining
+            order.side = side_holding
 
+        self._cash_balance -= order.cost + order.fee
         if order.ticker in self._positions:
             self._positions[order.ticker].buy(order)
         else:

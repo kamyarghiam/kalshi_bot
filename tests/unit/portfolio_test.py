@@ -965,3 +965,54 @@ def test_reserve_order_manual_intervention():
     assert portfolio.balance == new_balance + Cents(52 * 10) - compute_fee(
         Price(52), Quantity(10)
     )
+
+
+def test_portfolio_allow_side_cross():
+    original_balance = Balance(Cents(5000))
+    portfolio = PortfolioHistory(original_balance)
+    order1 = Order(
+        ticker=MarketTicker("Ticker1"),
+        price=Price(5),
+        quantity=Quantity(100),
+        side=Side.YES,
+        trade=TradeType.BUY,
+    )
+    order2 = Order(
+        ticker=MarketTicker("Ticker1"),
+        price=Price(5),
+        quantity=Quantity(50),
+        side=Side.NO,
+        trade=TradeType.BUY,
+    )
+
+    portfolio.buy(order1)
+
+    # We can't buy other side
+    with pytest.raises(PortfolioError):
+        portfolio.buy(order2)
+
+    # But if we allow for side cross, it should work
+    portfolio = PortfolioHistory(original_balance, allow_side_cross=True)
+    portfolio.buy(order1)
+    portfolio.buy(order2)
+
+    assert len(portfolio.orders) == 2
+    assert portfolio.orders[0].side == Side.YES
+    assert portfolio.orders[0].quantity == 100
+    assert portfolio.orders[0].trade == TradeType.BUY
+
+    assert portfolio.orders[1].side == Side.YES
+    assert portfolio.orders[1].quantity == 50
+    assert portfolio.orders[1].trade == TradeType.SELL
+
+    order2.quantity = Quantity(100)
+    portfolio.buy(order2)
+
+    assert len(portfolio.orders) == 4
+    assert portfolio.orders[2].side == Side.YES
+    assert portfolio.orders[2].quantity == 50
+    assert portfolio.orders[2].trade == TradeType.SELL
+
+    assert portfolio.orders[3].side == Side.YES
+    assert portfolio.orders[3].quantity == 50
+    assert portfolio.orders[3].trade == TradeType.BUY
