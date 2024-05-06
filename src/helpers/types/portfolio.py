@@ -332,7 +332,6 @@ class PortfolioHistory:
 
     def receive_fill_message(self, fill: OrderFillRM):
         """Unreserve cash and place order in portfolio"""
-        # TODO: test me
         o = fill.to_order()
         if fill.action == TradeType.BUY:
             # Need to unreserve cash
