@@ -6,6 +6,7 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Price
 from helpers.types.orderbook import Orderbook
+from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import (
     OrderbookDeltaWR,
@@ -25,15 +26,19 @@ def seed_strategy():
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
     TODO: follow the BBO?
+    TODO: cancel order when closing strat
+    TODO: test this whole thing?
 
     Followup analysis: see which markets perform the best with this
     strategy
     """
     num_markets_to_trade_on = 15
+    seed_quantity = Quantity(1)
+    follow_up_quantity = Quantity(11)
 
     with ExchangeInterface(is_test_run=False) as e:
         balance = e.get_portfolio_balance().balance
-        portfolio = PortfolioHistory(Balance(balance))
+        portfolio = PortfolioHistory(Balance(balance), allow_side_cross=True)
 
         open_markets = e.get_active_markets()
         tickers = [m.ticker for m in open_markets]
@@ -41,6 +46,9 @@ def seed_strategy():
 
         obs: Dict[MarketTicker, Orderbook] = {}
         placed_bbo_order: Dict[MarketTicker, bool] = {
+            ticker: False for ticker in tickers_to_trade
+        }
+        placed_followup_order: Dict[MarketTicker, bool] = {
             ticker: False for ticker in tickers_to_trade
         }
         with e.get_websocket() as ws:
@@ -54,39 +62,66 @@ def seed_strategy():
                     ob = Orderbook.from_snapshot(data.msg)
                     obs[ob.market_ticker] = ob
                     if not placed_bbo_order[ob.market_ticker]:
-                        place_bbo_order(e, ob.market_ticker, ob)
+                        place_bbo_order(e, ob, seed_quantity)
                         placed_bbo_order[ob.market_ticker] = True
                 elif isinstance(data, OrderbookDeltaWR):
                     ticker = data.msg.market_ticker
                     obs[ticker] = obs[ticker].apply_delta(data.msg)
+                    if (
+                        ticker in portfolio.positions
+                        and not placed_followup_order[ticker]
+                    ):
+                        sell_order = obs[ticker].sell_order(
+                            portfolio.positions[ticker].side
+                        )
+                        if sell_order is not None:
+                            sell_order.quantity = min(
+                                sell_order.quantity,
+                                portfolio.positions[ticker].total_quantity,
+                            )
+                            pnl, fees = portfolio.potential_pnl(sell_order)
+                            if pnl - fees > 0:
+                                e.place_order(sell_order)
+                                placed_bbo_order[ob.market_ticker] = False
+                    elif not placed_bbo_order[ob.market_ticker]:
+                        place_bbo_order(e, ob, seed_quantity)
+                        placed_bbo_order[ob.market_ticker] = True
                 elif isinstance(data, OrderFillWR):
-                    # TODO: allow for buying on the other side in portfolio class
-                    # (and therefore selling what you have)
-
-                    # TODO: if the quantity is 1, place more orders on this market
                     portfolio.receive_fill_message(data.msg)
+                    if data.msg.count == 1:
+                        # This is one of our seeds
+                        place_followup_order(
+                            e, obs[data.msg.market_ticker], follow_up_quantity
+                        )
+                        placed_followup_order[data.msg.market_ticker] = True
+                    else:
+                        # Followup order received
+                        placed_followup_order[data.msg.market_ticker] = False
                 else:
                     print("Received unknown data type: ", data)
 
 
-def place_bbo_order(e: ExchangeInterface, ticker: MarketTicker, ob: Orderbook):
+def place_bbo_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
     """Places orders right above the bbo if spread is > 1"""
     spread = ob.get_spread()
     if spread and spread > 1:
         bbo = ob.get_bbo()
-        if bbo.ask and bbo.ask.price != Price(1):
-            price = bbo.ask.price - 1
-            quantity = 1
-            print(
-                f"Placing order on {ticker} at price {price} with quantity {quantity}"
+        if bbo.bid and bbo.bid.price != Price(99):
+            price = Price(bbo.bid.price + 1)
+            order = Order(
+                price=price,
+                quantity=q,
+                trade=TradeType.BUY,
+                ticker=ob.market_ticker,
+                side=Side.YES,
             )
-            # TODO: finish here
-            # order = Order(
-            #     price=price,
-            #     quantity=quantity,
-            #     trade=TradeType.SELL,
-            #     ticker=ticker,
-            #     side=Side.YES,
-            #     order_type=OrderType.LIMIT
-            # )
-            # e.place_order()
+            # NOTE: there is a chance the order immediately fills lol
+            e.place_order(order)
+            print(f"Placed {q} {price} orders on {ob.market_ticker}")
+
+
+def place_followup_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
+    order = ob.buy_order(Side.NO)
+    if order is not None:
+        order.quantity = min(order.quantity, q)
+        e.place_order(order)
