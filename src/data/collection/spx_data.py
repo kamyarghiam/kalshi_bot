@@ -3,6 +3,7 @@ import signal
 import sys
 import time
 from datetime import datetime
+from datetime import time as datetime_time
 from typing import List
 
 import requests
@@ -65,10 +66,16 @@ if __name__ == "__main__":
     # Set up signal handler for keyboard interrupt (Ctrl+C)
     signal.signal(signal.SIGINT, signal_handler)
 
+    open_time = datetime_time(9, 30)
+    close_time = datetime_time(16, 0)
     # Run continuously
     try:
         while True:
-            hit_endpoint_and_append_result(endpoint_url, result_buffer)
+            now = datetime.now().time()
+            if now >= open_time:
+                hit_endpoint_and_append_result(endpoint_url, result_buffer)
+            if now > close_time:
+                break
             time.sleep(2)  # Wait for 2 seconds before the next request
 
     except KeyboardInterrupt:
