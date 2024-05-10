@@ -4,7 +4,7 @@ from typing import Dict
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Price
+from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import (
     GetOrdersRequest,
@@ -43,8 +43,7 @@ def seed_strategy(e: ExchangeInterface):
     seed_quantity = Quantity(1)
     follow_up_quantity = Quantity(11)
 
-    balance = e.get_portfolio_balance().balance
-    portfolio = PortfolioHistory(Balance(balance), allow_side_cross=True)
+    portfolio = PortfolioHistory.load_from_exchange_portfolio(e, allow_side_cross=True)
 
     open_markets = e.get_active_markets()
     tickers = [m.ticker for m in open_markets]

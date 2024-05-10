@@ -1,3 +1,4 @@
+import math
 import pickle
 from dataclasses import dataclass
 from datetime import datetime
@@ -187,6 +188,20 @@ class PortfolioHistory:
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
         self.allow_side_cross = allow_side_cross
+
+    @classmethod
+    def load_from_exchange_portfolio(
+        cls, e: "ExchangeInterface", allow_side_cross: bool = False
+    ):
+        positions = [
+            p.to_position() for p in e.get_positions(GetMarketPositionsRequest())
+        ]
+        balance = e.get_portfolio_balance().balance
+        portfolio = PortfolioHistory(
+            Balance(balance), allow_side_cross=allow_side_cross
+        )
+        portfolio._positions = {p.ticker: p for p in positions}
+        return portfolio
 
     @property
     def balance(self) -> Cents:
@@ -543,15 +558,37 @@ class GetPortfolioBalanceResponse(ExternalApi):
 class GetMarketPositionsRequest(ExternalApi):
     cursor: Cursor | None = None
     ticker: MarketTicker | None = None
+    # This filter restricts the api request to open positions
+    count_filter: List[str] = ["position"]
 
 
 class ApiMarketPosition(ExternalApi):
     """Class to represent position from perspective of API"""
 
     ticker: MarketTicker
+    # Positive means Yes side, Negative means No side
+    position: int
+    fees_paid: Cents
+    market_exposure: Cents
 
     class Config:
         extra = Extra.allow
+
+    def to_position(self) -> Position:
+        assert self.position != 0, "Not holding any side"
+        side = Side.NO if self.position < 0 else Side.YES
+        quantity = Quantity(abs(self.position))
+        # Round up, conservative assumption that you paid more
+        avg_price = Price(min(math.ceil(self.market_exposure / quantity), 99))
+        # Fake order to set up position
+        order = Order(
+            price=avg_price,
+            quantity=quantity,
+            trade=TradeType.BUY,
+            ticker=self.ticker,
+            side=side,
+        )
+        return Position(order)
 
 
 class GetMarketPositionsResponse(ExternalApi):

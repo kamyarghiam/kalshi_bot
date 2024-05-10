@@ -322,8 +322,11 @@ def kalshi_test_exchange_factory():
         """Returns all markets on the exchange"""
         ticker = ticker or MarketTicker("some_market")
         positions: List[ApiMarketPosition] = [
-            ApiMarketPosition(ticker=MarketTicker(ticker)) for _ in range(5)
+            random_data(ApiMarketPosition) for _ in range(5)
         ]
+        if ticker:
+            for position in positions:
+                position.ticker = ticker
 
         # We hardcode that there are 3 pages
         if cursor is None:
