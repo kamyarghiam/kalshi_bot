@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 from types import TracebackType
 from typing import ContextManager, Generator, List
@@ -89,7 +88,7 @@ class ExchangeInterface:
             client_order_id=str(hash(order)),
             count=order.quantity,
             side=order.side,
-            expiration_ts=order.expiration_ts or int(time.time()),
+            expiration_ts=order.expiration_ts,
             sell_position_floor=Quantity(0)
             if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
             else None,

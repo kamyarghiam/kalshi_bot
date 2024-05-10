@@ -1,6 +1,7 @@
 import copy
 import dataclasses
 import math
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -81,7 +82,8 @@ class Order:
     is_taker: bool = field(default_factory=lambda: True)
     order_type: OrderType = field(default_factory=lambda: OrderType.LIMIT)
     # Use this field to specify IOC, if time is in the past
-    expiration_ts: int | None = None
+    # If it's None, then it's Good 'til Canceled
+    expiration_ts: int | None = int(time.time())
 
     @property
     def fee(self) -> Cents:

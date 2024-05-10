@@ -38,7 +38,7 @@ def seed_strategy(e: ExchangeInterface):
     Followup analysis: see which markets perform the best with this
     strategy
     """
-    num_markets_to_trade_on = 15
+    num_markets_to_trade_on = 100
     seed_quantity = Quantity(1)
     follow_up_quantity = Quantity(11)
 
@@ -118,10 +118,11 @@ def place_bbo_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
                 trade=TradeType.BUY,
                 ticker=ob.market_ticker,
                 side=Side.YES,
+                expiration_ts=None,
             )
             # NOTE: there is a chance the order immediately fills lol
             e.place_order(order)
-            print(f"Placed {q} {price} orders on {ob.market_ticker}")
+            print(f"Seed: Placed {q} {price} {order.side} orders on {ob.market_ticker}")
 
 
 def place_followup_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
@@ -129,6 +130,9 @@ def place_followup_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
     if order is not None:
         order.quantity = min(order.quantity, q)
         e.place_order(order)
+        print(
+            f"Followup: {order.side} {order.quantity} {order.price} {ob.market_ticker}"
+        )
 
 
 def run_seed_strategy():
@@ -142,3 +146,7 @@ def run_seed_strategy():
             for order in orders:
                 e.cancel_order(order.order_id)
                 print(f"Canceled {order.order_id}")
+
+
+if __name__ == "__main__":
+    run_seed_strategy()
