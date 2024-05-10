@@ -542,6 +542,7 @@ class GetPortfolioBalanceResponse(ExternalApi):
 
 class GetMarketPositionsRequest(ExternalApi):
     cursor: Cursor | None = None
+    ticker: MarketTicker | None = None
 
 
 class ApiMarketPosition(ExternalApi):

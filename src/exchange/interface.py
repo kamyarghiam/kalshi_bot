@@ -224,16 +224,17 @@ class ExchangeInterface:
             )
         )
 
-    def get_positions(self, pages: int | None = None) -> List[ApiMarketPosition]:
-        response = self._get_positions(GetMarketPositionsRequest())
+    def get_positions(
+        self, request: GetMarketPositionsRequest, pages: int | None = None
+    ) -> List[ApiMarketPosition]:
+        response = self._get_positions(request)
         positions: List[ApiMarketPosition] = response.market_positions
 
         while (
             pages is None or (pages := pages - 1)
         ) and not response.has_empty_cursor():
-            response = self._get_positions(
-                GetMarketPositionsRequest(cursor=response.cursor)
-            )
+            request.cursor = response.cursor
+            response = self._get_positions(request)
             positions.extend(response.market_positions)
         return positions
 

@@ -318,10 +318,11 @@ def kalshi_test_exchange_factory():
             )
 
     @router.get(POSITION_URL)
-    def get_positions(cursor: Cursor | None = None):
+    def get_positions(cursor: Cursor | None = None, ticker: MarketTicker | None = None):
         """Returns all markets on the exchange"""
+        ticker = ticker or MarketTicker("some_market")
         positions: List[ApiMarketPosition] = [
-            ApiMarketPosition(ticker=MarketTicker("some_market")) for _ in range(5)
+            ApiMarketPosition(ticker=MarketTicker(ticker)) for _ in range(5)
         ]
 
         # We hardcode that there are 3 pages
