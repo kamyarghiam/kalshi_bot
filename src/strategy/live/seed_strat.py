@@ -30,6 +30,7 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
+    TODO: don't place seeds orders on markets that we already have a position on
     TODO: what if we just convert this to a market making strategy?
     TODO: sell back order with limit order?
     TODO: let's say we load positions in the morning and want to sell off everything
@@ -44,7 +45,7 @@ def seed_strategy(e: ExchangeInterface):
     Followup analysis: see which markets perform the best with this
     strategy
     """
-    num_markets_to_trade_on = 500
+    num_markets_to_trade_on = 1000
     seed_quantity = Quantity(1)
     follow_up_quantity = Quantity(3)
 
