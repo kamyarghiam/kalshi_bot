@@ -34,7 +34,7 @@ def seed_strategy(e: ExchangeInterface):
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
     TODO: follow the BBO?
-    TODO: test this whole thing?
+    TODO: trade on all markets? Remove num_markets_to_trade_on restriction
 
     Followup analysis: see which markets perform the best with this
     strategy
