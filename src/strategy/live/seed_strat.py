@@ -46,7 +46,7 @@ def seed_strategy(e: ExchangeInterface):
     """
     num_markets_to_trade_on = 500
     seed_quantity = Quantity(1)
-    follow_up_quantity = Quantity(11)
+    follow_up_quantity = Quantity(3)
 
     portfolio = PortfolioHistory.load_from_exchange(e, allow_side_cross=True)
 
