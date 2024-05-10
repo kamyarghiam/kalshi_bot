@@ -323,6 +323,9 @@ class Connection:
     def post(self, url: URL, body: ExternalApi | None = None, check_auth: bool = True):
         return self._request(Method.POST, url, body=body, check_auth=check_auth)
 
+    def delete(self, url: URL):
+        return self._request(Method.DELETE, url)
+
     def sign_in(self):
         response = LogInResponse.parse_obj(
             self.post(

@@ -1,4 +1,5 @@
 import random
+import time
 import typing
 from enum import Enum
 
@@ -6,8 +7,9 @@ from polyfactory.factories import DataclassFactory, pydantic_factory
 from pydantic import BaseModel
 
 from exchange.interface import ExchangeInterface
+from helpers.types.money import Price
 from helpers.types.orderbook import GetOrderbookRequest, OrderbookView
-from helpers.types.orders import Order, Quantity, Side
+from helpers.types.orders import Order, OrderType, Quantity, Side, TradeType
 
 # Dataclasses don't have native type hints
 BM = typing.TypeVar("BM", bound=BaseModel | typing.Any)
@@ -58,11 +60,16 @@ def list_to_generator(list_: typing.List) -> typing.Generator:
     return (x for x in list_)
 
 
-def get_valid_order_on_demo_market(e: ExchangeInterface) -> Order:
+def get_valid_order_on_demo_market(
+    e: ExchangeInterface, resting: bool = False
+) -> Order:
     """Useful for tests that place orders on demo exchange.
 
     Returns an order that's valid on the market and can be placed.
-    Defaults quantity to 1"""
+    Defaults quantity to 1
+
+    Resting: whether to place resting order
+    """
     assert e.is_test_run
     active_markets = e.get_active_markets(pages=50)
     positions = e.get_positions()
@@ -71,7 +78,18 @@ def get_valid_order_on_demo_market(e: ExchangeInterface) -> Order:
         if market.ticker in market_tickers_with_positions:
             # We don't want to place an order on a market where we have a position
             continue
-        if market.liquidity >= 50:
+        if resting and market.liquidity == 0:
+            return Order(
+                price=Price(10),
+                quantity=Quantity(10),
+                trade=TradeType.BUY,
+                ticker=market.ticker,
+                side=Side.YES,
+                order_type=OrderType.LIMIT,
+                # Give 60 seconds to rest the order
+                expiration_ts=int(time.time()) + 60,
+            )
+        elif market.liquidity >= 50:
             o = e.get_market_orderbook(
                 GetOrderbookRequest(ticker=market.ticker, depth=1)
             )

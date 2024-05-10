@@ -80,6 +80,8 @@ class Order:
     time_placed: datetime = field(default_factory=datetime.now, compare=False)
     is_taker: bool = field(default_factory=lambda: True)
     order_type: OrderType = field(default_factory=lambda: OrderType.LIMIT)
+    # Use this field to specify IOC, if time is in the past
+    expiration_ts: int | None = None
 
     @property
     def fee(self) -> Cents:
@@ -189,7 +191,7 @@ class GetOrdersRequest(ExternalApi):
         use_enum_values = True
 
 
-class GetOrderResponse(ExternalApi):
+class OrderAPIResponse(ExternalApi):
     class Config:
         extra = Extra.allow
         use_enum_values = True
@@ -207,8 +209,12 @@ class GetOrderResponse(ExternalApi):
 
 
 class GetOrdersResponse(ExternalApi):
-    orders: List[GetOrderResponse]
+    orders: List[OrderAPIResponse]
     cursor: Cursor | None = None
 
     def has_empty_cursor(self) -> bool:
         return self.cursor is None or len(self.cursor) == 0
+
+
+class CancelOrderResponse(ExternalApi):
+    order: OrderAPIResponse

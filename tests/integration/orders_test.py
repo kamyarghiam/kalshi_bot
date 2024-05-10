@@ -4,7 +4,7 @@ import pytest
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
-from helpers.types.orders import GetOrdersRequest, Order, OrderStatus
+from helpers.types.orders import GetOrdersRequest, Order, OrderId, OrderStatus
 from tests.utils import get_valid_order_on_demo_market
 
 
@@ -47,3 +47,15 @@ def test_get_orders(exchange_interface: ExchangeInterface):
         assert len(orders) > 0
         for order in orders:
             assert order.status == status
+
+
+def test_cancel_order(exchange_interface: ExchangeInterface):
+    if pytest.is_functional:
+        req: Order = get_valid_order_on_demo_market(exchange_interface, resting=True)
+        order_id = exchange_interface.place_order(req)
+        assert order_id is not None
+    else:
+        order_id = OrderId("some_id")
+    order = exchange_interface.cancel_order(order_id)
+    assert order.order_id == order_id
+    assert order.status == OrderStatus.CANCELED

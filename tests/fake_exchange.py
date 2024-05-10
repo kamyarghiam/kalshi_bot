@@ -45,11 +45,12 @@ from helpers.types.markets import (
 from helpers.types.money import Cents, Price
 from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
 from helpers.types.orders import (
+    CancelOrderResponse,
     CreateOrderRequest,
     CreateOrderResponse,
-    GetOrderResponse,
     GetOrdersResponse,
     InnerCreateOrderResponse,
+    OrderAPIResponse,
     OrderId,
     OrderStatus,
     Quantity,
@@ -143,6 +144,14 @@ def kalshi_test_exchange_factory():
     @router.get(PORTFOLIO_BALANCE_URL)
     def portfolio_balance():
         return GetPortfolioBalanceResponse(balance=Cents(1000))
+
+    @router.delete(ORDERS_URL + "/{order_id}")
+    def cancel_order(order_id: OrderId):
+        # We hardcode that there are 3 pages
+        order = get_random_get_order_response()
+        order.order_id = order_id
+        order.status = OrderStatus.CANCELED
+        return CancelOrderResponse(order=order)
 
     @router.get(ORDERS_URL)
     def get_orders(status: OrderStatus | None = None, cursor: Cursor | None = None):
@@ -571,7 +580,7 @@ def kalshi_test_exchange_factory():
 
 def get_random_get_order_response():
     return random_data(
-        GetOrderResponse,
+        OrderAPIResponse,
         custom_args={
             Price: lambda: Price(random.randint(1, 99)),
         },

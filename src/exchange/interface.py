@@ -27,12 +27,13 @@ from helpers.types.markets import (
 )
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.orders import (
+    CancelOrderResponse,
     CreateOrderRequest,
     CreateOrderResponse,
-    GetOrderResponse,
     GetOrdersRequest,
     GetOrdersResponse,
     Order,
+    OrderAPIResponse,
     OrderId,
     OrderStatus,
     OrderType,
@@ -81,25 +82,26 @@ class ExchangeInterface:
             if order.side == Side.YES
             else {"no_price": order.price}
         )
-        raw_resp = self._connection.post(
-            ORDERS_URL,
-            CreateOrderRequest(
-                ticker=order.ticker,
-                action=order.trade,
-                type=order.order_type,
-                client_order_id=str(hash(order)),
-                count=order.quantity,
-                side=order.side,
-                expiration_ts=int(time.time()),  # Some time in the past to trigger IOC
-                sell_position_floor=Quantity(0)
-                if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
-                else None,
-                **price,  # type:ignore[arg-type]
-            ),
+        request = CreateOrderRequest(
+            ticker=order.ticker,
+            action=order.trade,
+            type=order.order_type,
+            client_order_id=str(hash(order)),
+            count=order.quantity,
+            side=order.side,
+            expiration_ts=order.expiration_ts or int(time.time()),
+            sell_position_floor=Quantity(0)
+            if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
+            else None,
+            **price,  # type:ignore[arg-type]
         )
+        raw_resp = self._connection.post(ORDERS_URL, request)
 
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
-        if resp.order.status == OrderStatus.EXECUTED:
+        if (
+            resp.order.status == OrderStatus.EXECUTED
+            or resp.order.status == OrderStatus.RESTING
+        ):
             return resp.order.order_id
         return None
 
@@ -113,11 +115,11 @@ class ExchangeInterface:
 
     def get_orders(
         self, request: GetOrdersRequest, pages: int | None = None
-    ) -> List[GetOrderResponse]:
+    ) -> List[OrderAPIResponse]:
         if request.status == OrderStatus.PENDING:
             raise ValueError("Cannot get pending orders")
         response = self._get_orders(request)
-        orders: List[GetOrderResponse] = response.orders
+        orders: List[OrderAPIResponse] = response.orders
 
         while (
             pages is None or (pages := pages - 1)
@@ -135,6 +137,13 @@ class ExchangeInterface:
                 params=request.dict(exclude_none=True),
             )
         )
+
+    def cancel_order(self, order_id: OrderId) -> OrderAPIResponse:
+        return CancelOrderResponse.parse_obj(
+            self._connection.delete(
+                url=ORDERS_URL.add(order_id),
+            )
+        ).order
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:
         """Gets all active markets on the exchange
