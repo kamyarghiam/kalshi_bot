@@ -10,6 +10,7 @@ from helpers.types.orders import (
     GetOrdersRequest,
     Order,
     OrderStatus,
+    OrderType,
     Quantity,
     Side,
     TradeType,
@@ -38,7 +39,7 @@ def seed_strategy(e: ExchangeInterface):
     Followup analysis: see which markets perform the best with this
     strategy
     """
-    num_markets_to_trade_on = 100
+    num_markets_to_trade_on = 500
     seed_quantity = Quantity(1)
     follow_up_quantity = Quantity(11)
 
@@ -128,7 +129,9 @@ def place_bbo_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
 def place_followup_order(e: ExchangeInterface, ob: Orderbook, q: Quantity):
     order = ob.buy_order(Side.NO)
     if order is not None:
-        order.quantity = min(order.quantity, q)
+        order.quantity = q
+        # We'll take whatever price
+        order.order_type = OrderType.MARKET
         e.place_order(order)
         print(
             f"Followup: {order.side} {order.quantity} {order.price} {ob.market_ticker}"
