@@ -30,7 +30,6 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
-    TODO: fill position history with current position from the website
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
     TODO: follow the BBO?
