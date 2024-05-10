@@ -4,11 +4,11 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Union
+from typing import List, Union
 
 from pydantic import BaseModel, Extra
 
-from helpers.types.api import ExternalApi
+from helpers.types.api import Cursor, ExternalApi
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
 
@@ -158,7 +158,7 @@ class CreateOrderRequest(ExternalApi):
     buy_max_cost: Cents | None = None
 
 
-class CreateOrderStatus(str, Enum):
+class OrderStatus(str, Enum):
     RESTING = "resting"
     CANCELED = "canceled"
     EXECUTED = "executed"
@@ -170,9 +170,45 @@ class InnerCreateOrderResponse(BaseModel):
         extra = Extra.allow
         use_enum_values = True
 
-    status: CreateOrderStatus
+    status: OrderStatus
     order_id: OrderId
 
 
 class CreateOrderResponse(ExternalApi):
     order: InnerCreateOrderResponse
+
+
+class GetOrdersRequest(ExternalApi):
+    status: OrderStatus | None = None
+    ticker: MarketTicker | None = None
+    cursor: Cursor | None = None
+    # Note: there are more fields you can filter,
+    # see Kalshi api docs.
+
+    class Config:
+        use_enum_values = True
+
+
+class GetOrderResponse(ExternalApi):
+    class Config:
+        extra = Extra.allow
+        use_enum_values = True
+
+    client_order_id: OrderId
+    order_id: OrderId
+    action: TradeType
+    no_price: Price
+    yes_price: Price
+    side: Side
+    status: OrderStatus
+    ticker: MarketTicker
+    type: OrderType
+    # There are other fields, if you're interested
+
+
+class GetOrdersResponse(ExternalApi):
+    orders: List[GetOrderResponse]
+    cursor: Cursor | None = None
+
+    def has_empty_cursor(self) -> bool:
+        return self.cursor is None or len(self.cursor) == 0

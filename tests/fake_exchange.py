@@ -17,7 +17,7 @@ from helpers.constants import (
     LOGOUT_URL,
     MARKETS_URL,
     ORDERBOOK_URL,
-    PLACE_ORDER_URL,
+    ORDERS_URL,
     PORTFOLIO_BALANCE_URL,
     POSITION_URL,
     TRADES_URL,
@@ -47,9 +47,11 @@ from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
 from helpers.types.orders import (
     CreateOrderRequest,
     CreateOrderResponse,
-    CreateOrderStatus,
+    GetOrderResponse,
+    GetOrdersResponse,
     InnerCreateOrderResponse,
     OrderId,
+    OrderStatus,
     Quantity,
     QuantityDelta,
     Side,
@@ -142,6 +144,43 @@ def kalshi_test_exchange_factory():
     def portfolio_balance():
         return GetPortfolioBalanceResponse(balance=Cents(1000))
 
+    @router.get(ORDERS_URL)
+    def get_orders(status: OrderStatus | None = None, cursor: Cursor | None = None):
+        # We hardcode that there are 3 pages
+        if cursor is None:
+            order_response1 = get_random_get_order_response()
+            order_response2 = get_random_get_order_response()
+            order_response1.ticker = MarketTicker("1")
+            order_response2.ticker = MarketTicker("2")
+            order_response1.status = status
+            order_response2.status = status
+
+            return GetOrdersResponse(
+                cursor=Cursor("1"), orders=[order_response1, order_response2]
+            )
+        elif cursor == Cursor("1"):
+            order_response3 = get_random_get_order_response()
+            order_response4 = get_random_get_order_response()
+            order_response3.ticker = MarketTicker("3")
+            order_response4.ticker = MarketTicker("4")
+            order_response3.status = status
+            order_response4.status = status
+
+            return GetOrdersResponse(
+                cursor=Cursor("2"), orders=[order_response3, order_response4]
+            )
+        elif cursor == Cursor("2"):
+            order_response5 = get_random_get_order_response()
+            order_response6 = get_random_get_order_response()
+            order_response5.ticker = MarketTicker("5")
+            order_response6.ticker = MarketTicker("6")
+            order_response5.status = status
+            order_response6.status = status
+
+            return GetOrdersResponse(
+                cursor=Cursor(""), orders=[order_response5, order_response6]
+            )
+
     @router.get(TRADES_URL)
     def get_trades(
         ticker: MarketTicker,
@@ -224,11 +263,11 @@ def kalshi_test_exchange_factory():
             orderbook=ApiOrderbook(yes=yes, no=no),
         )
 
-    @router.post(PLACE_ORDER_URL)
+    @router.post(ORDERS_URL)
     def create_order(order: CreateOrderRequest):
         return CreateOrderResponse(
             order=InnerCreateOrderResponse(
-                status=CreateOrderStatus.EXECUTED, order_id=OrderId("some_order_id")
+                status=OrderStatus.EXECUTED, order_id=OrderId("some_order_id")
             ),
         )
 
@@ -528,3 +567,12 @@ def kalshi_test_exchange_factory():
 
     app.include_router(router)
     return app
+
+
+def get_random_get_order_response():
+    return random_data(
+        GetOrderResponse,
+        custom_args={
+            Price: lambda: Price(random.randint(1, 99)),
+        },
+    )

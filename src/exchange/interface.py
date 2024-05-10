@@ -10,7 +10,7 @@ from helpers.constants import (
     EXCHANGE_STATUS_URL,
     MARKETS_URL,
     ORDERBOOK_URL,
-    PLACE_ORDER_URL,
+    ORDERS_URL,
     PORTFOLIO_BALANCE_URL,
     POSITION_URL,
     TRADES_URL,
@@ -29,9 +29,12 @@ from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, O
 from helpers.types.orders import (
     CreateOrderRequest,
     CreateOrderResponse,
-    CreateOrderStatus,
+    GetOrderResponse,
+    GetOrdersRequest,
+    GetOrdersResponse,
     Order,
     OrderId,
+    OrderStatus,
     OrderType,
     Quantity,
     Side,
@@ -79,7 +82,7 @@ class ExchangeInterface:
             else {"no_price": order.price}
         )
         raw_resp = self._connection.post(
-            PLACE_ORDER_URL,
+            ORDERS_URL,
             CreateOrderRequest(
                 ticker=order.ticker,
                 action=order.trade,
@@ -96,7 +99,7 @@ class ExchangeInterface:
         )
 
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
-        if resp.order.status == CreateOrderStatus.EXECUTED:
+        if resp.order.status == OrderStatus.EXECUTED:
             return resp.order.order_id
         return None
 
@@ -107,6 +110,31 @@ class ExchangeInterface:
 
     def get_websocket(self) -> ContextManager[Websocket]:
         return self._connection.get_websocket_session()
+
+    def get_orders(
+        self, request: GetOrdersRequest, pages: int | None = None
+    ) -> List[GetOrderResponse]:
+        if request.status == OrderStatus.PENDING:
+            raise ValueError("Cannot get pending orders")
+        response = self._get_orders(request)
+        orders: List[GetOrderResponse] = response.orders
+
+        while (
+            pages is None or (pages := pages - 1)
+        ) and not response.has_empty_cursor():
+            request.cursor = response.cursor
+            response = self._get_orders(request)
+            orders.extend(response.orders)
+
+        return orders
+
+    def _get_orders(self, request: GetOrdersRequest) -> GetOrdersResponse:
+        return GetOrdersResponse.parse_obj(
+            self._connection.get(
+                url=ORDERS_URL,
+                params=request.dict(exclude_none=True),
+            )
+        )
 
     def get_active_markets(self, pages: int | None = None) -> List[Market]:
         """Gets all active markets on the exchange

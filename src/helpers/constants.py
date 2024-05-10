@@ -12,7 +12,7 @@ MARKETS_URL = URL("/markets")
 LOGOUT_URL = URL("/logout")
 TRADES_URL = URL("/markets/trades")
 ORDERBOOK_URL = URL("/orderbook")
-PLACE_ORDER_URL = URL("/portfolio/orders")
+ORDERS_URL = URL("/portfolio/orders")
 PORTFOLIO_BALANCE_URL = URL("/portfolio/balance")
 POSITION_URL = URL("/portfolio/positions")
 
