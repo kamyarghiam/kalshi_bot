@@ -7,7 +7,6 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Cents, Price
 from helpers.types.orders import Order, OrderType, Quantity, TradeType, compute_fee
-from helpers.types.portfolio import GetMarketPositionsRequest
 from helpers.types.websockets.response import OrderFillWR
 from helpers.utils import Side
 from strategy.utils import PortfolioHistory
@@ -95,21 +94,28 @@ def test_reserve_order_portfolio(exchange_interface: ExchangeInterface):
 
 
 def test_get_positions(exchange_interface: ExchangeInterface):
-    positions = exchange_interface.get_positions(GetMarketPositionsRequest())
+    positions = exchange_interface.get_positions()
     if not pytest.is_functional:
         assert len(positions) == 15
 
         # Test with ticker
-        ticker = MarketTicker("test_get_positions")
-        positions = exchange_interface.get_positions(
-            GetMarketPositionsRequest(ticker=ticker)
-        )
+        positions = exchange_interface.get_positions()
         assert len(positions) == 15
-        for position in positions:
-            assert position.ticker == ticker
     else:
         assert len(positions) >= 0
 
 
 def test_load_portfolio_from_exchange(exchange_interface: ExchangeInterface):
-    PortfolioHistory.load_from_exchange(exchange_interface)
+    if pytest.is_functional:
+        req = get_valid_order_on_demo_market(exchange_interface)
+        exchange_interface.place_order(req)
+        # Give the exchange a second to process order
+        sleep(1)
+        p = PortfolioHistory.load_from_exchange(exchange_interface)
+        position = p.positions[req.ticker]
+        assert position.quantities[0] == req.quantity
+        assert position.prices[0] == req.price
+        assert position.fees[0] == req.fee
+    else:
+        p = PortfolioHistory.load_from_exchange(exchange_interface)
+        assert len(p.positions) == 15

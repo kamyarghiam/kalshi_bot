@@ -10,7 +10,6 @@ from exchange.interface import ExchangeInterface
 from helpers.types.money import Price
 from helpers.types.orderbook import GetOrderbookRequest, OrderbookView
 from helpers.types.orders import Order, OrderType, Quantity, Side, TradeType
-from helpers.types.portfolio import GetMarketPositionsRequest
 
 # Dataclasses don't have native type hints
 BM = typing.TypeVar("BM", bound=BaseModel | typing.Any)
@@ -73,7 +72,7 @@ def get_valid_order_on_demo_market(
     """
     assert e.is_test_run
     active_markets = e.get_active_markets(pages=50)
-    positions = e.get_positions(GetMarketPositionsRequest())
+    positions = e.get_positions()
     market_tickers_with_positions = set([m.ticker for m in positions])
     for market in active_markets:
         if market.ticker in market_tickers_with_positions:

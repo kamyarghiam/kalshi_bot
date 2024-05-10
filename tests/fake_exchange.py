@@ -318,30 +318,39 @@ def kalshi_test_exchange_factory():
             )
 
     @router.get(POSITION_URL)
-    def get_positions(cursor: Cursor | None = None, ticker: MarketTicker | None = None):
+    def get_positions(cursor: Cursor | None = None):
         """Returns all markets on the exchange"""
-        ticker = ticker or MarketTicker("some_market")
         positions: List[ApiMarketPosition] = [
             random_data(ApiMarketPosition) for _ in range(5)
         ]
         for position in positions:
-            if ticker:
-                position.ticker = ticker
             position.market_exposure = Cents(50)
             position.position = 5
 
         # We hardcode that there are 3 pages
         if cursor is None:
+            ticker_start = 0
+            for position in positions:
+                position.ticker = MarketTicker(str(ticker_start))
+                ticker_start += 1
             return GetMarketPositionsResponse(
                 cursor=Cursor("1"),
                 market_positions=positions,
             )
         elif cursor == Cursor("1"):
+            ticker_start = 10
+            for position in positions:
+                position.ticker = MarketTicker(str(ticker_start))
+                ticker_start += 1
             return GetMarketPositionsResponse(
                 cursor=Cursor("2"),
                 market_positions=positions,
             )
         elif cursor == Cursor("2"):
+            ticker_start = 20
+            for position in positions:
+                position.ticker = MarketTicker(str(ticker_start))
+                ticker_start += 1
             return GetMarketPositionsResponse(
                 cursor=Cursor(""),
                 market_positions=positions,

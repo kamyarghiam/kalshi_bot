@@ -224,9 +224,8 @@ class ExchangeInterface:
             )
         )
 
-    def get_positions(
-        self, request: GetMarketPositionsRequest, pages: int | None = None
-    ) -> List[ApiMarketPosition]:
+    def get_positions(self, pages: int | None = None) -> List[ApiMarketPosition]:
+        request = GetMarketPositionsRequest()
         response = self._get_positions(request)
         positions: List[ApiMarketPosition] = response.market_positions
 

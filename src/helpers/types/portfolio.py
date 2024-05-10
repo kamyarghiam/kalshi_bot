@@ -191,9 +191,7 @@ class PortfolioHistory:
 
     @classmethod
     def load_from_exchange(cls, e: "ExchangeInterface", allow_side_cross: bool = False):
-        positions = [
-            p.to_position() for p in e.get_positions(GetMarketPositionsRequest())
-        ]
+        positions = [p.to_position() for p in e.get_positions()]
         balance = e.get_portfolio_balance().balance
         portfolio = PortfolioHistory(
             Balance(balance), allow_side_cross=allow_side_cross

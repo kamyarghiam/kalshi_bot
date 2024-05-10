@@ -34,6 +34,8 @@ def seed_strategy(e: ExchangeInterface):
     filled fist?
     TODO: follow the BBO?
     TODO: trade on all markets? Remove num_markets_to_trade_on restriction
+    TODO: are we placing more orders after the followup?
+    TODO: what to do when we run out of funds?
 
     Followup analysis: see which markets perform the best with this
     strategy
