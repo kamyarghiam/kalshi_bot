@@ -30,7 +30,6 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
-
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
     TODO: follow the BBO?
@@ -43,6 +42,7 @@ def seed_strategy(e: ExchangeInterface):
     seed_quantity = Quantity(1)
     follow_up_quantity = Quantity(11)
 
+    # TODO: fill position history with current position
     balance = e.get_portfolio_balance().balance
     portfolio = PortfolioHistory(Balance(balance), allow_side_cross=True)
 

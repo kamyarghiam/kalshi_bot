@@ -1013,6 +1013,6 @@ def test_portfolio_allow_side_cross():
     assert portfolio.orders[2].quantity == 50
     assert portfolio.orders[2].trade == TradeType.SELL
 
-    assert portfolio.orders[3].side == Side.YES
+    assert portfolio.orders[3].side == Side.NO
     assert portfolio.orders[3].quantity == 50
     assert portfolio.orders[3].trade == TradeType.BUY

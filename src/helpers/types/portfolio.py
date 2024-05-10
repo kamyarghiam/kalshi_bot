@@ -377,7 +377,6 @@ class PortfolioHistory:
                 return
             # Continue processing rest of order if there is quantity
             order.quantity = quantity_remaining
-            order.side = side_holding
 
         self._cash_balance -= order.cost + order.fee
         if order.ticker in self._positions:
