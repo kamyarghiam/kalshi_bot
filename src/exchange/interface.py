@@ -94,6 +94,9 @@ class ExchangeInterface:
             else None,
             **price,  # type:ignore[arg-type]
         )
+        # Sometimes, we get issues when creating an order
+        # So for now, we print to see what happened
+        print(request.__repr__())
         raw_resp = self._connection.post(ORDERS_URL, request)
 
         resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
