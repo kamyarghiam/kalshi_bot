@@ -109,3 +109,7 @@ def test_get_positions(exchange_interface: ExchangeInterface):
             assert position.ticker == ticker
     else:
         assert len(positions) >= 0
+
+
+def test_load_portfolio_from_exchange(exchange_interface: ExchangeInterface):
+    PortfolioHistory.load_from_exchange(exchange_interface)

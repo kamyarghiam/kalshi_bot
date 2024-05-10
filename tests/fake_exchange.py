@@ -324,9 +324,11 @@ def kalshi_test_exchange_factory():
         positions: List[ApiMarketPosition] = [
             random_data(ApiMarketPosition) for _ in range(5)
         ]
-        if ticker:
-            for position in positions:
+        for position in positions:
+            if ticker:
                 position.ticker = ticker
+            position.market_exposure = Cents(50)
+            position.position = 5
 
         # We hardcode that there are 3 pages
         if cursor is None:

@@ -43,7 +43,7 @@ def seed_strategy(e: ExchangeInterface):
     seed_quantity = Quantity(1)
     follow_up_quantity = Quantity(11)
 
-    portfolio = PortfolioHistory.load_from_exchange_portfolio(e, allow_side_cross=True)
+    portfolio = PortfolioHistory.load_from_exchange(e, allow_side_cross=True)
 
     open_markets = e.get_active_markets()
     tickers = [m.ticker for m in open_markets]
