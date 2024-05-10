@@ -38,7 +38,8 @@ def seed_strategy(e: ExchangeInterface):
     that is profitable -- make sure this happens automatically
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
-    TODO: follow the BBO?
+    TODO: follow the BBO? PROBLEM: someone can work against your
+    strategy to get cheap orders
     TODO: trade on all markets? Remove num_markets_to_trade_on restriction
     TODO: are we placing more orders after the followup?
     TODO: what to do when we run out of funds? We can't followup, so we should cancel?
