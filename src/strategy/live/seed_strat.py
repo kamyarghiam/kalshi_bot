@@ -1,4 +1,5 @@
 import random
+import traceback
 from typing import Dict
 
 from exchange.interface import ExchangeInterface
@@ -159,8 +160,12 @@ def run_seed_strategy():
             orders = e.get_orders(request=GetOrdersRequest(status=OrderStatus.RESTING))
             print(f"Found {len(orders)} orders to cancel...")
             for order in orders:
-                e.cancel_order(order.order_id)
-                print(f"Canceled {order.order_id}")
+                try:
+                    e.cancel_order(order.order_id)
+                    print(f"Canceled {order.order_id}")
+                except Exception:
+                    print(f"Could not find order for {order.order_id}. Error: ")
+                    traceback.print_exc()
 
 
 if __name__ == "__main__":
