@@ -6,7 +6,14 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Balance, Price
 from helpers.types.orderbook import Orderbook
-from helpers.types.orders import Order, Quantity, Side, TradeType
+from helpers.types.orders import (
+    GetOrdersRequest,
+    Order,
+    OrderStatus,
+    Quantity,
+    Side,
+    TradeType,
+)
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import (
     OrderbookDeltaWR,
@@ -45,9 +52,13 @@ def seed_strategy():
         tickers_to_trade = random.sample(tickers, num_markets_to_trade_on)
 
         obs: Dict[MarketTicker, Orderbook] = {}
+
         placed_bbo_order: Dict[MarketTicker, bool] = {
             ticker: False for ticker in tickers_to_trade
         }
+        orders = e.get_orders(request=GetOrdersRequest(status=OrderStatus.RESTING))
+        for order in orders:
+            placed_bbo_order[order.ticker] = True
         placed_followup_order: Dict[MarketTicker, bool] = {
             ticker: False for ticker in tickers_to_trade
         }
