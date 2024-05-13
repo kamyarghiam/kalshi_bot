@@ -43,6 +43,7 @@ def seed_strategy(e: ExchangeInterface):
     TODO: trade on all markets? Remove num_markets_to_trade_on restriction
     TODO: are we placing more orders after the followup?
     TODO: what to do when we run out of funds? We can't followup, so we should cancel?
+    TODO: hear back from advanced API access?
 
     Followup analysis: see which markets perform the best with this
     strategy
