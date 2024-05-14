@@ -32,8 +32,6 @@ def seed_strategy(e: ExchangeInterface):
     cancel all orders when the program crashes or stops.
 
     TODO: sell back order with limit order?
-    TODO: let's say we load positions in the morning and want to sell off everything
-    that is profitable -- make sure this happens automatically
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
     TODO: follow the BBO? PROBLEM: someone can work against your
@@ -59,12 +57,12 @@ def seed_strategy(e: ExchangeInterface):
 
     obs: Dict[MarketTicker, Orderbook] = {}
 
-    placed_bbo_order: Dict[MarketTicker, bool] = {
+    placed_seed_order: Dict[MarketTicker, bool] = {
         ticker: False for ticker in tickers_to_trade
     }
     orders = e.get_orders(request=GetOrdersRequest(status=OrderStatus.RESTING))
     for order in orders:
-        placed_bbo_order[order.ticker] = True
+        placed_seed_order[order.ticker] = True
     placed_followup_order: Dict[MarketTicker, bool] = {
         ticker: False for ticker in tickers_to_trade
     }
@@ -74,31 +72,14 @@ def seed_strategy(e: ExchangeInterface):
         while True:
             data: OrderbookSubscription.MESSAGE_TYPES_TO_RETURN = next(orderbook_gen)
             if isinstance(data, OrderbookSnapshotWR):
+                ticker = data.msg.market_ticker
                 ob = Orderbook.from_snapshot(data.msg)
                 obs[ob.market_ticker] = ob
-                if not placed_bbo_order[ob.market_ticker]:
-                    if place_seed_order(e, ob, seed_quantity, portfolio):
-                        placed_bbo_order[ob.market_ticker] = True
             elif isinstance(data, OrderbookDeltaWR):
                 ticker = data.msg.market_ticker
                 obs[ticker] = obs[ticker].apply_delta(data.msg)
-                if ticker in portfolio.positions and not placed_followup_order[ticker]:
-                    sell_order = obs[ticker].sell_order(
-                        portfolio.positions[ticker].side
-                    )
-                    if sell_order is not None:
-                        sell_order.quantity = min(
-                            sell_order.quantity,
-                            portfolio.positions[ticker].total_quantity,
-                        )
-                        pnl, fees = portfolio.potential_pnl(sell_order)
-                        if pnl - fees > 0:
-                            e.place_order(sell_order)
-                            placed_bbo_order[ob.market_ticker] = False
-                elif not placed_bbo_order[ob.market_ticker]:
-                    if place_seed_order(e, ob, seed_quantity, portfolio):
-                        placed_bbo_order[ob.market_ticker] = True
             elif isinstance(data, OrderFillWR):
+                ticker = data.msg.market_ticker
                 portfolio.receive_fill_message(data.msg)
                 if data.msg.count == 1:
                     # This is one of our seeds
@@ -110,7 +91,21 @@ def seed_strategy(e: ExchangeInterface):
                     # Followup order received
                     placed_followup_order[data.msg.market_ticker] = False
             else:
-                print("Received unknown data type: ", data)
+                raise ValueError("Received unknown data type: ", data)
+            if ticker in portfolio.positions and not placed_followup_order[ticker]:
+                sell_order = obs[ticker].sell_order(portfolio.positions[ticker].side)
+                if sell_order is not None:
+                    sell_order.quantity = min(
+                        sell_order.quantity,
+                        portfolio.positions[ticker].total_quantity,
+                    )
+                    pnl, fees = portfolio.potential_pnl(sell_order)
+                    if pnl - fees > 0:
+                        e.place_order(sell_order)
+                        placed_seed_order[ob.market_ticker] = False
+            elif not placed_seed_order[ob.market_ticker]:
+                if place_seed_order(e, ob, seed_quantity, portfolio):
+                    placed_seed_order[ob.market_ticker] = True
 
 
 def place_seed_order(
