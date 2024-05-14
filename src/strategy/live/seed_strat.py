@@ -31,8 +31,6 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
-    TODO: don't place seeds orders on markets that we already have a position on
-    TODO: what if we just convert this to a market making strategy?
     TODO: sell back order with limit order?
     TODO: let's say we load positions in the morning and want to sell off everything
     that is profitable -- make sure this happens automatically
@@ -44,6 +42,7 @@ def seed_strategy(e: ExchangeInterface):
     TODO: are we placing more orders after the followup?
     TODO: what to do when we run out of funds? We can't followup, so we should cancel?
     TODO: hear back from advanced API access?
+    TODO: what if we just convert this to a market making strategy?
 
     Followup analysis: see which markets perform the best with this
     strategy
@@ -78,8 +77,8 @@ def seed_strategy(e: ExchangeInterface):
                 ob = Orderbook.from_snapshot(data.msg)
                 obs[ob.market_ticker] = ob
                 if not placed_bbo_order[ob.market_ticker]:
-                    place_bbo_order(e, ob, seed_quantity, portfolio)
-                    placed_bbo_order[ob.market_ticker] = True
+                    if place_seed_order(e, ob, seed_quantity, portfolio):
+                        placed_bbo_order[ob.market_ticker] = True
             elif isinstance(data, OrderbookDeltaWR):
                 ticker = data.msg.market_ticker
                 obs[ticker] = obs[ticker].apply_delta(data.msg)
@@ -97,8 +96,8 @@ def seed_strategy(e: ExchangeInterface):
                             e.place_order(sell_order)
                             placed_bbo_order[ob.market_ticker] = False
                 elif not placed_bbo_order[ob.market_ticker]:
-                    place_bbo_order(e, ob, seed_quantity, portfolio)
-                    placed_bbo_order[ob.market_ticker] = True
+                    if place_seed_order(e, ob, seed_quantity, portfolio):
+                        placed_bbo_order[ob.market_ticker] = True
             elif isinstance(data, OrderFillWR):
                 portfolio.receive_fill_message(data.msg)
                 if data.msg.count == 1:
@@ -114,10 +113,15 @@ def seed_strategy(e: ExchangeInterface):
                 print("Received unknown data type: ", data)
 
 
-def place_bbo_order(
+def place_seed_order(
     e: ExchangeInterface, ob: Orderbook, q: Quantity, portfolio: PortfolioHistory
-):
-    """Places orders right above the bbo if spread is > 1"""
+) -> bool:
+    """Places orders right above the bbo if spread is > 1
+
+    Returns whether an order was placed"""
+    if ob.market_ticker in portfolio.positions:
+        # Don't place seed order on market we already have position on
+        return False
     spread = ob.get_spread()
     if spread and spread > 1:
         bbo = ob.get_bbo()
@@ -137,6 +141,8 @@ def place_bbo_order(
                 print(
                     f"Seed: Placed {q} {price} {order.side} orders {ob.market_ticker}"
                 )
+                return True
+    return False
 
 
 def place_followup_order(
