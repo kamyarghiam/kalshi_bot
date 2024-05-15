@@ -53,6 +53,10 @@ class Balance:
     def balance(self) -> Cents:
         return self._balance
 
+    @balance.setter
+    def balance(self, value: Cents):
+        self._balance = value
+
     def __add__(self, other):
         return Balance(self._balance + other)
 

@@ -203,6 +203,13 @@ class PortfolioHistory:
     def balance(self) -> Cents:
         return self._cash_balance.balance - self._reserved_cash.balance
 
+    @balance.setter
+    def balance(self, value: Cents):
+        # This setter should not be used if we have a reserved cash balance
+        # because we might get undesired results
+        assert self._reserved_cash.balance == Cents(0)
+        self._cash_balance.balance = value
+
     @property
     def current_exposure(self) -> Cents:
         return self.get_positions_value()
