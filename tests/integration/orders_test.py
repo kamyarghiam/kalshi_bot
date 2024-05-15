@@ -4,12 +4,22 @@ import pytest
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
-from helpers.types.orders import GetOrdersRequest, Order, OrderId, OrderStatus
+from helpers.types.orders import (
+    GetOrdersRequest,
+    Order,
+    OrderId,
+    OrderStatus,
+    OrderType,
+    TradeType,
+)
 from tests.utils import get_valid_order_on_demo_market
 
 
 def test_place_orders(exchange_interface: ExchangeInterface):
     req: Order = get_valid_order_on_demo_market(exchange_interface)
+    assert exchange_interface.place_order(req) is not None
+    req.trade = TradeType.SELL
+    req.order_type = OrderType.MARKET
     assert exchange_interface.place_order(req) is not None
 
 
