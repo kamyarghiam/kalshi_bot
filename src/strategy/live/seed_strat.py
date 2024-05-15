@@ -31,6 +31,7 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
+    TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
     TODO: Maybe place orders on both sides and see which gets
     filled fist?
@@ -41,6 +42,7 @@ def seed_strategy(e: ExchangeInterface):
     TODO: what to do when we run out of funds? We can't followup, so we should cancel?
     TODO: hear back from advanced API access?
     TODO: what if we just convert this to a market making strategy?
+    TODO: review, refactor, and this this whole strategy please. It can be fun
 
     Followup analysis: see which markets perform the best with this
     strategy
