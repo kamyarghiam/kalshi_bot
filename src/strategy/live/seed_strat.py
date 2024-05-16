@@ -35,8 +35,6 @@ def seed_strategy(e: ExchangeInterface):
     TODO: remove market order on followup when sizing up (or look into buy_max_cost)
     TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
-    TODO: Maybe place orders on both sides and see which gets
-    filled fist?
     TODO: follow the BBO? PROBLEM: someone can work against your
     strategy to get cheap orders
     TODO: trade on all markets? Remove num_markets_to_trade_on restriction
@@ -75,13 +73,18 @@ def seed_strategy(e: ExchangeInterface):
 
     obs: Dict[MarketTicker, Orderbook] = {}
 
-    placed_seed_order: Dict[MarketTicker, bool] = {
-        ticker: False for ticker in tickers_to_trade
+    placed_seed_order: Dict[MarketTicker, Dict[Side, bool]] = {
+        ticker: {Side.YES: False, Side.NO: False} for ticker in tickers_to_trade
     }
     orders = e.get_orders(request=GetOrdersRequest(status=OrderStatus.RESTING))
     for order in orders:
-        placed_seed_order[order.ticker] = True
-    followup_order_count: Dict[MarketTicker, Quantity] = dict()
+        if order.ticker not in placed_seed_order:
+            placed_seed_order[order.ticker] = {Side.YES: False, Side.NO: False}
+        placed_seed_order[order.ticker][order.side] = True
+    followup_order_count: Dict[MarketTicker, Dict[Side, Quantity]] = {
+        ticker: {Side.YES: Quantity(0), Side.NO: Quantity(0)}
+        for ticker in tickers_to_trade
+    }
     with e.get_websocket() as ws:
         sub = OrderbookSubscription(ws, tickers_to_trade, send_order_fills=True)
         orderbook_gen = sub.continuous_receive()
@@ -97,14 +100,15 @@ def seed_strategy(e: ExchangeInterface):
             elif isinstance(data, OrderFillWR):
                 ticker = data.msg.market_ticker
                 qty = data.msg.count
+                side = data.msg.side
                 portfolio.receive_fill_message(data.msg)
                 # This is one of our seeds
-                if qty == seed_quantity and placed_seed_order[ticker]:
+                if qty == seed_quantity and placed_seed_order[ticker][side]:
                     if place_followup_order(
                         e, obs[data.msg.market_ticker], follow_up_quantity, portfolio
                     ):
-                        followup_order_count[
-                            data.msg.market_ticker
+                        followup_order_count[data.msg.market_ticker][
+                            side
                         ] = follow_up_quantity
                         if portfolio.balance < min_amount_to_seed:
                             print("Out of money, closing seeds")
@@ -112,15 +116,15 @@ def seed_strategy(e: ExchangeInterface):
                             # Hopefully this will go away when we batch cancel
                             cancel_all_seed_orders(e)
                     # Seed has been taken
-                    placed_seed_order[ticker] = False
+                    placed_seed_order[ticker][data.msg.side] = False
                 else:
                     # Followup order received
-                    followup_order_count[ticker] -= qty
-                    if followup_order_count[ticker] == Quantity(0):
-                        del followup_order_count[ticker]
+                    followup_order_count[ticker][side] -= qty
             else:
                 raise ValueError("Received unknown data type: ", data)
-            if ticker in portfolio.positions and ticker not in followup_order_count:
+            if ticker in portfolio.positions and followup_order_count[ticker][
+                portfolio.positions[ticker].side
+            ] == Quantity(0):
                 # This means we're holding a position on this market and not expecting
                 # more quantity to be filled on this market
                 sell_order = obs[ticker].sell_order(portfolio.positions[ticker].side)
@@ -132,13 +136,19 @@ def seed_strategy(e: ExchangeInterface):
                     pnl, fees = portfolio.potential_pnl(sell_order)
                     if pnl - fees > 0:
                         e.place_order(sell_order)
-            elif not placed_seed_order[ob.market_ticker]:
-                if place_seed_order(e, ob, seed_quantity, portfolio):
-                    placed_seed_order[ob.market_ticker] = True
+            else:
+                for side in Side:
+                    if not placed_seed_order[ob.market_ticker][side]:
+                        if place_seed_order(e, ob, seed_quantity, portfolio, side):
+                            placed_seed_order[ob.market_ticker][side] = True
 
 
 def place_seed_order(
-    e: ExchangeInterface, ob: Orderbook, q: Quantity, portfolio: PortfolioHistory
+    e: ExchangeInterface,
+    ob: Orderbook,
+    q: Quantity,
+    portfolio: PortfolioHistory,
+    side: Side,
 ) -> bool:
     """Places orders right above the bbo if spread is > 1
 
@@ -149,23 +159,29 @@ def place_seed_order(
     spread = ob.get_spread()
     if spread and spread > 1:
         bbo = ob.get_bbo()
-        if bbo.bid and bbo.bid.price != Price(99):
-            price = Price(bbo.bid.price + 1)
-            order = Order(
-                price=price,
-                quantity=q,
-                trade=TradeType.BUY,
-                ticker=ob.market_ticker,
-                side=Side.YES,
-                expiration_ts=None,
-            )
-            if portfolio.can_afford(order):
-                # NOTE: there is a chance the order immediately fills lol
-                e.place_order(order)
-                print(
-                    f"Seed: Placed {q} {price} {order.side} orders {ob.market_ticker}"
-                )
-                return True
+        if side == Side.YES:
+            if bbo.bid and bbo.bid.price != Price(99):
+                price = Price(bbo.bid.price + 1)
+            else:
+                return False
+        else:
+            if bbo.ask and bbo.ask.price != Price(1):
+                price = Price(bbo.ask.price - 1)
+            else:
+                return False
+        order = Order(
+            price=price,
+            quantity=q,
+            trade=TradeType.BUY,
+            ticker=ob.market_ticker,
+            side=side,
+            expiration_ts=None,
+        )
+        if portfolio.can_afford(order):
+            # NOTE: there is a chance the order immediately fills lol
+            e.place_order(order)
+            print(f"Seed: Placed {q} {price} {order.side} orders {ob.market_ticker}")
+            return True
     return False
 
 
@@ -182,6 +198,14 @@ def place_followup_order(
         print(
             f"Followup: {order.side} {order.quantity} {order.price} {ob.market_ticker}"
         )
+        # Cancel resting orders
+        orders = e.get_orders(
+            request=GetOrdersRequest(
+                status=OrderStatus.RESTING, ticker=ob.market_ticker
+            )
+        )
+        for o in orders:
+            e.cancel_order(o.order_id)
         return True
     return False
 
