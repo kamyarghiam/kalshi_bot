@@ -32,7 +32,8 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
-    TODO: I noticed that NO orders aren't placed on some markets on seed?
+    TODO: I noticed that NO orders aren't placed on some markets on seed? Maybe
+    to fix this, you can try to launch the strategy on the demo exchange and test out
     TODO: remove market order on followup when sizing up (or look into buy_max_cost)
     TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
@@ -41,7 +42,8 @@ def seed_strategy(e: ExchangeInterface):
     TODO: trade on all markets? Remove num_markets_to_trade_on restriction
     TODO: hear back from advanced API access?
     TODO: what if we just convert this to a market making strategy?
-    TODO: review, refactor, and this this whole strategy please. It can be fun
+    TODO: review, refactor, and this this whole strategy please. It can be fun. Maybe
+    you can create a competing bot on the demo exchange
     TODO: batch cancel and create seed orders
 
     Followup analysis: see which markets perform the best with this
