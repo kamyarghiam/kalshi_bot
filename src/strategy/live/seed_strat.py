@@ -5,7 +5,7 @@ from typing import Dict
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Dollars, Price
+from helpers.types.money import Balance, Dollars, Price, get_opposite_side_price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import (
     GetOrdersRequest,
@@ -32,8 +32,6 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
-    TODO: I noticed that NO orders aren't placed on some markets on seed? Maybe
-    to fix this, you can try to launch the strategy on the demo exchange and test out
     TODO: remove market order on followup when sizing up (or look into buy_max_cost)
     TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
@@ -107,8 +105,13 @@ def seed_strategy(e: ExchangeInterface):
                 portfolio.receive_fill_message(data.msg)
                 # This is one of our seeds
                 if qty == seed_quantity and placed_seed_order[ticker][side]:
+                    # Followup order on the order side
                     if place_followup_order(
-                        e, obs[data.msg.market_ticker], follow_up_quantity, portfolio
+                        e,
+                        obs[ticker],
+                        follow_up_quantity,
+                        portfolio,
+                        Side.get_other_side(side),
                     ):
                         followup_order_count[data.msg.market_ticker][
                             side
@@ -169,7 +172,7 @@ def place_seed_order(
                 return False
         else:
             if bbo.ask and bbo.ask.price != Price(1):
-                price = Price(bbo.ask.price - 1)
+                price = get_opposite_side_price(Price(bbo.ask.price - 1))
             else:
                 return False
         order = Order(
@@ -189,9 +192,13 @@ def place_seed_order(
 
 
 def place_followup_order(
-    e: ExchangeInterface, ob: Orderbook, q: Quantity, portfolio: PortfolioHistory
+    e: ExchangeInterface,
+    ob: Orderbook,
+    q: Quantity,
+    portfolio: PortfolioHistory,
+    side: Side,
 ):
-    order = ob.buy_order(Side.NO)
+    order = ob.buy_order(side)
     if order is not None and portfolio.can_afford(order):
         order.quantity = q
         # We'll take whatever price
