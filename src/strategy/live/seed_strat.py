@@ -5,7 +5,13 @@ from typing import Dict
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Dollars, Price, get_opposite_side_price
+from helpers.types.money import (
+    BalanceCents,
+    Cents,
+    Dollars,
+    Price,
+    get_opposite_side_price,
+)
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import (
     GetOrdersRequest,
@@ -22,7 +28,6 @@ from helpers.types.websockets.response import (
     OrderbookSnapshotWR,
     OrderFillWR,
 )
-from helpers.utils import Cents
 
 
 def seed_strategy(e: ExchangeInterface):
@@ -32,6 +37,8 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
+    TODO: run this on demo market, and try to buy one side with another account. For
+    some reason, it gets stuck?
     TODO: remove market order on followup when sizing up (or look into buy_max_cost)
     TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
@@ -62,7 +69,9 @@ def seed_strategy(e: ExchangeInterface):
     ), "We shouldn't size up until we remove market orders from followup quantity"
     portfolio = PortfolioHistory.load_from_exchange(e, allow_side_cross=True)
     if max_value_to_trade:
-        portfolio.balance = min(portfolio.balance, Balance(max_value_to_trade))
+        portfolio.balance = min(
+            portfolio.balance, BalanceCents(int(max_value_to_trade))
+        )
 
     assert (
         portfolio.balance > min_amount_to_seed
