@@ -80,6 +80,7 @@ def seed_strategy(e: ExchangeInterface):
     open_markets = e.get_active_markets()
     tickers = [m.ticker for m in open_markets]
     tickers_to_trade = random.sample(tickers, num_markets_to_trade_on)
+    tickers_to_trade = list(set(tickers_to_trade) | (set(portfolio.positions.keys())))
 
     obs: Dict[MarketTicker, Orderbook] = {}
 
