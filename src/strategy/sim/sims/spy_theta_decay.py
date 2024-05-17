@@ -3,7 +3,7 @@ from typing import List
 
 from exchange.interface import ExchangeInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
-from helpers.types.money import Balance, Cents
+from helpers.types.money import BalanceCents
 from helpers.types.portfolio import PortfolioHistory
 from strategy.features.base.kalshi import (
     SPYRangedKalshiMarket,
@@ -75,7 +75,7 @@ def run_spy_theta_decay_strat_with_blind_simulator():
         strategy = SPYThetaDecay(kalshi_spy_markets)
         historical_features.precalculate_strategy_features(strategy=strategy)
         sim = BlindOrderSim(
-            historical_data=historical_features, starting_balance=Balance(Cents(10000))
+            historical_data=historical_features, starting_balance=BalanceCents(10000)
         )
         result: PortfolioHistory = sim.run(strategy=strategy)
         print(result)

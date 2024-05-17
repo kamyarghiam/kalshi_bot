@@ -3,7 +3,7 @@ from pathlib import Path
 
 import tqdm
 
-from helpers.types.money import Balance, Cents
+from helpers.types.money import BalanceCents
 from helpers.types.portfolio import PortfolioHistory
 from strategy.sim.abstract import StrategySimulator
 from strategy.utils import HistoricalObservationSetCursor, Strategy
@@ -20,7 +20,7 @@ class BlindOrderSim(StrategySimulator):
     def __init__(
         self,
         historical_data: HistoricalObservationSetCursor,
-        starting_balance: Balance = Balance(Cents(100_000_000)),
+        starting_balance: BalanceCents = BalanceCents(100_000_000),
     ):
         self.hist = historical_data
         self.starting_balance = starting_balance

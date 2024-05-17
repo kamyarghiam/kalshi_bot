@@ -42,7 +42,7 @@ from helpers.types.markets import (
     MarketStatus,
     MarketTicker,
 )
-from helpers.types.money import Cents, Price
+from helpers.types.money import BalanceCents, Cents, Price
 from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
 from helpers.types.orders import (
     CancelOrderResponse,
@@ -143,7 +143,7 @@ def kalshi_test_exchange_factory():
 
     @router.get(PORTFOLIO_BALANCE_URL)
     def portfolio_balance():
-        return GetPortfolioBalanceResponse(balance=Cents(1000))
+        return GetPortfolioBalanceResponse(balance=BalanceCents(1000))
 
     @router.delete(ORDERS_URL + "/{order_id}")
     def cancel_order(order_id: OrderId):

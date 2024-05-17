@@ -9,7 +9,7 @@ import tqdm.autonotebook as tqdm
 
 from data.coledb.coledb import OrderbookCursor
 from exchange.interface import MarketTicker
-from helpers.types.money import Balance, Cents, get_opposite_side_price
+from helpers.types.money import BalanceCents, get_opposite_side_price
 from helpers.types.orders import Order, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from strategy.sim.abstract import StrategySimulator
@@ -41,7 +41,7 @@ class ActiveIOCStrategySimulator(StrategySimulator):
         historical_data: HistoricalObservationSetCursor,
         ignore_price: bool = False,
         ignore_qty: bool = False,
-        starting_balance: Balance = Balance(Cents(100_000_000)),
+        starting_balance: BalanceCents = BalanceCents(100_000_000),
         latency_to_exchange: timedelta = timedelta(milliseconds=100),
         pretty: bool = False,
         logger: Logger = getLogger(__file__),

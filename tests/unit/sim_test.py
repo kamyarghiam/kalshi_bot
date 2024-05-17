@@ -4,7 +4,7 @@ import pytz
 
 from data.coledb.coledb import OrderbookCursor
 from exchange.interface import MarketTicker
-from helpers.types.money import Balance, Cents, Price
+from helpers.types.money import BalanceCents, Price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from strategy.sim.sim_types.active_ioc import ActiveIOCStrategySimulator
@@ -56,7 +56,7 @@ def test_active_ioc_strategy_simulator_simple():
         ticker,
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         kalshi_orderbook_updates=updates,
-        starting_balance=Balance(Cents(100)),
+        starting_balance=BalanceCents(100),
     )
     portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 
@@ -181,7 +181,7 @@ def test_active_ioc_strategy_simulator_ignore_price():
         historical_data=mock_historical_from_orderbook_updates(updates=updates),
         ignore_price=True,
         kalshi_orderbook_updates=updates,
-        starting_balance=Balance(Cents(100)),
+        starting_balance=BalanceCents(100),
     )
     portfolio_history = simulator.run(PredeterminedStrategy(orders_to_place=orders))
 

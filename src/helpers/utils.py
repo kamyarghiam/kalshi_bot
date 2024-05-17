@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from typing import Generic, Iterable, Iterator, TypeVar
 
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Cents, Price
+from helpers.types.money import BalanceCents, Price
 from helpers.types.orders import Order, Quantity, Side, TradeType
 
 T = TypeVar("T")
@@ -87,7 +87,7 @@ def send_alert_email(message: str):
         server.quit()
 
 
-def get_max_quantity_can_afford(portfolio_balance: Cents, price: Price):
+def get_max_quantity_can_afford(portfolio_balance: BalanceCents, price: Price):
     """Gets the max quantity we can afford to buy a contract
     at a specific price (with fees)
 

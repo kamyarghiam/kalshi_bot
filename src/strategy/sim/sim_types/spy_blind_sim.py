@@ -6,10 +6,9 @@ import pandas as pd
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance
+from helpers.types.money import BalanceCents, Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.portfolio import PortfolioHistory
-from helpers.utils import Cents
 from strategy.features.base.kalshi import daily_spy_range_kalshi_markets
 from strategy.utils import SpyStrategy
 
@@ -45,7 +44,7 @@ def run_spy_sim(
     spy_iter = spy_df.itertuples()
     obs = [db.read(m.ticker, start_dt_object, end_dt_object) for m in kalshi_markets]
 
-    portfolio = PortfolioHistory(Balance(Cents(100000)))
+    portfolio = PortfolioHistory(BalanceCents(100000))
 
     # The top values
     top_obs = [next_ob(ob) for ob in obs]

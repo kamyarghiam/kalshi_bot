@@ -6,7 +6,7 @@ import pandas as pd
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Cents
+from helpers.types.money import BalanceCents
 from helpers.types.portfolio import PortfolioHistory
 from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 
@@ -36,7 +36,7 @@ def main():
     ob = db.read(ticker, start_dt_object, end_dt_object)
 
     strat = TanModelINXZStrategy(ticker)
-    portfolio = PortfolioHistory(Balance(Cents(100000)))
+    portfolio = PortfolioHistory(BalanceCents(100000))
 
     # The top values
     top_ob = next(ob)

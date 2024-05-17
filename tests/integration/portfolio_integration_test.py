@@ -5,7 +5,7 @@ import pytest
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Cents, Price
+from helpers.types.money import BalanceCents, Cents, Price
 from helpers.types.orders import Order, OrderType, Quantity, TradeType, compute_fee
 from helpers.types.websockets.response import OrderFillWR
 from helpers.utils import Side
@@ -18,7 +18,7 @@ def test_get_unrealized_pnl(exchange_interface: ExchangeInterface):
     determined_ticker = MarketTicker("DETERMINED-YES")
     not_determined_ticker = MarketTicker("NOT-DETERMINED")
 
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
 
     order1 = Order(
         ticker=determined_ticker,
@@ -64,7 +64,7 @@ def test_reserve_order_portfolio(exchange_interface: ExchangeInterface):
     # the balance might change on demo
     req: Order = get_valid_order_on_demo_market(exchange_interface)
     balance_on_demo = exchange_interface.get_portfolio_balance().balance
-    portfolio = PortfolioHistory(Balance(balance_on_demo))
+    portfolio = PortfolioHistory(BalanceCents(balance_on_demo))
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(
             ws, [req.ticker], send_order_fills=True, send_orderbook_updates=False

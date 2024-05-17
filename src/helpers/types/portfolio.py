@@ -11,7 +11,13 @@ from pydantic import Extra
 from data.coledb.coledb import ColeDBInterface
 from helpers.types.api import Cursor, ExternalApi
 from helpers.types.markets import MarketResult, MarketTicker
-from helpers.types.money import Balance, Cents, Dollars, Price, get_opposite_side_price
+from helpers.types.money import (
+    BalanceCents,
+    Cents,
+    Dollars,
+    Price,
+    get_opposite_side_price,
+)
 from helpers.types.orderbook import GetOrderbookRequest, Orderbook
 from helpers.types.orders import (
     Order,
@@ -172,7 +178,7 @@ class ReservedOrder:
 class PortfolioHistory:
     _pickle_file = Path("last_portfolio.pickle")
 
-    def __init__(self, balance: Balance, allow_side_cross: bool = False):
+    def __init__(self, balance: BalanceCents, allow_side_cross: bool = False):
         """This class allows us to keep track of a portfolio
         in real time as well as historical information about the portfolio.
 
@@ -180,8 +186,8 @@ class PortfolioHistory:
         we are allowed to buy contracts on the opposite side before selling on the
         side we're holding"""
 
-        self._cash_balance: Balance = balance
-        self._reserved_cash: Balance = Balance(0)
+        self._cash_balance: BalanceCents = balance
+        self._reserved_cash: BalanceCents = BalanceCents(0)
         self._positions: Dict[MarketTicker, Position] = {}
         self._reserved_orders: Dict[OrderId, ReservedOrder] = {}
         self.orders: List[Order] = []
@@ -194,21 +200,21 @@ class PortfolioHistory:
         positions = [p.to_position() for p in e.get_positions()]
         balance = e.get_portfolio_balance().balance
         portfolio = PortfolioHistory(
-            Balance(balance), allow_side_cross=allow_side_cross
+            BalanceCents(balance), allow_side_cross=allow_side_cross
         )
         portfolio._positions = {p.ticker: p for p in positions}
         return portfolio
 
     @property
-    def balance(self) -> Cents:
-        return self._cash_balance.balance - self._reserved_cash.balance
+    def balance(self) -> BalanceCents:
+        return BalanceCents(self._cash_balance - self._reserved_cash)
 
     @balance.setter
-    def balance(self, value: Cents):
+    def balance(self, value: int):
         # This setter should not be used if we have a reserved cash balance
         # because we might get undesired results
-        assert self._reserved_cash.balance == Cents(0)
-        self._cash_balance.balance = value
+        assert self._reserved_cash == 0
+        self._cash_balance = BalanceCents(value)
 
     @property
     def current_exposure(self) -> Cents:
@@ -238,7 +244,7 @@ class PortfolioHistory:
 
         Reserved cash is good for setting aside some money until an order
         goes through, for example. Pass in negative amount to free up cash"""
-        self._reserved_cash += amount
+        self._reserved_cash = BalanceCents(self._reserved_cash + int(amount))
 
     def has_open_positions(self):
         return len(self._positions) > 0
@@ -292,8 +298,8 @@ class PortfolioHistory:
             f"Realized PnL (no fees): {self.realized_pnl}\n"
             + f"Fees paid: {self.fees_paid}\n"
             + f"Realized PnL (with fees): {self.realized_pnl_after_fees}\n"
-            + f"Cash left: {self._cash_balance}\n"
-            + f"Reserved cash: {self._reserved_cash}\n"
+            + f"Cash left: {BalanceCents(int(self._cash_balance))}\n"
+            + f"Reserved cash: {BalanceCents(int(self._reserved_cash))}\n"
             + f"Max exposure: {self.max_exposure}\n"
             + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
         )
@@ -554,8 +560,8 @@ class PortfolioHistory:
 
 
 class GetPortfolioBalanceResponse(ExternalApi):
-    balance: Cents
-    payout: Cents = Cents(0)
+    balance: BalanceCents
+    payout: BalanceCents = BalanceCents(0)
 
 
 class GetMarketPositionsRequest(ExternalApi):

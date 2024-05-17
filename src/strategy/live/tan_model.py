@@ -6,7 +6,7 @@ from rich.table import Table
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Cents
+from helpers.types.money import BalanceCents, Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.websockets.response import (
     OrderbookDeltaWR,
@@ -30,7 +30,7 @@ def main(is_test_run: bool = True):
         balance = e.get_portfolio_balance().balance
         ticker = get_current_inxz_ticker(e)
         strat = TanModelINXZStrategy(ticker, is_test_run)
-        portfolio = PortfolioHistory(Balance(balance))
+        portfolio = PortfolioHistory(BalanceCents(balance))
         with e.get_websocket() as ws:
             sub = OrderbookSubscription(ws, [ticker], send_order_fills=True)
             orderbook_gen = sub.continuous_receive()

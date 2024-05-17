@@ -1,6 +1,3 @@
-from functools import total_ordering
-
-
 class Price(int):
     """Provides a type for prices"""
 
@@ -40,34 +37,21 @@ class OutOfMoney(Exception):
     """Raised when we're out of money"""
 
 
-@total_ordering
-class Balance:
-    """Balance in cents"""
+class BalanceCents(int):
+    """Balance in cents.
 
-    def __init__(self, initial_balance: Cents | int):
-        if initial_balance < 0:
-            raise ValueError(f"{initial_balance} negative balance")
-        self._balance: Cents = Cents(initial_balance)
+    The reason we can't use Cents is that Cents is a float that
+    could possibly be negative. And we can't use price because
+    Balance can go beyond the range of 1 to 99.
 
-    @property
-    def balance(self) -> Cents:
-        return self._balance
+    TODO: revisit this, might need to add dunder functions. Problem
+    is that super().__add__ returns NotImplemented
+    """
 
-    @balance.setter
-    def balance(self, value: Cents):
-        self._balance = value
-
-    def __add__(self, other):
-        return Balance(self._balance + other)
-
-    def __sub__(self, other):
-        return Balance(self._balance - other)
-
-    def __eq__(self, other):
-        return self._balance == other
+    def __new__(cls, num: int):
+        if num < 0 or int(num) != num:
+            raise ValueError(f"{num} invalid balance")
+        return super(BalanceCents, cls).__new__(cls, num)
 
     def __str__(self):
-        return str(self._balance)
-
-    def __gt__(self, other):
-        return self._balance > other
+        return "$%0.2f" % (self / 100)

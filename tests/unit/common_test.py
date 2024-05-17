@@ -7,7 +7,7 @@ from mock import MagicMock, patch
 
 from helpers.types.common import URL, NonNullStr
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Balance, Cents, Dollars, Price
+from helpers.types.money import BalanceCents, Cents, Dollars, Price
 from helpers.types.orders import Quantity, Side, compute_fee
 from helpers.types.trades import ExternalTrade
 from helpers.utils import (
@@ -80,7 +80,7 @@ def test_pending_messages():
 
 def test_negative_balance():
     with pytest.raises(ValueError):
-        Balance(Cents(-50))
+        BalanceCents(-50)
 
 
 def test_cents_str():
@@ -92,7 +92,7 @@ def test_cents_str():
 
 
 def test_balance_str():
-    b = Balance(Cents(10))
+    b = BalanceCents(10)
     assert str(b) == "$0.10"
 
 
@@ -194,16 +194,27 @@ def test_merge_generators():
 
 
 def test_get_max_quantity_can_afford():
-    assert get_max_quantity_can_afford(portfolio_balance=Cents(0), price=Price(1)) == 0
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(1)) == 50
+        get_max_quantity_can_afford(portfolio_balance=BalanceCents(0), price=Price(1))
+        == 0
     )
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(100), price=Price(2)) == 33
+        get_max_quantity_can_afford(portfolio_balance=BalanceCents(100), price=Price(1))
+        == 50
     )
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(500), price=Price(11)) == 41
+        get_max_quantity_can_afford(portfolio_balance=BalanceCents(100), price=Price(2))
+        == 33
     )
     assert (
-        get_max_quantity_can_afford(portfolio_balance=Cents(1000), price=Price(99)) == 9
+        get_max_quantity_can_afford(
+            portfolio_balance=BalanceCents(500), price=Price(11)
+        )
+        == 41
+    )
+    assert (
+        get_max_quantity_can_afford(
+            portfolio_balance=BalanceCents(1000), price=Price(99)
+        )
+        == 9
     )

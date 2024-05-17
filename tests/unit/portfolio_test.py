@@ -6,7 +6,7 @@ from mock import MagicMock, patch
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTicker
-from helpers.types.money import Balance, Cents, Dollars, get_opposite_side_price
+from helpers.types.money import BalanceCents, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import (
     Order,
@@ -210,7 +210,7 @@ def test_add_duplicate_price_point():
 
 
 def test_portfolio_buy():
-    original_balance = Balance(Cents(5000))
+    original_balance = BalanceCents(5000)
     portfolio = PortfolioHistory(original_balance)
     portfolio.buy(
         Order(
@@ -222,7 +222,7 @@ def test_portfolio_buy():
         )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
-    assert portfolio._cash_balance._balance == original_balance - 5 * 100 - fees_paid
+    assert portfolio._cash_balance == original_balance - 5 * 100 - fees_paid
     assert portfolio.fees_paid == fees_paid
     portfolio.buy(
         Order(
@@ -234,10 +234,7 @@ def test_portfolio_buy():
         )
     )
     fees_paid += compute_fee(Price(10), Quantity(10))
-    assert (
-        portfolio._cash_balance._balance
-        == original_balance - 5 * 100 - 10 * 10 - fees_paid
-    )
+    assert portfolio._cash_balance == original_balance - 5 * 100 - 10 * 10 - fees_paid
     assert portfolio.fees_paid == fees_paid
     portfolio.buy(
         Order(
@@ -250,7 +247,7 @@ def test_portfolio_buy():
     )
     fees_paid += compute_fee(Price(15), Quantity(5))
     assert (
-        portfolio._cash_balance._balance
+        portfolio._cash_balance
         == original_balance - 5 * 100 - 10 * 10 - 15 * 5 - fees_paid
     )
     assert portfolio.fees_paid == fees_paid
@@ -265,7 +262,7 @@ def test_portfolio_buy():
     )
     fees_paid += compute_fee(Price(20), Quantity(25))
     assert (
-        portfolio._cash_balance._balance
+        portfolio._cash_balance
         == original_balance - 5 * 100 - 10 * 10 - 15 * 5 - 20 * 25 - fees_paid
     )
     assert portfolio.fees_paid == fees_paid
@@ -283,7 +280,7 @@ def test_portfolio_buy():
                 trade=TradeType.BUY,
             )
         )
-    money_remaining = portfolio._cash_balance._balance
+    money_remaining = portfolio._cash_balance
     assert portfolio.get_positions_value() == 5 * 100 + 10 * 10 + 15 * 5 + 20 * 25
 
     # Does not raise out of money error
@@ -311,7 +308,7 @@ def test_portfolio_buy():
 
 
 def test_portfolio_sell():
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
     assert len(portfolio._positions) == 0
     portfolio.buy(
         Order(
@@ -323,7 +320,7 @@ def test_portfolio_sell():
         )
     )
     fees_paid = compute_fee(Price(5), Quantity(100))
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 - fees_paid
+    assert portfolio._cash_balance == 5000 - 5 * 100 - fees_paid
     assert portfolio.fees_paid == fees_paid
     assert len(portfolio._positions) == 1
 
@@ -366,7 +363,7 @@ def test_portfolio_sell():
     assert portfolio.fees_paid == fees_paid
 
     assert profit1 == (100 - 50) * (6 - 5)
-    assert portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 - fees_paid
+    assert portfolio._cash_balance == 5000 - 5 * 100 + 50 * 6 - fees_paid
 
     # Sell more than there is available
     with pytest.raises(ValueError):
@@ -395,9 +392,7 @@ def test_portfolio_sell():
     sell_fee = compute_fee(Price(3), Quantity(50))
     assert fee == buy_fee + sell_fee
     fees_paid += sell_fee
-    assert (
-        portfolio._cash_balance._balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3 - fees_paid
-    )
+    assert portfolio._cash_balance == 5000 - 5 * 100 + 50 * 6 + 50 * 3 - fees_paid
     assert portfolio.fees_paid == fees_paid
 
     assert profit2 == (100 - 50) * (3 - 5)
@@ -405,7 +400,7 @@ def test_portfolio_sell():
 
 
 def test_find_sell_opportunites():
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
     portfolio.buy(
         Order(
             ticker=MarketTicker("hi"),
@@ -479,7 +474,7 @@ def test_find_sell_opportunites():
 
 
 def test_save_load(tmp_path):
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
     portfolio.buy(
         Order(
             ticker=MarketTicker("hi"),
@@ -614,7 +609,7 @@ def test_position_print():
 
 
 def test_portfolio_print():
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
     ts = datetime.datetime(2023, 11, 1, 7, 23)
     portfolio.buy(
         Order(
@@ -666,7 +661,7 @@ Orders:
 
 
 def test_get_unrealized_pnl():
-    p = PortfolioHistory(Balance(Dollars(10000)))
+    p = PortfolioHistory(BalanceCents(1000000))
     p.buy(
         Order(
             price=Price(10),
@@ -729,7 +724,7 @@ def test_get_unrealized_pnl():
 
 
 def test_place_order():
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
     buy_o = Order(
         price=Price(10),
         quantity=Quantity(100),
@@ -754,7 +749,7 @@ def test_place_order():
 
 
 def test_portfolio_reserve():
-    portfolio = PortfolioHistory(Balance(Cents(5000)))
+    portfolio = PortfolioHistory(BalanceCents(5000))
     buy_o = Order(
         price=Price(10),
         quantity=Quantity(100),
@@ -772,7 +767,7 @@ def test_portfolio_reserve():
 
 def test_portfolio_order_reserve():
     # Should not reserve on sells
-    original_balance = Balance(Cents(5000))
+    original_balance = BalanceCents(5000)
     portfolio = PortfolioHistory(original_balance)
     sell_o = Order(
         price=Price(10),
@@ -818,7 +813,7 @@ def test_portfolio_order_reserve():
     )
     assert portfolio.balance == new_balance_2, (
         portfolio.balance,
-        new_balance_2.balance,
+        new_balance_2,
     )
 
     assert len(portfolio._reserved_orders) == 2
@@ -923,7 +918,7 @@ def test_portfolio_order_reserve():
 
 
 def test_reserve_order_manual_intervention():
-    original_balance = Balance(Cents(5000))
+    original_balance = BalanceCents(5000)
     portfolio = PortfolioHistory(original_balance)
 
     # Test manual intervention (we place a trade on the website and receive fill)
@@ -968,7 +963,7 @@ def test_reserve_order_manual_intervention():
 
 
 def test_portfolio_allow_side_cross():
-    original_balance = Balance(Cents(5000))
+    original_balance = BalanceCents(5000)
     portfolio = PortfolioHistory(original_balance)
     order1 = Order(
         ticker=MarketTicker("Ticker1"),
