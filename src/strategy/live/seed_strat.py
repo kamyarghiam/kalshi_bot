@@ -130,9 +130,12 @@ def seed_strategy(e: ExchangeInterface):
                             cancel_all_seed_orders(e)
                     # Seed has been taken
                     placed_seed_order[ticker][side] = False
-                else:
+                elif followup_order_count[ticker][side] > Quantity(0):
                     # Followup order received
                     followup_order_count[ticker][side] -= qty
+                else:
+                    # Sell fill order received
+                    pass
             else:
                 raise ValueError("Received unknown data type: ", data)
             if ticker in portfolio.positions and followup_order_count[ticker][
