@@ -37,8 +37,6 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
-    TODO: run this on demo market, and try to buy one side with another account. For
-    some reason, it gets stuck?
     TODO: remove market order on followup when sizing up (or look into buy_max_cost)
     TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
@@ -62,7 +60,7 @@ def seed_strategy(e: ExchangeInterface):
     # If we fall below this threshold, we can't afford to follow up.
     # We do 101 to take fees into account.
     min_amount_to_seed: Cents = Cents(follow_up_quantity * 101)
-    num_markets_to_trade_on = 1000
+    num_markets_to_trade_on = 100
 
     assert follow_up_quantity < Quantity(
         20
@@ -112,6 +110,7 @@ def seed_strategy(e: ExchangeInterface):
                 ticker = data.msg.market_ticker
                 qty = data.msg.count
                 side = data.msg.side
+                other_side = Side.get_other_side(side)
                 portfolio.receive_fill_message(data.msg)
                 # This is one of our seeds
                 if qty == seed_quantity and placed_seed_order[ticker][side]:
@@ -121,18 +120,16 @@ def seed_strategy(e: ExchangeInterface):
                         obs[ticker],
                         follow_up_quantity,
                         portfolio,
-                        Side.get_other_side(side),
+                        other_side,
                     ):
-                        followup_order_count[data.msg.market_ticker][
-                            side
-                        ] = follow_up_quantity
+                        followup_order_count[ticker][other_side] = follow_up_quantity
                         if portfolio.balance < min_amount_to_seed:
                             print("Out of money, closing seeds")
                             # It's possible to get a seed filled while canceling orders
                             # Hopefully this will go away when we batch cancel
                             cancel_all_seed_orders(e)
                     # Seed has been taken
-                    placed_seed_order[ticker][data.msg.side] = False
+                    placed_seed_order[ticker][side] = False
                 else:
                     # Followup order received
                     followup_order_count[ticker][side] -= qty
@@ -244,7 +241,7 @@ def cancel_all_seed_orders(e: ExchangeInterface):
 
 
 def run_seed_strategy():
-    with ExchangeInterface(is_test_run=False) as e:
+    with ExchangeInterface(is_test_run=True) as e:
         try:
             seed_strategy(e)
         finally:
