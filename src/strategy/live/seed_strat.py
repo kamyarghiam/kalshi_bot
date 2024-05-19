@@ -37,6 +37,8 @@ def seed_strategy(e: ExchangeInterface):
     the market has just gained some information leading to the buy order. We
     cancel all orders when the program crashes or stops.
 
+    TODO: when deciding to sell including fees / loss from seed order
+    TODO: someone can game your strategy because you place seed orders on book updates
     TODO: remove market order on followup when sizing up (or look into buy_max_cost)
     TODO: sell negative positions after holding for a certain amount of time?
     TODO: sell back order with limit order?
@@ -95,6 +97,9 @@ def seed_strategy(e: ExchangeInterface):
         ticker: {Side.YES: Quantity(0), Side.NO: Quantity(0)}
         for ticker in tickers_to_trade
     }
+    placed_sell_order: Dict[MarketTicker, Dict[Side, bool]] = {
+        ticker: {Side.YES: False, Side.NO: False} for ticker in tickers_to_trade
+    }
     with e.get_websocket() as ws:
         sub = OrderbookSubscription(ws, tickers_to_trade, send_order_fills=True)
         orderbook_gen = sub.continuous_receive()
@@ -139,23 +144,29 @@ def seed_strategy(e: ExchangeInterface):
                     followup_order_count[ticker][side] -= qty
                 else:
                     # Sell fill order received
-                    pass
+                    if portfolio.positions[ticker].total_quantity == 0:
+                        # We've sold everything
+                        placed_sell_order[ticker][side] = False
             else:
                 raise ValueError("Received unknown data type: ", data)
-            if ticker in portfolio.positions and followup_order_count[ticker][
-                portfolio.positions[ticker].side
-            ] == Quantity(0):
-                # This means we're holding a position on this market and not expecting
-                # more quantity to be filled on this market
-                sell_order = obs[ticker].sell_order(portfolio.positions[ticker].side)
-                if sell_order is not None:
-                    sell_order.quantity = min(
-                        sell_order.quantity,
-                        portfolio.positions[ticker].total_quantity,
-                    )
-                    pnl, fees = portfolio.potential_pnl(sell_order)
-                    if pnl - fees > 0:
-                        e.place_order(sell_order)
+            if ticker in portfolio.positions:
+                side = portfolio.positions[ticker].side
+                if (
+                    followup_order_count[ticker][side] == Quantity(0)
+                    and not placed_sell_order[ticker][side]
+                ):
+                    # We're holding a position on this market and not expecting more qty
+                    # to be filled on this market and we haven't placed a sell order yet
+                    sell_order = obs[ticker].sell_order(side)
+                    if sell_order is not None:
+                        sell_order.quantity = min(
+                            sell_order.quantity,
+                            portfolio.positions[ticker].total_quantity,
+                        )
+                        pnl, fees = portfolio.potential_pnl(sell_order)
+                        if pnl - fees > 0:
+                            e.place_order(sell_order)
+                            placed_sell_order[ticker][side] = True
             else:
                 for side in Side:
                     if not placed_seed_order[ob.market_ticker][side]:
@@ -224,21 +235,17 @@ def place_followup_order(
         print(
             f"Followup: {order.side} {order.quantity} {order.price} {ob.market_ticker}"
         )
-        # Cancel resting orders
-        orders = e.get_orders(
-            request=GetOrdersRequest(
-                status=OrderStatus.RESTING, ticker=ob.market_ticker
-            )
-        )
-        for o in orders:
-            e.cancel_order(o.order_id)
+        cancel_all_seed_orders(e, ob.market_ticker)
         return True
     return False
 
 
-def cancel_all_seed_orders(e: ExchangeInterface):
-    print("Cancelling all seed orders...")
-    orders = e.get_orders(request=GetOrdersRequest(status=OrderStatus.RESTING))
+def cancel_all_seed_orders(e: ExchangeInterface, ticker: MarketTicker | None = None):
+    print_suffix = "on all markets" if ticker is None else f"on market {ticker}"
+    print(f"Cancelling all seed orders {print_suffix}")
+    orders = e.get_orders(
+        request=GetOrdersRequest(status=OrderStatus.RESTING, ticker=ticker)
+    )
     print(f"Found {len(orders)} orders to cancel...")
     for order in orders:
         try:
