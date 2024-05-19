@@ -51,6 +51,7 @@ def seed_strategy(e: ExchangeInterface):
     you can create a competing bot on the demo exchange
     TODO: batch cancel and create seed orders
     TODO: design system to allow for strategy changes without canceling/placing orders
+    TODO: instead of placing seeds, what if you just listen to trades?
 
     Followup analysis: see which markets perform the best with this
     strategy
@@ -132,11 +133,17 @@ def seed_strategy(e: ExchangeInterface):
                         other_side,
                     ):
                         followup_order_count[ticker][other_side] = follow_up_quantity
+
+                        # Cancel the seed on the other side
+                        cancel_all_seed_orders(e, ob.market_ticker)
+                        placed_seed_order[ticker][other_side] = False
+
                         if portfolio.balance < min_amount_to_seed:
                             print("Out of money, closing seeds")
                             # It's possible to get a seed filled while canceling orders
                             # Hopefully this will go away when we batch cancel
                             cancel_all_seed_orders(e)
+
                     # Seed has been taken
                     placed_seed_order[ticker][side] = False
                 elif followup_order_count[ticker][side] > Quantity(0):
@@ -235,7 +242,6 @@ def place_followup_order(
         print(
             f"Followup: {order.side} {order.quantity} {order.price} {ob.market_ticker}"
         )
-        cancel_all_seed_orders(e, ob.market_ticker)
         return True
     return False
 
