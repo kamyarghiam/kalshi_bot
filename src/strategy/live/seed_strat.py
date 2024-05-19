@@ -48,6 +48,7 @@ def seed_strategy(e: ExchangeInterface):
     TODO: review, refactor, and this this whole strategy please. It can be fun. Maybe
     you can create a competing bot on the demo exchange
     TODO: batch cancel and create seed orders
+    TODO: design system to allow for strategy changes without canceling/placing orders
 
     Followup analysis: see which markets perform the best with this
     strategy
@@ -60,7 +61,7 @@ def seed_strategy(e: ExchangeInterface):
     # If we fall below this threshold, we can't afford to follow up.
     # We do 101 to take fees into account.
     min_amount_to_seed: Cents = Cents(follow_up_quantity * 101)
-    num_markets_to_trade_on = 100
+    num_markets_to_trade_on = 1000
 
     assert follow_up_quantity < Quantity(
         20
@@ -112,6 +113,9 @@ def seed_strategy(e: ExchangeInterface):
                 side = data.msg.side
                 other_side = Side.get_other_side(side)
                 portfolio.receive_fill_message(data.msg)
+                print(
+                    f"Fill! {ticker} {qty} {side}",
+                )
                 # This is one of our seeds
                 if qty == seed_quantity and placed_seed_order[ticker][side]:
                     # Followup order on the order side
@@ -209,8 +213,10 @@ def place_followup_order(
     side: Side,
 ):
     order = ob.buy_order(side)
-    if order is not None and portfolio.can_afford(order):
-        order.quantity = q
+    if order is None:
+        return False
+    order.quantity = q
+    if portfolio.can_afford(order):
         # We'll take whatever price
         # TODO: danger! might be bad if we size up. Could sweep market
         order.order_type = OrderType.MARKET
@@ -244,7 +250,7 @@ def cancel_all_seed_orders(e: ExchangeInterface):
 
 
 def run_seed_strategy():
-    with ExchangeInterface(is_test_run=True) as e:
+    with ExchangeInterface(is_test_run=False) as e:
         try:
             seed_strategy(e)
         finally:
