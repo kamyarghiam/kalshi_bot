@@ -10,9 +10,9 @@ from helpers.utils import Side
 
 
 class GetTradesRequest(ExternalApi):
-    ticker: MarketTicker
-    min_ts: datetime | None
-    max_ts: datetime | None
+    ticker: MarketTicker | None
+    min_ts: int | None
+    max_ts: int | None
     cursor: Cursor | None = None
     limit: int | None = None
 

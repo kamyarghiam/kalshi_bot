@@ -184,7 +184,7 @@ class ExchangeInterface:
 
     def get_trades(
         self,
-        ticker: MarketTicker,
+        ticker: MarketTicker | None = None,
         min_ts: datetime | None = None,
         max_ts: datetime | None = None,
         limit: int | None = None,
@@ -201,8 +201,8 @@ class ExchangeInterface:
         but also lets you adjust how much space you want to hold in memory. Max 100"""
         request = GetTradesRequest(
             ticker=ticker,
-            min_ts=min_ts,
-            max_ts=max_ts,
+            min_ts=int(min_ts.timestamp()) if min_ts is not None else None,
+            max_ts=int(max_ts.timestamp()) if max_ts is not None else None,
             limit=limit,
         )
         while True:
