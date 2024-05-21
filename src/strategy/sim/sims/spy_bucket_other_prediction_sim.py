@@ -11,7 +11,7 @@ def spy_sim_wrapper(date: datetime):
 def main():
     from multiprocessing import Pool, cpu_count
 
-    from data.historical.databento import HistoricalDatabento
+    from data.databento.databento import HistoricalDatabento
 
     h = HistoricalDatabento()
     dates = h.list_dates_stored()

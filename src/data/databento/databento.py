@@ -2,7 +2,7 @@ import asyncio
 import time as time_module
 from datetime import datetime, time
 from pathlib import Path
-from typing import List
+from typing import Generator, List
 
 import databento as db
 import pytz
@@ -10,6 +10,7 @@ import pytz
 from data.coledb.coledb import ColeDBInterface
 from helpers.constants import LOCAL_STORAGE_FOLDER
 from helpers.types.auth import Auth
+from helpers.types.money import Cents
 
 
 class JobId(str):
@@ -132,3 +133,28 @@ def get_utc_datetime_on_day(dt: datetime):
     formatted_dt_400_pm_utc = dt_400_pm_utc.strftime("%Y-%m-%dT%H:%M:%S%z")
 
     return formatted_dt_930_am_utc, formatted_dt_400_pm_utc
+
+
+class LiveDatabento:
+    """Live databento client for SPY"""
+
+    def __init__(self, is_test_run: bool = True):
+        self._auth = Auth(is_test_run)
+        self._client = db.Live(key=self._auth.databento_api_key)
+        self._client.subscribe(
+            dataset="DBEQ.BASIC",
+            schema="MBP-1",
+            stype_in="raw_symbol",
+            symbols="SPY",
+        )
+
+    def stream_data(self) -> Generator[Cents, None, None]:
+        """Gives the next price"""
+        for msg in self._client:
+            if isinstance(msg, (db.SymbolMappingMsg, db.SystemMsg)):
+                continue
+            elif isinstance(msg, db.MBP1Msg):
+                price = round((msg.price / 1e7))
+                yield Cents(price)
+            else:
+                raise ValueError("Unknown databento message: ", msg)

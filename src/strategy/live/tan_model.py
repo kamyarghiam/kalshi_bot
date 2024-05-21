@@ -3,6 +3,7 @@ import time
 from rich.live import Live
 from rich.table import Table
 
+from data.databento.databento import LiveDatabento
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
@@ -13,7 +14,6 @@ from helpers.types.websockets.response import (
     OrderbookSnapshotWR,
     OrderFillWR,
 )
-from strategy.live.databento.live_reader import Databento
 from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
 from strategy.utils import PortfolioHistory, merge_generators
 
@@ -23,7 +23,7 @@ def main(is_test_run: bool = True):
     num_snapshot_msgs = 0
     num_delta_msgs = 0
 
-    databento = Databento(is_test_run)
+    databento = LiveDatabento(is_test_run)
     last_ob: Orderbook | None = None
     last_spy_price: Cents | None = None
     with ExchangeInterface(is_test_run=is_test_run) as e:
@@ -60,7 +60,7 @@ def main(is_test_run: bool = True):
                         num_delta_msgs += 1
                         last_ob = last_ob.apply_delta(data.msg)
                     elif isinstance(data, Cents):
-                        # Databento data
+                        # LiveDatabento data
                         last_spy_price = data
                         num_spy_msgs += 1
                     elif isinstance(data, OrderFillWR):
