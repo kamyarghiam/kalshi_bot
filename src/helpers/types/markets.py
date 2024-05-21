@@ -4,6 +4,7 @@ from typing import List, Union
 from pydantic import BaseModel, Extra
 
 from helpers.types.api import Cursor, ExternalApi
+from helpers.types.money import Price
 
 
 class SeriesTicker(str):
@@ -63,6 +64,8 @@ class Market(BaseModel):
     ticker: MarketTicker
     result: MarketResult
     liquidity: int = 0
+    # Last Yes price traded on this market
+    last_price: Price | None = None
 
     class Config:
         extra = Extra.allow

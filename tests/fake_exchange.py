@@ -296,7 +296,12 @@ def kalshi_test_exchange_factory():
             for _ in range(100)
         ]
         # For INXZ test
-        inxz_market = random_data(Market)
+        inxz_market = random_data(
+            Market,
+            custom_args={
+                Price: lambda: Price(random.randint(1, 99)),
+            },
+        )
         inxz_market.ticker = MarketTicker("INXZ-test")
         inxz_market.status = MarketStatus.ACTIVE
 
