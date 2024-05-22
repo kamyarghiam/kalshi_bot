@@ -2,7 +2,7 @@ import os
 import typing
 from datetime import datetime, timedelta
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from helpers.constants import (
     API_VERSION_ENV_VAR,
@@ -43,9 +43,8 @@ class DatabentoAPIKey(NonNullStr):
     """Api key for databento"""
 
 
-class LogInResponse(
-    ExternalApi, allow_population_by_field_name=True
-):  # type:ignore[call-arg]
+class LogInResponse(ExternalApi):  # type:ignore[call-arg]
+    model_config = ConfigDict(populate_by_name=True)
     member_id: MemberId
     member_id_and_token: MemberIdAndToken = Field(alias="token")
 

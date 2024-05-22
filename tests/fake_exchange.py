@@ -366,9 +366,8 @@ def kalshi_test_exchange_factory():
         """Handles websocket requests"""
         await websocket.accept()
         while True:
-            data: WebsocketRequest = WebsocketRequest.parse_raw(
-                await websocket.receive_text()
-            )
+            req = await websocket.receive_text()
+            data: WebsocketRequest = WebsocketRequest.model_validate_json(req)
             await process_request(websocket, data)
 
     @app.middleware("https")

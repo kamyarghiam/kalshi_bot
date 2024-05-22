@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from matplotlib import pyplot as plt
-from pydantic import Extra
 
 from data.coledb.coledb import ColeDBInterface
 from helpers.types.api import Cursor, ExternalApi
@@ -580,9 +579,6 @@ class ApiMarketPosition(ExternalApi):
     fees_paid: Cents
     market_exposure: Cents
 
-    class Config:
-        extra = Extra.allow
-
     def to_position(self) -> Position:
         assert self.position != 0, "Not holding any side"
         side = Side.NO if self.position < 0 else Side.YES
@@ -603,9 +599,6 @@ class ApiMarketPosition(ExternalApi):
 class GetMarketPositionsResponse(ExternalApi):
     market_positions: List[ApiMarketPosition]
     cursor: Cursor
-
-    class Config:
-        extra = Extra.allow
 
     def has_empty_cursor(self) -> bool:
         return len(self.cursor) == 0

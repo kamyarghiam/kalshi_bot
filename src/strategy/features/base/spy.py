@@ -4,8 +4,7 @@ import zoneinfo
 
 import pandas as pd
 
-from data.backends.s3 import S3Path, sync_remote_to_local
-from helpers.constants import LOCAL_STORAGE_FOLDER, RAW_FEATURES_BUCKET
+from helpers.constants import LOCAL_STORAGE_FOLDER
 from strategy.utils import ObservationCursor, observation_cursor_from_df
 
 
@@ -21,15 +20,6 @@ _DATA_PATH_COMPONENTS = ("databento", "xnas-itch", "spy")
 _DATA_LOCAL_PATH = LOCAL_STORAGE_FOLDER
 for c in _DATA_PATH_COMPONENTS:
     _DATA_LOCAL_PATH /= c
-
-
-def sync_to_local():
-    sync_remote_to_local(
-        remote=S3Path(
-            bucket=RAW_FEATURES_BUCKET, path_components=_DATA_PATH_COMPONENTS
-        ),
-        local=_DATA_LOCAL_PATH,
-    )
 
 
 def es_data_file_to_clean_df(es_file: pathlib.Path) -> pd.DataFrame:

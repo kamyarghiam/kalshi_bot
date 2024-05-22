@@ -5,9 +5,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Union
+from typing import Any, List, Union
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 from helpers.types.api import Cursor, ExternalApi
 from helpers.types.markets import MarketTicker
@@ -16,6 +17,12 @@ from helpers.types.money import Cents, Price, get_opposite_side_price
 
 class QuantityDelta(int):
     """Positive means increase, negative means decrease"""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(int))
 
 
 class Quantity(int):
@@ -34,6 +41,12 @@ class Quantity(int):
 
     def __sub__(self, delta: Union[QuantityDelta, "Quantity"]):  # type:ignore[override]
         return Quantity(super().__sub__(delta))
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(int))
 
 
 class Side(str, Enum):
@@ -65,9 +78,21 @@ def compute_fee(price: Price, quantity: Quantity) -> Cents:
 class OrderId(str):
     """Id for an order that we placed"""
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
+
 
 class TradeId(str):
     """Id for trades placed. A trade is a confirmed order"""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
 
 
 # Unsafe hash is for CreateOrderRequest to create unique id for order
@@ -137,8 +162,7 @@ class Order:
 
 
 class CreateOrderRequest(ExternalApi):
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
     action: TradeType
     client_order_id: str
@@ -170,9 +194,7 @@ class OrderStatus(str, Enum):
 
 
 class InnerCreateOrderResponse(BaseModel):
-    class Config:
-        extra = Extra.allow
-        use_enum_values = True
+    model_config = ConfigDict(extra="allow", use_enum_values=True)
 
     status: OrderStatus
     order_id: OrderId
@@ -186,17 +208,11 @@ class GetOrdersRequest(ExternalApi):
     status: OrderStatus | None = None
     ticker: MarketTicker | None = None
     cursor: Cursor | None = None
-    # Note: there are more fields you can filter,
-    # see Kalshi api docs.
-
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class OrderAPIResponse(ExternalApi):
-    class Config:
-        extra = Extra.allow
-        use_enum_values = True
+    model_config = ConfigDict(extra="allow", use_enum_values=True)
 
     client_order_id: OrderId
     order_id: OrderId

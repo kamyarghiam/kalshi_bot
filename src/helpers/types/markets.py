@@ -1,7 +1,8 @@
 from enum import Enum
-from typing import List, Union
+from typing import Any, List, Union
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 from helpers.types.api import Cursor, ExternalApi
 from helpers.types.money import Price
@@ -23,6 +24,12 @@ class MarketTicker(str):
     """Full market tickers on the exchange.
 
     Example: CPICORE-23JUL-TN0.1"""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
 
 
 Ticker = Union[MarketTicker, EventTicker, SeriesTicker]
@@ -67,16 +74,11 @@ class Market(BaseModel):
     # Last Yes price traded on this market
     last_price: Price | None = None
 
-    class Config:
-        extra = Extra.allow
-
 
 class GetMarketsRequest(ExternalApi):
     status: MarketStatus
     cursor: Cursor | None = None
-
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class GetMarketsResponse(ExternalApi):

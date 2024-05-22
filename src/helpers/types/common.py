@@ -1,5 +1,8 @@
 import urllib.parse
-from typing import Union
+from typing import Any, Union
+
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 
 class NonNullStr(str):
@@ -11,6 +14,12 @@ class NonNullStr(str):
                 f"Value for {cls} was None. Did you specify your env vars?"
             )
         return str.__new__(cls, s)
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
 
 
 class URL(NonNullStr):

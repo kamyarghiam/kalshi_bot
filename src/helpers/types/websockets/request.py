@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Generic, List, TypeVar
 
-from pydantic import BaseModel, Extra, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from helpers.types.markets import MarketTicker
 from helpers.types.websockets.common import Command, CommandId, SubscriptionId
@@ -29,9 +29,7 @@ class UpdateSubscriptionAction(str, Enum):
 
 
 class RequestParams(BaseModel):
-    class Config:
-        use_enum_values = True
-        extra = Extra.allow
+    model_config = ConfigDict(use_enum_values=True, extra="allow")
 
 
 class SubscribeRP(RequestParams):
@@ -55,7 +53,8 @@ class UpdateSubscriptionRP(RequestParams):
     market_tickers: List[MarketTicker]
     action: UpdateSubscriptionAction
 
-    @validator("sids")
+    @field_validator("sids")
+    @classmethod
     @classmethod
     def check_storage_type(cls, sids: List[SubscriptionId]):
         if len(sids) != 1:
@@ -74,10 +73,8 @@ class WebsocketRequest(BaseModel, Generic[RP]):
     id: CommandId
     cmd: Command
     params: RP
-
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
     def parse_params(self, params_class: type[RP]):
         """Converts the params abstract class to something more specific"""
-        self.params = params_class.parse_obj(self.params)
+        self.params = params_class.model_validate(self.params.model_dump())

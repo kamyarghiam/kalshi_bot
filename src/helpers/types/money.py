@@ -1,3 +1,9 @@
+from typing import Any
+
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
+
+
 class Price(int):
     """Provides a type for prices"""
 
@@ -8,6 +14,12 @@ class Price(int):
 
     def __str__(self):
         return f"{super().__str__()}¢"
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(int))
 
 
 class Cents(float):
@@ -21,6 +33,12 @@ class Cents(float):
 
     def __str__(self):
         return "$%0.2f" % (self / 100)
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(float))
 
 
 class Dollars(Cents):
@@ -55,3 +73,9 @@ class BalanceCents(int):
 
     def __str__(self):
         return "$%0.2f" % (self / 100)
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(int))

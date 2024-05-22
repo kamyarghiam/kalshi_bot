@@ -1,7 +1,8 @@
-from typing import Callable
+from typing import Any, Callable
 
 import ratelimit
-from pydantic import BaseModel
+from pydantic import BaseModel, GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 
 class ExternalApi(BaseModel):
@@ -14,6 +15,12 @@ class Cursor(str):
     the next page containing limit records. An empty value of this field indicates there
     is no next page.
     """
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
 
 
 class RateLimit:

@@ -4,9 +4,7 @@ from time import sleep
 from rich.live import Live
 from rich.table import Table
 
-from data.backends.s3 import S3Path
 from data.coledb.coledb import ColeDBInterface
-from data.coledb.remote import _DEFAULT_COLEDB_S3_PATH, sync_to_remote
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.websockets.response import OrderbookDeltaWR, OrderbookSnapshotWR
@@ -83,7 +81,6 @@ def collect_orderbook_data(
 def retry_collect_orderbook_data(
     exchange_interface: ExchangeInterface,
     cole: ColeDBInterface = ColeDBInterface(),
-    remote: S3Path | None = None,
 ):
     """Adds retries to collect_orderbook_data"""
     time_between_emails = timedelta(days=1)
@@ -92,8 +89,6 @@ def retry_collect_orderbook_data(
     while True:
         try:
             collect_orderbook_data(exchange_interface=exchange_interface, cole=cole)
-            if remote:
-                sync_to_remote(cole=cole, remote=remote)
         except Exception as e:
             error_msg = f"Received error: {str(e)}. Re-running collect orderbook algo"
             print(error_msg)
@@ -107,5 +102,4 @@ if __name__ == "__main__":
     retry_collect_orderbook_data(
         # pragma: no cover
         ExchangeInterface(is_test_run=False),
-        remote=_DEFAULT_COLEDB_S3_PATH,
     )

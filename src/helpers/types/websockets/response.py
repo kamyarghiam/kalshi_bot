@@ -3,7 +3,7 @@ import typing
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, TypeVar
 
-from pydantic import BaseModel, Extra, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
@@ -28,10 +28,7 @@ WR = TypeVar("WR", bound="WebsocketResponse")
 
 class WebsocketResponse(BaseModel):
     type: Type
-
-    class Config:
-        use_enum_values = True
-        extra = Extra.allow
+    model_config = ConfigDict(use_enum_values=True, extra="allow")
 
     def convert(self, sub_class: typing.Type[WR]) -> WR:
         """Converts a websocket response to the specific type it should be
@@ -44,9 +41,6 @@ class WebsocketResponse(BaseModel):
 
 class ResponseMessage(BaseModel):
     """Msg attribute of the websocket response"""
-
-    class Config:
-        extra = Extra.allow
 
     def encode(self) -> bytes:
         return pickle.dumps(self)
@@ -78,7 +72,8 @@ class OrderbookSnapshotRM(ResponseMessage):
     # The timestamp of receiving the message from the exchange
     ts: datetime = Field(default_factory=datetime.now)
 
-    @validator("yes", "no", pre=True)
+    @field_validator("yes", "no", mode="before")
+    @classmethod
     def validate_iterable(cls, input_levels: List[Sequence[int]]):
         """Converts levels into Price and Quantity and makes sure it's sorted"""
         output_levels: List[Tuple[Price, Quantity]] = []
