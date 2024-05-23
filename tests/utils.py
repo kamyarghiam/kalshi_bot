@@ -71,10 +71,9 @@ def get_valid_order_on_demo_market(
     Resting: whether to place resting order
     """
     assert e.is_test_run
-    active_markets = e.get_active_markets(pages=20)
     positions = e.get_positions()
     market_tickers_with_positions = set([m.ticker for m in positions])
-    for market in active_markets:
+    for market in e.get_active_markets(pages=200):
         if market.ticker in market_tickers_with_positions:
             # We don't want to place an order on a market where we have a position
             continue

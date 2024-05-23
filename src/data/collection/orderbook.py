@@ -35,7 +35,7 @@ def collect_orderbook_data(
     """
     is_test_run = exchange_interface.is_test_run
     pages = 1 if is_test_run else None
-    open_markets = exchange_interface.get_active_markets(pages=pages)
+    open_markets = list(exchange_interface.get_active_markets(pages=pages))
     market_tickers = [market.ticker for market in open_markets]
     db = cole
     num_snapshot_msgs = 0
@@ -72,7 +72,9 @@ def collect_orderbook_data(
                 if (now := datetime.now()) - last_update_time > timedelta(hours=8) and (
                     time_5pm <= now.hour or now.hour <= time_5am
                 ):
-                    open_markets = exchange_interface.get_active_markets(pages=pages)
+                    open_markets = list(
+                        exchange_interface.get_active_markets(pages=pages)
+                    )
                     market_tickers = [market.ticker for market in open_markets]
                     sub.update_subscription(market_tickers)
                     last_update_time = now

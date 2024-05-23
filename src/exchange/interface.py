@@ -147,13 +147,15 @@ class ExchangeInterface:
             )
         ).order
 
-    def get_active_markets(self, pages: int | None = None) -> List[Market]:
+    def get_active_markets(
+        self, pages: int | None = None
+    ) -> Generator[Market, None, None]:
         """Gets all active markets on the exchange
 
         If pages is None, gets all active markets. If pages is set, we only
         send that many pages of markets"""
         response = self._get_markets(GetMarketsRequest(status=MarketStatus.OPEN))
-        markets: List[Market] = response.markets
+        yield from response.markets
 
         while (
             pages is None or (pages := pages - 1)
@@ -161,9 +163,7 @@ class ExchangeInterface:
             response = self._get_markets(
                 GetMarketsRequest(status=MarketStatus.OPEN, cursor=response.cursor)
             )
-            markets.extend(response.markets)
-
-        return markets
+            yield from response.markets
 
     def get_market(self, ticker: MarketTicker) -> Market:
         return GetMarketResponse.model_validate(

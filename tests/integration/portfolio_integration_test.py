@@ -78,8 +78,8 @@ def test_reserve_order_portfolio(exchange_interface: ExchangeInterface):
                 assert fill_msg.msg.order_id == order_id
                 assert fill_msg.msg.count == req.quantity
                 portfolio.receive_fill_message(fill_msg.msg)
-                # We sleep 1 second to give Kalshi some time to update their books
-                sleep(1)
+                # We sleep 2 second to give Kalshi some time to update their books
+                sleep(2)
                 assert (
                     portfolio.balance
                     == exchange_interface.get_portfolio_balance().balance

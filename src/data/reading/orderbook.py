@@ -76,7 +76,7 @@ def live_data_reader(
     exchange_interface: ExchangeInterface,
 ) -> Generator[OrderbookSnapshotRM | OrderbookDeltaRM, None, None]:
     pages = 10 if exchange_interface.is_test_run else None
-    open_markets = exchange_interface.get_active_markets(pages=pages)
+    open_markets = list(exchange_interface.get_active_markets(pages=pages))
     market_tickers = [market.ticker for market in open_markets]
     with exchange_interface.get_websocket() as ws:
         sub = OrderbookSubscription(ws, market_tickers)

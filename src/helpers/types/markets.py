@@ -71,8 +71,8 @@ class Market(BaseModel):
     ticker: MarketTicker
     result: MarketResult
     liquidity: int = 0
-    # Last Yes price traded on this market
-    last_price: Price | None = None
+    # Last Yes price traded on this market. Can be 0
+    last_price: Price | int = 0
 
 
 class GetMarketsRequest(ExternalApi):

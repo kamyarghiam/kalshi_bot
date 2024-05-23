@@ -91,7 +91,7 @@ def main(is_test_run: bool = True):
 
 def get_current_inxz_ticker(e: ExchangeInterface) -> MarketTicker:
     print("Getting inxz ticker..")
-    active_markets = e.get_active_markets()
+    active_markets = list(e.get_active_markets())
     tickers = [market.ticker for market in active_markets]
     inxz_tickers = [ticker for ticker in tickers if "INXZ" in ticker]
     assert len(inxz_tickers) == 1, f"There is not just one inxz ticker: {inxz_tickers}"

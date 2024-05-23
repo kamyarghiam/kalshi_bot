@@ -79,7 +79,7 @@ def seed_strategy(e: ExchangeInterface):
         portfolio.balance > min_amount_to_seed
     ), "Either not enough money in account or increase max_value_to_trade"
 
-    open_markets = e.get_active_markets()
+    open_markets = list(e.get_active_markets())
     tickers = [m.ticker for m in open_markets]
     tickers_to_trade = random.sample(tickers, num_markets_to_trade_on)
     tickers_to_trade = list(set(tickers_to_trade) | (set(portfolio.positions.keys())))
