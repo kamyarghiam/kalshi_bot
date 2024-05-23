@@ -13,9 +13,6 @@ from helpers.types.orders import Quantity
 
 @pytest.mark.usefixtures("local_only")
 def test_live_orderbook_reader(exchange_interface: ExchangeInterface):
-    import pdb
-
-    pdb.set_trace()
     reader = OrderbookReader.live(exchange_interface)
 
     msg1 = next(reader)

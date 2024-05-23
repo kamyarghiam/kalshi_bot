@@ -719,7 +719,7 @@ class ColeDBInterface:
             b.read(padding)
 
         # Construct does not do validation, faster
-        return OrderbookDeltaRM.construct(
+        return OrderbookDeltaRM.model_construct(
             market_ticker=ticker,
             price=Price(price),
             delta=QuantityDelta(delta),
@@ -753,7 +753,7 @@ class ColeDBInterface:
         ts = ts.astimezone(ColeDBInterface.tz)
         num_bits_read += timestamp_bits_length
 
-        snapshot_rm = OrderbookSnapshotRM.construct(
+        snapshot_rm = OrderbookSnapshotRM.model_construct(
             market_ticker=ticker, ts=ts, yes=[], no=[]
         )
 

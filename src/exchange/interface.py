@@ -99,7 +99,7 @@ class ExchangeInterface:
         print(request.__repr__())
         raw_resp = self._connection.post(ORDERS_URL, request)
 
-        resp: CreateOrderResponse = CreateOrderResponse.parse_obj(raw_resp)
+        resp: CreateOrderResponse = CreateOrderResponse.model_validate(raw_resp)
         if (
             resp.order.status == OrderStatus.EXECUTED
             or resp.order.status == OrderStatus.RESTING
@@ -108,7 +108,7 @@ class ExchangeInterface:
         return None
 
     def get_exchange_status(self):
-        return ExchangeStatusResponse.parse_obj(
+        return ExchangeStatusResponse.model_validate(
             self._connection.get(EXCHANGE_STATUS_URL)
         )
 
@@ -133,15 +133,15 @@ class ExchangeInterface:
         return orders
 
     def _get_orders(self, request: GetOrdersRequest) -> GetOrdersResponse:
-        return GetOrdersResponse.parse_obj(
+        return GetOrdersResponse.model_validate(
             self._connection.get(
                 url=ORDERS_URL,
-                params=request.dict(exclude_none=True),
+                params=request.model_dump(exclude_none=True),
             )
         )
 
     def cancel_order(self, order_id: OrderId) -> OrderAPIResponse:
-        return CancelOrderResponse.parse_obj(
+        return CancelOrderResponse.model_validate(
             self._connection.delete(
                 url=ORDERS_URL.add(order_id),
             )
@@ -166,14 +166,14 @@ class ExchangeInterface:
         return markets
 
     def get_market(self, ticker: MarketTicker) -> Market:
-        return GetMarketResponse.parse_obj(
+        return GetMarketResponse.model_validate(
             self._connection.get(
                 url=MARKETS_URL.add(URL(f"/{ticker}")),
             )
         ).market
 
     def get_market_orderbook(self, request: GetOrderbookRequest) -> Orderbook:
-        return GetOrderbookResponse.parse_obj(
+        return GetOrderbookResponse.model_validate(
             self._connection.get(
                 url=MARKETS_URL.add(f"{request.ticker}").add(ORDERBOOK_URL),
                 params=dict(depth=str(request.depth))
@@ -206,10 +206,10 @@ class ExchangeInterface:
             limit=limit,
         )
         while True:
-            response = GetTradesResponse.parse_obj(
+            response = GetTradesResponse.model_validate(
                 self._connection.get(
                     url=TRADES_URL,
-                    params=request.dict(exclude_none=True),
+                    params=request.model_dump(exclude_none=True),
                 )
             )
             yield from [trade.to_internal_trade() for trade in response.trades]
@@ -218,7 +218,7 @@ class ExchangeInterface:
             request.cursor = response.cursor
 
     def get_portfolio_balance(self) -> GetPortfolioBalanceResponse:
-        return GetPortfolioBalanceResponse.parse_obj(
+        return GetPortfolioBalanceResponse.model_validate(
             self._connection.get(
                 url=PORTFOLIO_BALANCE_URL,
             )
@@ -242,18 +242,18 @@ class ExchangeInterface:
     def _get_positions(
         self, request: GetMarketPositionsRequest
     ) -> GetMarketPositionsResponse:
-        return GetMarketPositionsResponse.parse_obj(
+        return GetMarketPositionsResponse.model_validate(
             self._connection.get(
                 url=POSITION_URL,
-                params=request.dict(exclude_none=True),
+                params=request.model_dump(exclude_none=True),
             )
         )
 
     def _get_markets(self, request: GetMarketsRequest) -> GetMarketsResponse:
-        return GetMarketsResponse.parse_obj(
+        return GetMarketsResponse.model_validate(
             self._connection.get(
                 url=MARKETS_URL,
-                params=request.dict(exclude_none=True),
+                params=request.model_dump(exclude_none=True),
             )
         )
 

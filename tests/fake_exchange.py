@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List
 
+import starlette
 from fastapi import APIRouter, FastAPI, Request
 from fastapi import WebSocket as FastApiWebSocket
 from starlette.responses import JSONResponse
@@ -366,7 +367,10 @@ def kalshi_test_exchange_factory():
         """Handles websocket requests"""
         await websocket.accept()
         while True:
-            req = await websocket.receive_text()
+            try:
+                req = await websocket.receive_text()
+            except starlette.websockets.WebSocketDisconnect:
+                return
             data: WebsocketRequest = WebsocketRequest.model_validate_json(req)
             await process_request(websocket, data)
 
@@ -438,7 +442,7 @@ def kalshi_test_exchange_factory():
                 type=Type.ERROR,
                 msg=ErrorRM(code=6, msg="Already subscribed"),
             )
-            await websocket.send_text(error_response.json(exclude_none=True))
+            await websocket.send_text(error_response.model_dump_json(exclude_none=True))
             sid = storage.subscribed_channels[channel]
         else:
             # Send subscribed
@@ -450,7 +454,9 @@ def kalshi_test_exchange_factory():
                 type=Type.SUBSCRIBED,
                 msg=SubscribedRM(channel=channel, sid=sid),
             )
-            await websocket.send_text(subscribed_response.json(exclude_none=True))
+            await websocket.send_text(
+                subscribed_response.model_dump_json(exclude_none=True)
+            )
 
         return sid
 
@@ -462,7 +468,7 @@ def kalshi_test_exchange_factory():
             if sid in params.sids:
                 del storage.subscribed_channels[channel]
                 await websocket.send_text(
-                    UnsubscribedWR(sid=sid, type=Type.UNSUBSCRIBE).json(
+                    UnsubscribedWR(sid=sid, type=Type.UNSUBSCRIBE).model_dump_json(
                         exclude_none=True
                     )
                 )
@@ -485,7 +491,7 @@ def kalshi_test_exchange_factory():
                 msg=SubscriptionUpdatedRM(
                     market_tickers=storage.subscribed_markets[data.params.sid],
                 ),
-            ).json()
+            ).model_dump_json()
         )
 
     async def handle_unknown_channel(
@@ -497,7 +503,7 @@ def kalshi_test_exchange_factory():
             type=Type.ERROR,
             msg=ErrorRM(code=8, msg="Unknown channel name"),
         )
-        await websocket.send_text(unknown_channel.json(exclude_none=True))
+        await websocket.send_text(unknown_channel.model_dump_json(exclude_none=True))
 
     async def handle_order_fill_channel(
         websocket: FastApiWebSocket, data: WebsocketRequest
@@ -515,7 +521,7 @@ def kalshi_test_exchange_factory():
         )
         order_fill_rm.market_ticker = market_ticker
         order_fill_wr = OrderFillWR(type=Type.FILL, sid=sid, msg=order_fill_rm)
-        await websocket.send_text(order_fill_wr.json(exclude_none=True))
+        await websocket.send_text(order_fill_wr.model_dump_json(exclude_none=True))
 
     async def handle_order_book_delta_channel(
         websocket: FastApiWebSocket, data: WebsocketRequest
@@ -533,7 +539,7 @@ def kalshi_test_exchange_factory():
                     id=data.id,
                     type=Type.ERROR,
                     msg=ErrorRM(code=8, msg="Something went wrong"),
-                ).json(exclude_none=True)
+                ).model_dump_json(exclude_none=True)
             )
         else:
             # Send two test messages
@@ -548,7 +554,9 @@ def kalshi_test_exchange_factory():
                     no=[[20, 40]],  # type:ignore[list-item]
                 ),
             )
-            await websocket.send_text(response_snapshot.json(exclude_none=True))
+            await websocket.send_text(
+                response_snapshot.model_dump_json(exclude_none=True)
+            )
             # Purposefully send the subscribe messages after first message to
             # see if subscribe system works
             sid = await subscribe(websocket, data, Channel.ORDER_BOOK_DELTA)
@@ -563,7 +571,7 @@ def kalshi_test_exchange_factory():
                     delta=QuantityDelta(5),
                 ),
             )
-            await websocket.send_text(response_delta.json(exclude_none=True))
+            await websocket.send_text(response_delta.model_dump_json(exclude_none=True))
 
             response_delta = OrderbookDeltaWR(
                 type=Type.ORDERBOOK_DELTA,
@@ -576,7 +584,7 @@ def kalshi_test_exchange_factory():
                     delta=QuantityDelta(5),
                 ),
             )
-            await websocket.send_text(response_delta.json(exclude_none=True))
+            await websocket.send_text(response_delta.model_dump_json(exclude_none=True))
 
             if market_ticker == MarketTicker("bad_seq_id"):
                 # Send response with bad seq id
@@ -591,7 +599,9 @@ def kalshi_test_exchange_factory():
                         delta=QuantityDelta(5),
                     ),
                 )
-                await websocket.send_text(response_delta.json(exclude_none=True))
+                await websocket.send_text(
+                    response_delta.model_dump_json(exclude_none=True)
+                )
 
     app.include_router(router)
     return app

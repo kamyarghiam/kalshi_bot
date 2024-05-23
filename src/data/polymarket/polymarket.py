@@ -34,7 +34,7 @@ class LivePolyMarket:
                 websocket.close()
 
     def subscribe(self, ws: ClientConnection, request: SubscribeRequest):
-        ws.send(request.json())
+        ws.send(request.model_dump_json())
 
     def receive(self, ws: ClientConnection):
         payload = ws.recv()

@@ -98,7 +98,7 @@ def test_convert_websocket_response():
                 type=Type.ORDERBOOK_DELTA, sid=SubscriptionId(1), seq=SeqId(1), msg=data
             )
 
-        response_as_wr = WebsocketResponse(**data.dict())
+        response_as_wr = WebsocketResponse(**data.model_dump())
         # Does not error
         result = response_as_wr.convert(data)
         assert result == data
@@ -111,7 +111,7 @@ def test_parse_response():
             id=CommandId(1),
             type=Type.ERROR,
             msg=ErrorRM(code=8, msg="something"),
-        ).json()
+        ).model_dump_json()
     )
     assert isinstance(response, ErrorWR)
     assert response.msg == ErrorRM(code=8, msg="something")
@@ -184,8 +184,8 @@ def test_websockets_with_session_wrapper_send_recieve():
         )
         ws.send(request=request)
         send.assert_called_once_with(
-            '{"id": 1, "cmd": "subscribe", "params": '
-            + '{"channels": ["fill"], "market_tickers": []}}'
+            '{"id":1,"cmd":"subscribe","params":'
+            + '{"channels":["fill"],"market_tickers":[]}}'
         )
 
     # Test receive
@@ -193,7 +193,7 @@ def test_websockets_with_session_wrapper_send_recieve():
         response = ErrorWR(
             id=CommandId(1), type=Type.ERROR, msg=ErrorRM(code=8, msg="hi")
         )
-        recv.return_value = response.json()
+        recv.return_value = response.model_dump_json()
 
         with pytest.raises(WebsocketError) as error:
             ws.receive()

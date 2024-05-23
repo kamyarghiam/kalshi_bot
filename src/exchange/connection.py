@@ -148,9 +148,9 @@ class Websocket:
             raise ValueError("Send: Did not intialize the websocket")
         match self._ws:
             case ExternalWebsocket():  # type:ignore[misc]
-                self._ws.send(request.json())
+                self._ws.send(request.model_dump_json())
             case WebSocketTestSession():
-                self._ws.send_text(request.json())
+                self._ws.send_text(request.model_dump_json())
 
     def receive(self) -> type[WebsocketResponse]:
         """Receive single message"""
@@ -243,7 +243,7 @@ class Websocket:
 
     def _parse_response(self, payload: str):
         """Parses the response from the websocket and returns it"""
-        response: WebsocketResponse = WebsocketResponse.parse_raw(payload)
+        response: WebsocketResponse = WebsocketResponse.model_validate_json(payload)
         type_to_response: Dict[Type, type[WebsocketResponse]] = {
             Type.ERROR: ErrorWR,
             Type.ORDERBOOK_DELTA: OrderbookDeltaWR,
@@ -309,7 +309,7 @@ class Connection:
                 method=method.value,
                 url=self._api_version.add(url),
                 params=params,
-                json=None if body is None else body.dict(exclude_none=True),
+                json=None if body is None else body.model_dump(exclude_none=True),
                 headers=headers,
             )
         )
@@ -330,7 +330,7 @@ class Connection:
         return self._request(Method.DELETE, url)
 
     def sign_in(self):
-        response = LogInResponse.parse_obj(
+        response = LogInResponse.model_validate(
             self.post(
                 url=LOGIN_URL,
                 body=LogInRequest(
@@ -345,7 +345,7 @@ class Connection:
     def sign_out(self):
         """Used to sign out. It clears the credentials in the auth object"""
         if self._auth.is_valid():
-            LogOutResponse.parse_obj(
+            LogOutResponse.model_validate(
                 self.post(
                     url=LOGOUT_URL,
                     body=LogOutRequest(),

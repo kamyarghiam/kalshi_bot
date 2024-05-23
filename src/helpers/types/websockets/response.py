@@ -36,7 +36,7 @@ class WebsocketResponse(BaseModel):
 
         For example, converts a websocket response to a orderbook snapshot
         websocket response."""
-        return sub_class.parse_obj(self)
+        return sub_class.model_validate(self.model_dump())
 
 
 class ResponseMessage(BaseModel):
