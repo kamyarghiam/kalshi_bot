@@ -10,7 +10,7 @@ from typing import Any, List, Union
 from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
-from helpers.types.api import Cursor, ExternalApi
+from helpers.types.api import ExternalApi, ExternalApiWithCursor
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
 
@@ -204,10 +204,9 @@ class CreateOrderResponse(ExternalApi):
     order: InnerCreateOrderResponse
 
 
-class GetOrdersRequest(ExternalApi):
+class GetOrdersRequest(ExternalApiWithCursor):
     status: OrderStatus | None = None
     ticker: MarketTicker | None = None
-    cursor: Cursor | None = None
     model_config = ConfigDict(use_enum_values=True)
 
 
@@ -226,12 +225,8 @@ class OrderAPIResponse(ExternalApi):
     # There are other fields, if you're interested
 
 
-class GetOrdersResponse(ExternalApi):
+class GetOrdersResponse(ExternalApiWithCursor):
     orders: List[OrderAPIResponse]
-    cursor: Cursor | None = None
-
-    def has_empty_cursor(self) -> bool:
-        return self.cursor is None or len(self.cursor) == 0
 
 
 class CancelOrderResponse(ExternalApi):

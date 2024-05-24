@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Dict, List, Tuple
 from matplotlib import pyplot as plt
 
 from data.coledb.coledb import ColeDBInterface
-from helpers.types.api import Cursor, ExternalApi
+from helpers.types.api import ExternalApi, ExternalApiWithCursor
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import (
     BalanceCents,
@@ -563,8 +563,7 @@ class GetPortfolioBalanceResponse(ExternalApi):
     payout: BalanceCents = BalanceCents(0)
 
 
-class GetMarketPositionsRequest(ExternalApi):
-    cursor: Cursor | None = None
+class GetMarketPositionsRequest(ExternalApiWithCursor):
     ticker: MarketTicker | None = None
     # This filter restricts the api request to open positions
     count_filter: List[str] = ["position"]
@@ -596,9 +595,5 @@ class ApiMarketPosition(ExternalApi):
         return Position(order)
 
 
-class GetMarketPositionsResponse(ExternalApi):
+class GetMarketPositionsResponse(ExternalApiWithCursor):
     market_positions: List[ApiMarketPosition]
-    cursor: Cursor
-
-    def has_empty_cursor(self) -> bool:
-        return len(self.cursor) == 0

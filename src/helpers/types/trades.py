@@ -2,18 +2,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
-from helpers.types.api import Cursor, ExternalApi
+from helpers.types.api import ExternalApi, ExternalApiWithCursor
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orders import Quantity
 from helpers.utils import Side
 
 
-class GetTradesRequest(ExternalApi):
+class GetTradesRequest(ExternalApiWithCursor):
     ticker: MarketTicker | None
     min_ts: int | None
     max_ts: int | None
-    cursor: Cursor | None = None
     limit: int | None = None
 
 
@@ -39,12 +38,8 @@ class ExternalTrade(ExternalApi):
         )
 
 
-class GetTradesResponse(ExternalApi):
+class GetTradesResponse(ExternalApiWithCursor):
     trades: List[ExternalTrade]
-    cursor: Cursor
-
-    def has_empty_cursor(self) -> bool:
-        return len(self.cursor) == 0
 
 
 @dataclass

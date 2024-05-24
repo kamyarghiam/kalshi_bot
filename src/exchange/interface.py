@@ -1,6 +1,6 @@
 from datetime import datetime
 from types import TracebackType
-from typing import ContextManager, Generator, List
+from typing import Callable, ContextManager, Generator, List, TypeVar
 
 from fastapi.testclient import TestClient
 
@@ -14,6 +14,7 @@ from helpers.constants import (
     POSITION_URL,
     TRADES_URL,
 )
+from helpers.types.api import ExternalApiWithCursor
 from helpers.types.common import URL
 from helpers.types.exchange import ExchangeStatusResponse
 from helpers.types.markets import (
@@ -120,17 +121,9 @@ class ExchangeInterface:
     ) -> List[OrderAPIResponse]:
         if request.status == OrderStatus.PENDING:
             raise ValueError("Cannot get pending orders")
-        response = self._get_orders(request)
-        orders: List[OrderAPIResponse] = response.orders
 
-        while (
-            pages is None or (pages := pages - 1)
-        ) and not response.has_empty_cursor():
-            request.cursor = response.cursor
-            response = self._get_orders(request)
-            orders.extend(response.orders)
-
-        return orders
+        responses = list(self._paginate_requests(self._get_orders, request, pages))
+        return sum([response.orders for response in responses], [])
 
     def _get_orders(self, request: GetOrdersRequest) -> GetOrdersResponse:
         return GetOrdersResponse.model_validate(
@@ -154,15 +147,8 @@ class ExchangeInterface:
 
         If pages is None, gets all active markets. If pages is set, we only
         send that many pages of markets"""
-        response = self._get_markets(GetMarketsRequest(status=MarketStatus.OPEN))
-        yield from response.markets
-
-        while (
-            pages is None or (pages := pages - 1)
-        ) and not response.has_empty_cursor():
-            response = self._get_markets(
-                GetMarketsRequest(status=MarketStatus.OPEN, cursor=response.cursor)
-            )
+        request = GetMarketsRequest(status=MarketStatus.OPEN)
+        for response in self._paginate_requests(self._get_markets, request, pages):
             yield from response.markets
 
     def get_market(self, ticker: MarketTicker) -> Market:
@@ -205,17 +191,8 @@ class ExchangeInterface:
             max_ts=int(max_ts.timestamp()) if max_ts is not None else None,
             limit=limit,
         )
-        while True:
-            response = GetTradesResponse.model_validate(
-                self._connection.get(
-                    url=TRADES_URL,
-                    params=request.model_dump(exclude_none=True),
-                )
-            )
+        for response in self._paginate_requests(self._get_trades, request, None):
             yield from [trade.to_internal_trade() for trade in response.trades]
-            if response.has_empty_cursor():
-                break
-            request.cursor = response.cursor
 
     def get_portfolio_balance(self) -> GetPortfolioBalanceResponse:
         return GetPortfolioBalanceResponse.model_validate(
@@ -226,18 +203,18 @@ class ExchangeInterface:
 
     def get_positions(self, pages: int | None = None) -> List[ApiMarketPosition]:
         request = GetMarketPositionsRequest()
-        response = self._get_positions(request)
-        positions: List[ApiMarketPosition] = response.market_positions
-
-        while (
-            pages is None or (pages := pages - 1)
-        ) and not response.has_empty_cursor():
-            request.cursor = response.cursor
-            response = self._get_positions(request)
-            positions.extend(response.market_positions)
-        return positions
+        responses = list(self._paginate_requests(self._get_positions, request, pages))
+        return sum([response.market_positions for response in responses], [])
 
     ######## Helpers ############
+
+    def _get_trades(self, request: GetTradesRequest) -> GetTradesResponse:
+        return GetTradesResponse.model_validate(
+            self._connection.get(
+                url=TRADES_URL,
+                params=request.model_dump(exclude_none=True),
+            )
+        )
 
     def _get_positions(
         self, request: GetMarketPositionsRequest
@@ -256,6 +233,26 @@ class ExchangeInterface:
                 params=request.model_dump(exclude_none=True),
             )
         )
+
+    _T = TypeVar("_T", bound=ExternalApiWithCursor)
+    _U = TypeVar("_U", bound=ExternalApiWithCursor)
+
+    def _paginate_requests(
+        self,
+        endpoint: Callable[[_U], _T],
+        request: _U,
+        pages: int | None = None,
+    ) -> Generator[_T, None, None]:
+        """Takes an endpoint and request and fetches all the data"""
+
+        while True:
+            response = endpoint(request)
+            yield response
+            if (
+                pages is not None and ((pages := pages - 1) == 0)
+            ) or response.has_empty_cursor():
+                break
+            request.cursor = response.cursor
 
     def __enter__(self) -> "ExchangeInterface":
         self._connection.sign_in()

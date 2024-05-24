@@ -4,7 +4,7 @@ from typing import Any, List, Union
 from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
-from helpers.types.api import Cursor, ExternalApi
+from helpers.types.api import ExternalApi, ExternalApiWithCursor
 from helpers.types.money import Price
 
 
@@ -75,18 +75,13 @@ class Market(BaseModel):
     last_price: Price | int = 0
 
 
-class GetMarketsRequest(ExternalApi):
+class GetMarketsRequest(ExternalApiWithCursor):
     status: MarketStatus
-    cursor: Cursor | None = None
     model_config = ConfigDict(use_enum_values=True)
 
 
-class GetMarketsResponse(ExternalApi):
-    cursor: Cursor
+class GetMarketsResponse(ExternalApiWithCursor):
     markets: List[Market]
-
-    def has_empty_cursor(self) -> bool:
-        return len(self.cursor) == 0
 
 
 class GetMarketResponse(ExternalApi):

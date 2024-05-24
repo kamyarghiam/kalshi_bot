@@ -23,6 +23,15 @@ class Cursor(str):
         return core_schema.no_info_after_validator_function(cls, handler(str))
 
 
+class ExternalApiWithCursor(ExternalApi):
+    """Adds cursor to the model to paginate requests"""
+
+    cursor: Cursor | None = None
+
+    def has_empty_cursor(self) -> bool:
+        return self.cursor is None or len(self.cursor) == 0
+
+
 class RateLimit:
     """Represents the num transactions per time period in seconds for a rate limit"""
 
