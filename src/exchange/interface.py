@@ -1,4 +1,5 @@
 from datetime import datetime
+from functools import partial
 from types import TracebackType
 from typing import Callable, ContextManager, Generator, List, TypeVar
 
@@ -18,10 +19,13 @@ from helpers.types.api import ExternalApiWithCursor
 from helpers.types.common import URL
 from helpers.types.exchange import ExchangeStatusResponse
 from helpers.types.markets import (
+    GetMarketHistoryRequest,
+    GetMarketHistoryResponse,
     GetMarketResponse,
     GetMarketsRequest,
     GetMarketsResponse,
     Market,
+    MarketHistory,
     MarketStatus,
     MarketTicker,
 )
@@ -206,7 +210,39 @@ class ExchangeInterface:
         responses = list(self._paginate_requests(self._get_positions, request, pages))
         return sum([response.market_positions for response in responses], [])
 
+    def get_market_history(
+        self,
+        ticker: MarketTicker,
+        min_ts: datetime | None = None,
+        max_ts: datetime | None = None,
+        pages: int | None = None,
+    ) -> List[MarketHistory]:
+        min_ts_int: int | None = None
+        max_ts_int: int | None = None
+        if min_ts is not None:
+            min_ts_int = int(min_ts.timestamp())
+        if max_ts is not None:
+            max_ts_int = int(max_ts.timestamp())
+
+        request = GetMarketHistoryRequest(min_ts=min_ts_int, max_ts=max_ts_int)
+        responses = list(
+            self._paginate_requests(
+                partial(self._get_market_history, ticker), request, pages
+            )
+        )
+        return sum([response.history for response in responses], [])
+
     ######## Helpers ############
+
+    def _get_market_history(
+        self, ticker: MarketTicker, request: GetMarketHistoryRequest
+    ) -> GetMarketHistoryResponse:
+        return GetMarketHistoryResponse.model_validate(
+            self._connection.get(
+                url=MARKETS_URL.add(ticker).add("history"),
+                params=request.model_dump(exclude_none=True),
+            )
+        )
 
     def _get_trades(self, request: GetTradesRequest) -> GetTradesResponse:
         return GetTradesResponse.model_validate(

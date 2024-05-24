@@ -19,3 +19,9 @@ def test_get_market(exchange_interface: ExchangeInterface):
     ticker = "HIGHMIA-23MAY30-B87.5"
     market = exchange_interface.get_market(MarketTicker(ticker))
     assert market.ticker == ticker
+
+
+@pytest.mark.usefixtures("local_only")
+def test_get_market_history(exchange_interface: ExchangeInterface):
+    history = exchange_interface.get_market_history(MarketTicker("some_ticker"))
+    assert len(history) == 12

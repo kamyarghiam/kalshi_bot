@@ -86,3 +86,25 @@ class GetMarketsResponse(ExternalApiWithCursor):
 
 class GetMarketResponse(ExternalApi):
     market: Market
+
+
+class GetMarketHistoryRequest(ExternalApiWithCursor):
+    min_ts: int | None = None
+    max_ts: int | None = None
+
+
+class MarketHistory(ExternalApi):
+    # These prices could be 0 or 100
+    no_ask: Price | int
+    no_bid: Price | int
+    open_interest: int
+    ts: int
+    volume: int
+    yes_ask: Price | int
+    yes_bid: Price | int
+    yes_price: Price | int
+
+
+class GetMarketHistoryResponse(ExternalApiWithCursor):
+    history: List[MarketHistory]
+    ticker: MarketTicker
