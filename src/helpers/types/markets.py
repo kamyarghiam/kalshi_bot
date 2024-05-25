@@ -19,6 +19,12 @@ class EventTicker(str):
 
     Example: CPICORE-23JUL"""
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
+
 
 class MarketTicker(str):
     """Full market tickers on the exchange.
@@ -60,6 +66,7 @@ class MarketStatus(str, Enum):
     ACTIVE = "active"
     DETERMINED = "determined"
     FINALIZED = "finalized"
+    INITIALIZED = "initialized"
 
 
 class Market(BaseModel):
@@ -73,10 +80,19 @@ class Market(BaseModel):
     liquidity: int = 0
     # Last Yes price traded on this market. Can be 0
     last_price: Price | int = 0
+    # These values can be used to determine market boundaries
+    strike_type: str | None = None
+    floor_strike: int | None = None
+    cap_strike: int | None = None
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
 
 
 class GetMarketsRequest(ExternalApiWithCursor):
-    status: MarketStatus
+    event_ticker: EventTicker | None = None
+    status: MarketStatus | None = None
     model_config = ConfigDict(use_enum_values=True)
 
 

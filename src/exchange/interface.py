@@ -152,6 +152,11 @@ class ExchangeInterface:
         If pages is None, gets all active markets. If pages is set, we only
         send that many pages of markets"""
         request = GetMarketsRequest(status=MarketStatus.OPEN)
+        yield from self.get_markets(request, pages)
+
+    def get_markets(
+        self, request: GetMarketsRequest, pages: int | None = None
+    ) -> Generator[Market, None, None]:
         for response in self._paginate_requests(self._get_markets, request, pages):
             yield from response.markets
 
