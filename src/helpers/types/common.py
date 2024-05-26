@@ -30,8 +30,12 @@ class URL(NonNullStr):
         url2 = other.strip("/")
         return URL(urllib.parse.urljoin(str(url1 + "/"), str(url2)))
 
-    def add_slash(self):
-        """Adds a leading forward slash in front of path if it does not exist"""
+    def add_slash(self, back: bool = False):
+        """Adds a leading/trailing slash in path if it does not exist"""
+        if back:
+            if not self.endswith("/"):
+                return URL(self + "/")
+            return self
         if not self.startswith("/"):
             return URL("/" + self)
         return self
