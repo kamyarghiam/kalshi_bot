@@ -1,15 +1,26 @@
+import os
 import ssl
 from contextlib import contextmanager
 from typing import Generator, List, Union
 
 from pydantic import BaseModel, ConfigDict
+from requests import Session
 from websockets.exceptions import ConnectionClosedError
 from websockets.sync.client import ClientConnection
 from websockets.sync.client import connect as external_websocket_connect
 
-from helpers.constants import POLYMARKET_PROD_BASE_WS_URL
+from helpers.constants import POLYMARKET_PROD_BASE_WS_URL, POLYMARKET_REST_BASE_URL
 
 SUB_TYPE = "market"
+
+
+class PolyMarketToken(BaseModel):
+    token_id: str
+    outcome: str
+
+
+class PolyMarketMarket(BaseModel):
+    tokens: List[PolyMarketToken]
 
 
 class SubscribeRequest(BaseModel):
@@ -43,9 +54,24 @@ class BookDelta(MarketMessage):
     time: str
 
 
+class SessionsWrapper:
+    """This class provides a wrapper around the requests session class so that
+    we can normalize the interface for the connection adapter"""
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self._session = Session()
+
+    def request(self, method: str, url: str, *args, **kwargs):
+        return self._session.request(
+            method, os.path.join(self.base_url, url), *args, **kwargs
+        )
+
+
 class LivePolyMarket:
     def __init__(self):
-        self._base_url = POLYMARKET_PROD_BASE_WS_URL.add_protocol("wss")
+        self._ws_url = POLYMARKET_PROD_BASE_WS_URL.add_protocol("wss")
+        self._http_client = SessionsWrapper(str(POLYMARKET_REST_BASE_URL))
 
     @contextmanager
     def connect(self) -> ClientConnection:
@@ -53,7 +79,7 @@ class LivePolyMarket:
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
         with external_websocket_connect(
-            self._base_url.add(SUB_TYPE),
+            self._ws_url.add(SUB_TYPE),
             ssl_context=ssl_context,
         ) as websocket:
             try:
@@ -74,11 +100,20 @@ class LivePolyMarket:
         return BookDelta.model_validate(msg.model_dump())
 
     def get_market_msgs(
-        self, asset_ids: List[str]
+        self, condition_ids: List[str]
     ) -> Generator[Union[BookSnapshot, BookDelta], None, None]:
+        """To get condition ID, go to the market, click inspect element,
+        then search for holders"""
+        token_ids = []
+        for condition_id in condition_ids:
+            # TODO: distinguish between YES side and NO side and question
+            market = self.get_market(condition_id)
+            assert len(market.tokens) == 2
+            token_ids.append(market.tokens[0].token_id)
+            token_ids.append(market.tokens[1].token_id)
         while True:
             with self.connect() as ws:
-                request = SubscribeRequest(assets_ids=asset_ids)
+                request = SubscribeRequest(assets_ids=token_ids)
                 self.subscribe(ws, request)
                 while True:
                     try:
@@ -87,17 +122,6 @@ class LivePolyMarket:
                         print("Reconnecting")
                         break
 
-
-def test_connection():
-    # TODO: programatically get asset_id from condition id?
-    # TODO: test delta somehow?
-    pm = LivePolyMarket()
-    for msg in pm.get_market_msgs(
-        [
-            "87508300922072948504644627375052680275959171582701244894747032869704225334739"
-        ]
-    ):
-        print(msg)
-
-
-test_connection()
+    def get_market(self, condition_id: str) -> PolyMarketMarket:
+        resp = self._http_client.request("GET", f"markets/{condition_id}")
+        return PolyMarketMarket.model_validate_json(resp.content)

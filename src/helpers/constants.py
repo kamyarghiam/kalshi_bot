@@ -5,6 +5,7 @@ from helpers.types.common import URL
 
 KALSHI_PROD_BASE_URL = "trading-api.kalshi.com"
 POLYMARKET_PROD_BASE_WS_URL = URL("ws-subscriptions-clob.polymarket.com/ws/")
+POLYMARKET_REST_BASE_URL = URL("https://clob.polymarket.com/")
 # URL's
 EXCHANGE_STATUS_URL = URL("/exchange/status")
 LOGIN_URL = URL("/login")
