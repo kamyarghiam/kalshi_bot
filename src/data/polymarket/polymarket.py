@@ -100,17 +100,9 @@ class LivePolyMarket:
         return BookDelta.model_validate(msg.model_dump())
 
     def get_market_msgs(
-        self, condition_ids: List[str]
+        self, token_ids: List[str]
     ) -> Generator[Union[BookSnapshot, BookDelta], None, None]:
-        """To get condition ID, go to the market, click inspect element,
-        then search for holders"""
-        token_ids = []
-        for condition_id in condition_ids:
-            # TODO: distinguish between YES side and NO side and question
-            market = self.get_market(condition_id)
-            assert len(market.tokens) == 2
-            token_ids.append(market.tokens[0].token_id)
-            token_ids.append(market.tokens[1].token_id)
+        """You can get token_ids from the get_market endpoint"""
         while True:
             with self.connect() as ws:
                 request = SubscribeRequest(assets_ids=token_ids)
@@ -123,5 +115,7 @@ class LivePolyMarket:
                         break
 
     def get_market(self, condition_id: str) -> PolyMarketMarket:
+        """To get condition ID, go to the market, click inspect element,
+        then search for holders in the networks tab"""
         resp = self._http_client.request("GET", f"markets/{condition_id}")
         return PolyMarketMarket.model_validate_json(resp.content)
