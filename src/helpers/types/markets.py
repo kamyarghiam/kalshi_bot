@@ -82,8 +82,8 @@ class Market(BaseModel):
     last_price: Price | int = 0
     # These values can be used to determine market boundaries
     strike_type: str | None = None
-    floor_strike: int | None = None
-    cap_strike: int | None = None
+    floor_strike: float | None = None
+    cap_strike: float | None = None
 
     model_config = ConfigDict(
         extra="allow",
