@@ -194,12 +194,15 @@ class ColeDBInterface:
         """Returns if a market ticker is in the DB already."""
         return self.ticker_to_metadata_path(ticker=ticker).exists()
 
-    def get_tickers_under_event(
-        self, event_ticker: EventTicker
-    ) -> Iterable[MarketTicker]:
+    def get_market_tickers(self, event_ticker: EventTicker) -> Iterable[MarketTicker]:
         """
         Gets all submarkets given an event ticker.
         """
+
+        # Some markets don't have a third section. Check if that's the case
+        ticker = MarketTicker(str(event_ticker))
+        if self.ticker_exists(ticker):
+            return [ticker]
 
         submarket_paths = (
             d for d in self.ticker_to_path(ticker=event_ticker).iterdir() if d.is_dir()
@@ -221,9 +224,16 @@ class ColeDBInterface:
             if d.is_dir()
         ]
 
+    def get_event_tickers(self, s: SeriesTicker) -> List[EventTicker]:
+        return [
+            EventTicker(str(s) + "-" + d.name)
+            for d in (self.cole_db_storage_path / s).iterdir()
+            if d.is_dir()
+        ]
+
     def ticker_to_path(self, ticker: Ticker) -> Path:
         """Given a market ticker returns a path to where all its data should live"""
-        return self.cole_db_storage_path / Path(ticker.replace("-", "/"))
+        return self.cole_db_storage_path / (ticker.replace("-", "/"))
 
     def ticker_to_metadata_path(self, ticker: MarketTicker) -> Path:
         """Given a market ticker returns a path to the metadata file"""

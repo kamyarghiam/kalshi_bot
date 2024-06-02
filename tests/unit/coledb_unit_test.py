@@ -15,7 +15,7 @@ from data.coledb.coledb import (
     ColeDBMetadata,
     get_num_byte_sections_per_bits,
 )
-from helpers.types.markets import MarketTicker
+from helpers.types.markets import EventTicker, MarketTicker, SeriesTicker
 from helpers.types.money import Price, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView
 from helpers.types.orders import Quantity, QuantityDelta, Side
@@ -880,3 +880,22 @@ def test_read_df():
 def test_get_series_tickers():
     cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
     assert cole_db.get_series_tickers() == ["OTHERSERIES", "INXD"]
+
+
+def test_get_event_tickers():
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
+    assert cole_db.get_event_tickers(SeriesTicker("INXD")) == [
+        EventTicker("INXD-23AUG31"),
+        EventTicker("INXD-23AUG30"),
+    ]
+
+
+def test_get_market_tickers():
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
+    event_ticker = EventTicker("OTHERSERIES-SOMEEVENT")
+    assert cole_db.get_market_tickers(event_ticker) == [
+        MarketTicker("OTHERSERIES-SOMEEVENT")
+    ]
+    assert cole_db.get_market_tickers(EventTicker("INXD-23AUG31")) == [
+        MarketTicker("INXD-23AUG31-B4512")
+    ]
