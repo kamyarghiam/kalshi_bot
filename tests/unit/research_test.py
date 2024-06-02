@@ -170,7 +170,7 @@ def test_clean_and_combine_data(tmp_path: Path):
 
 
 def test_get_spy_ob_merged_df():
-    cole_db = ColeDBInterface(storage_path=Path("tests/data/"))
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
     df = get_spy_ob_merged_df(
         cole_db,
         Path("tests/data/databento/20230831-truncated.mbo.csv"),

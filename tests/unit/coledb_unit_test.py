@@ -287,7 +287,7 @@ def test_encode_decode_orderbook_snapshot():
     )
 
     # Edge case, timestamp at edge
-    chunk_start_ts = datetime(2023, 8, 9, 20, 31, 55)
+    chunk_start_ts = datetime(2023, 8, 9, 20, 31, 55).astimezone(ColeDBInterface.tz)
     edge_ts = datetime.fromtimestamp(
         (chunk_start_ts.timestamp() + (((1 << 32) - 1) / 10))
     ).astimezone(ColeDBInterface.tz)
@@ -833,7 +833,7 @@ def test_backward_compatibility():
     the tests/data folder. Any changes to coledb should still allow
     us to open these files, or we need to convert all the old data"""
 
-    cole_db = ColeDBInterface(storage_path=Path("tests/data/"))
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
     data = cole_db.read(MarketTicker("INXD-23AUG31-B4512"))
 
     assert next(data) == Orderbook(
@@ -860,7 +860,7 @@ def test_coledb_write_guardrails():
 
 
 def test_read_df():
-    cole_db = ColeDBInterface(storage_path=Path("tests/data/"))
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
     data = cole_db.read_df(
         MarketTicker("INXD-23AUG31-B4512"),
         start_ts=datetime(2023, 8, 31, 9, 30, 11).astimezone(ColeDBInterface.tz),
@@ -875,3 +875,8 @@ def test_read_df():
     assert row.no_bid_48 == 31
     assert row.no_bid_50 == 5
     assert row.no_bid_60 == 5
+
+
+def test_get_series_tickers():
+    cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
+    assert cole_db.get_series_tickers() == ["OTHERSERIES", "INXD"]

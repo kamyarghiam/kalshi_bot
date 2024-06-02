@@ -61,7 +61,7 @@ from numpy.typing import NDArray
 from pandas import DataFrame
 
 from helpers.constants import COLEDB_DEFAULT_STORAGE_PATH
-from helpers.types.markets import EventTicker, MarketTicker, Ticker
+from helpers.types.markets import EventTicker, MarketTicker, SeriesTicker, Ticker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Quantity, QuantityDelta, Side
@@ -213,6 +213,13 @@ class ColeDBInterface:
             if self.ticker_exists(ticker=current_ticker):
                 final_markets.append(current_ticker)
         return final_markets
+
+    def get_series_tickers(self) -> List[SeriesTicker]:
+        return [
+            SeriesTicker(d.name)
+            for d in self.cole_db_storage_path.iterdir()
+            if d.is_dir()
+        ]
 
     def ticker_to_path(self, ticker: Ticker) -> Path:
         """Given a market ticker returns a path to where all its data should live"""
