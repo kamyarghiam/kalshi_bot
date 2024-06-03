@@ -13,6 +13,7 @@ from helpers.constants import (
     ORDERS_URL,
     PORTFOLIO_BALANCE_URL,
     POSITION_URL,
+    SERIES_URL,
     TRADES_URL,
 )
 from helpers.types.api import ExternalApiWithCursor
@@ -24,10 +25,13 @@ from helpers.types.markets import (
     GetMarketResponse,
     GetMarketsRequest,
     GetMarketsResponse,
+    GetSeriesApiResponse,
     Market,
     MarketHistory,
     MarketStatus,
     MarketTicker,
+    Series,
+    SeriesTicker,
 )
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.orders import (
@@ -236,6 +240,13 @@ class ExchangeInterface:
             )
         )
         return sum([response.history for response in responses], [])
+
+    def get_series(self, s: SeriesTicker) -> Series:
+        return GetSeriesApiResponse.model_validate(
+            self._connection.get(
+                url=SERIES_URL.add(s),
+            )
+        ).series
 
     ######## Helpers ############
 

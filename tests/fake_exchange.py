@@ -21,6 +21,7 @@ from helpers.constants import (
     ORDERS_URL,
     PORTFOLIO_BALANCE_URL,
     POSITION_URL,
+    SERIES_URL,
     TRADES_URL,
 )
 from helpers.types.api import Cursor
@@ -39,11 +40,14 @@ from helpers.types.markets import (
     GetMarketHistoryResponse,
     GetMarketResponse,
     GetMarketsResponse,
+    GetSeriesApiResponse,
     Market,
     MarketHistory,
     MarketResult,
     MarketStatus,
     MarketTicker,
+    Series,
+    SeriesTicker,
 )
 from helpers.types.money import BalanceCents, Cents, Price
 from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
@@ -314,6 +318,10 @@ def kalshi_test_exchange_factory():
                 status=OrderStatus.EXECUTED, order_id=OrderId("some_order_id")
             ),
         )
+
+    @router.get(SERIES_URL + "/{series_ticker}")
+    def get_series(series_ticker: SeriesTicker):
+        return GetSeriesApiResponse(series=Series(frequency="daily"))
 
     @router.get(MARKETS_URL)
     def get_markets(status: MarketStatus | None = None, cursor: Cursor | None = None):

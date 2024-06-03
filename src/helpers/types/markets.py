@@ -13,6 +13,12 @@ class SeriesTicker(str):
 
     Example: CPICORE"""
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
+
 
 class EventTicker(str):
     """Event tickers on the exchange.
@@ -124,3 +130,11 @@ class MarketHistory(ExternalApi):
 class GetMarketHistoryResponse(ExternalApiWithCursor):
     history: List[MarketHistory]
     ticker: MarketTicker
+
+
+class Series(ExternalApi):
+    frequency: str
+
+
+class GetSeriesApiResponse(ExternalApi):
+    series: Series

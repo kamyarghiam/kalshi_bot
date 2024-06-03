@@ -1,7 +1,7 @@
 import pytest
 
 from exchange.interface import ExchangeInterface
-from helpers.types.markets import Market, MarketStatus, MarketTicker
+from helpers.types.markets import Market, MarketStatus, MarketTicker, SeriesTicker
 
 
 @pytest.mark.usefixtures("local_only")
@@ -25,3 +25,9 @@ def test_get_market(exchange_interface: ExchangeInterface):
 def test_get_market_history(exchange_interface: ExchangeInterface):
     history = exchange_interface.get_market_history(MarketTicker("some_ticker"))
     assert len(history) == 12
+
+
+@pytest.mark.usefixtures("local_only")
+def test_get_series(exchange_interface: ExchangeInterface):
+    series = exchange_interface.get_series(SeriesTicker("some_ticker"))
+    assert series.frequency == "daily"
