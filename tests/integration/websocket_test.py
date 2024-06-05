@@ -17,6 +17,7 @@ from helpers.types.websockets.response import (
     OrderbookSnapshotWR,
     OrderFillRM,
     OrderFillWR,
+    TradeWR,
     WebsocketResponse,
 )
 from tests.utils import get_valid_order_on_demo_market
@@ -197,3 +198,16 @@ def test_orderbook_fill_functional_only(exchange_interface: ExchangeInterface):
                 else get_opposite_side_price(order.price),
             ),
         )
+
+
+@pytest.mark.usefixtures("local_only")
+def test_orderbook_trade(exchange_interface: ExchangeInterface):
+    with exchange_interface.get_websocket() as ws:
+        market_ticker = MarketTicker("NORMAL_TICKER")
+        sub = OrderbookSubscription(
+            ws, [market_ticker], send_orderbook_updates=False, send_trade_updates=True
+        )
+        gen = sub.continuous_receive()
+        msg = next(gen)
+        assert isinstance(msg, TradeWR)
+        assert msg.msg.market_ticker == market_ticker

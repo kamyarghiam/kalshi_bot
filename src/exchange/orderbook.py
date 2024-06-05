@@ -24,6 +24,7 @@ from helpers.types.websockets.response import (
     OrderFillWR,
     SubscribedWR,
     SubscriptionUpdatedWR,
+    TradeWR,
 )
 from helpers.utils import PendingMessages
 
@@ -41,6 +42,7 @@ class OrderbookSubscription:
         | SubscriptionUpdatedWR
         | OrderFillWR
         | SubscribedWR
+        | TradeWR
     )
 
     # These are messages with the seq field that needs to be checked
@@ -50,7 +52,7 @@ class OrderbookSubscription:
 
     # These are messages that are returnable to the client
     MESSAGE_TYPES_TO_RETURN: TypeAlias = (
-        OrderbookSnapshotWR | OrderbookDeltaWR | OrderFillWR
+        OrderbookSnapshotWR | OrderbookDeltaWR | OrderFillWR | TradeWR
     )
 
     def __init__(
@@ -59,9 +61,10 @@ class OrderbookSubscription:
         market_tickers: List[MarketTicker],
         send_orderbook_updates: bool = True,
         send_order_fills: bool = False,
+        send_trade_updates: bool = False,
     ):
         assert (
-            send_orderbook_updates or send_order_fills
+            send_orderbook_updates or send_order_fills or send_trade_updates
         ), "You should be subscribed to at least one channel"
         self._sid: SubscriptionId
         self._last_seq_id: SeqId | None = None
@@ -73,6 +76,7 @@ class OrderbookSubscription:
             OrderbookSubscription.MESSAGE_TYPES_TO_RECEIVE
         ] = PendingMessages()
         self._send_order_fills = send_order_fills
+        self._send_trade_updates = send_trade_updates
         self._send_orderbook_updates = send_orderbook_updates
         self._subscribe()
 
@@ -179,6 +183,8 @@ class OrderbookSubscription:
             channels.append(Channel.ORDER_BOOK_DELTA)
         if self._send_order_fills:
             channels.append(Channel.FILL)
+        if self._send_trade_updates:
+            channels.append(Channel.TRADE)
 
         return WebsocketRequest(
             id=CommandId.get_new_id(),

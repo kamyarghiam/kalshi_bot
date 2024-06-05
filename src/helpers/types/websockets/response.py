@@ -199,3 +199,17 @@ class OrderFillRM(ResponseMessage):
 class OrderFillWR(WebsocketResponse):
     sid: SubscriptionId
     msg: OrderFillRM
+
+
+class TradeRM(ResponseMessage):
+    market_ticker: MarketTicker
+    yes_price: Price
+    no_price: Price
+    count: Quantity
+    taker_side: Side
+    ts: int
+
+
+class TradeWR(WebsocketResponse):
+    sid: SubscriptionId
+    msg: TradeRM

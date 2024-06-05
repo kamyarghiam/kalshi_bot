@@ -93,6 +93,8 @@ from helpers.types.websockets.response import (
     SubscribedWR,
     SubscriptionUpdatedRM,
     SubscriptionUpdatedWR,
+    TradeRM,
+    TradeWR,
     UnsubscribedWR,
 )
 from tests.utils import random_data
@@ -468,6 +470,8 @@ def kalshi_test_exchange_factory():
             return await handle_order_book_delta_channel(websocket, data)
         if channel == Channel.FILL:
             return await handle_order_fill_channel(websocket, data)
+        if channel == Channel.TRADE:
+            return await handle_trade_channel(websocket, data)
         raise ValueError(f"Invalid channel {channel}")
 
     async def subscribe(
@@ -564,6 +568,22 @@ def kalshi_test_exchange_factory():
         order_fill_rm.market_ticker = market_ticker
         order_fill_wr = OrderFillWR(type=Type.FILL, sid=sid, msg=order_fill_rm)
         await websocket.send_text(order_fill_wr.model_dump_json(exclude_none=True))
+
+    async def handle_trade_channel(websocket: FastApiWebSocket, data: WebsocketRequest):
+        params: SubscribeRP = data.params
+        assert len(params.market_tickers) >= 1
+        market_ticker = params.market_tickers[0]
+        sid = await subscribe(websocket, data, Channel.TRADE)
+        trade_fill_rm: TradeRM = random_data(
+            TradeRM,
+            custom_args={
+                Quantity: lambda: Quantity(random.randint(0, 100)),
+                Price: lambda: Price(random.randint(1, 99)),
+            },
+        )
+        trade_fill_rm.market_ticker = market_ticker
+        trade_fill_wr = TradeWR(type=Type.TRADE, sid=sid, msg=trade_fill_rm)
+        await websocket.send_text(trade_fill_wr.model_dump_json(exclude_none=True))
 
     async def handle_order_book_delta_channel(
         websocket: FastApiWebSocket, data: WebsocketRequest

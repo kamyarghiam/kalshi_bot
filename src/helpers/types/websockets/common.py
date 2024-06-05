@@ -15,6 +15,7 @@ class Type(str, Enum):
     UNSUBSCRIBE = "unsubscribed"
     SUBSCRIPTION_UPDATED = "ok"
     FILL = "fill"
+    TRADE = "trade"
 
     # Incorrect type, used for testing
     TEST_WRONG_TYPE = "WRONG_TYPE"
