@@ -2,6 +2,10 @@
 Sim tests for the YouMissedASpotStratgey.
 
 Unfortunately, unit tests fix the max number of levels swept to 2.
+
+I put the tests in the sim because we don't want to run it as a part of
+the pytest testing suite every time, since the strategy may be retied at
+some point.
 """
 import datetime
 from typing import List, Union
