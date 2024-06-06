@@ -4,6 +4,7 @@ liquidity on the orderbook after someone sweeps. The purpose is to
 provide liquidity after a large sweep
 """
 
+import random
 import time
 from dataclasses import dataclass
 from datetime import timedelta
@@ -46,11 +47,14 @@ class YouMissedASpotStrategy:
     # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
     # TODO: sell orders
+    # TODO: maybe work on multiple sweeps on the same market
+    # TODO: maybe don't trade on the same market if you're holding a position already
+    # TODO: review seed strategy and borrow concepts from there
     def __init__(
         self,
         tickers: List[MarketTicker],
-        follow_up_qty: Quantity = Quantity(10),
-        passive_order_lifetime: timedelta = timedelta(hours=2),
+        follow_up_qty: Quantity = Quantity(random.randint(1, 10)),
+        passive_order_lifetime: timedelta = timedelta(hours=random.randint(2, 5)),
         levels_to_sweep: int = 2,
     ):
         # What quantity should we place as a passive order followup
