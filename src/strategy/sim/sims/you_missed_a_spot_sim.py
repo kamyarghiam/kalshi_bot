@@ -15,13 +15,14 @@ from exchange.interface import ExchangeInterface, TradeType
 from helpers.types.markets import MarketTicker
 from helpers.types.money import BalanceCents, Price
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side
+from helpers.types.trades import Trade
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
     TradeRM,
 )
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
-from strategy.utils import PortfolioHistory
+from strategy.utils import PortfolioHistory, merge_historical_generators
 
 
 def test_take_yes_side_real_msgs():
@@ -717,8 +718,28 @@ def sim_historical_data():
     for series_ticker in db.get_series_tickers():
         for event_ticker in db.get_event_tickers(series_ticker):
             for market_ticker in db.get_market_tickers(event_ticker):
-                db.read(market_ticker)
-                e.get_trades(market_ticker)
-
+                strat = YouMissedASpotStrategy(
+                    [market_ticker], PortfolioHistory(BalanceCents(10000))
+                )
+                ob_gen = db.read_raw(market_ticker)
+                trade_gen = (trade_to_tradeRM(t) for t in e.get_trades(market_ticker))
+                merged_gen = merge_historical_generators(
+                    ob_gen, trade_gen, "ts", "created_time"
+                )
+                for msg in merged_gen:
+                    orders = strat.consume_next_step(msg)
+                    if orders:
+                        print(orders[0])
                 # TODO: let's only run one market for now
                 return
+
+
+def trade_to_tradeRM(trade: Trade) -> TradeRM:
+    return TradeRM(
+        market_ticker=trade.ticker,
+        yes_price=trade.yes_price,
+        no_price=trade.no_price,
+        count=trade.count,
+        taker_side=trade.taker_side,
+        ts=int(trade.created_time.timestamp()),
+    )

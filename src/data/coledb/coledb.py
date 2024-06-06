@@ -332,6 +332,29 @@ class ColeDBInterface:
         start_ts: datetime | None = None,
         end_ts: datetime | None = None,
     ) -> Generator[Orderbook, None, None]:
+        for data in self._read(ticker, start_ts, end_ts, read_raw=False):
+            assert isinstance(data, Orderbook)
+            yield data
+
+    def read_raw(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+    ) -> Generator[OrderbookDeltaRM | OrderbookSnapshotRM, None, None]:
+        for data in self._read(ticker, start_ts, end_ts, read_raw=True):
+            assert isinstance(data, OrderbookDeltaRM) or isinstance(
+                data, OrderbookSnapshotRM
+            )
+            yield data
+
+    def _read(
+        self,
+        ticker: MarketTicker,
+        start_ts: datetime | None = None,
+        end_ts: datetime | None = None,
+        read_raw: bool = False,
+    ) -> Generator[Orderbook | OrderbookDeltaRM | OrderbookSnapshotRM, None, None]:
         """Reads data from coledb"""
 
         metadata = self.get_metadata(ticker)
@@ -352,7 +375,12 @@ class ColeDBInterface:
             path_to_chunk = metadata.path_to_market_data / str(chunk_name)
             chunk_start_ts = metadata.chunk_first_time_stamps[chunk_index]
             yield from self._read_chunk_apply_deltas_generator(
-                path_to_chunk, ticker, chunk_start_ts, start_ts, end_ts
+                path_to_chunk,
+                ticker,
+                chunk_start_ts,
+                start_ts,
+                end_ts,
+                read_raw=read_raw,
             )
             chunk_name += 1
 
@@ -843,6 +871,7 @@ class ColeDBInterface:
             path, ticker, chunk_start_ts
         ):
             continue
+        assert isinstance(orderbook, Orderbook)
         return orderbook
 
     @staticmethod
@@ -852,11 +881,13 @@ class ColeDBInterface:
         chunk_start_ts: datetime,
         start_ts: Optional[datetime] = None,
         end_ts: Optional[datetime] = None,
-    ) -> Generator[Orderbook, None, None]:
+        read_raw: bool = False,
+    ) -> Generator[Orderbook | OrderbookSnapshotRM | OrderbookDeltaRM, None, None]:
         """Yields messages with ts >= start_ts and <= end_ts
 
         If no start_ts / end_ts passed in, it will start from beginning /
-        go to the end."""
+        go to the end.
+        """
         if end_ts and start_ts and (end_ts < start_ts):
             raise ValueError("End ts must be larger than start ts")
         with open(str(path), "rb") as f:
@@ -870,7 +901,10 @@ class ColeDBInterface:
             except EOFError:
                 return
             assert isinstance(msg, OrderbookSnapshotRM)
-            orderbook = Orderbook.from_snapshot(msg)
+            if read_raw:
+                orderbook: OrderbookSnapshotRM | OrderbookDeltaRM = msg
+            else:
+                orderbook = Orderbook.from_snapshot(msg)
             file_empty = False
             while not file_empty:
                 try:
@@ -884,11 +918,15 @@ class ColeDBInterface:
                 if start_ts is None or start_ts <= orderbook.ts:
                     yield orderbook
                 if not file_empty:
-                    if isinstance(msg, OrderbookSnapshotRM):
-                        orderbook = Orderbook.from_snapshot(msg)
+                    if not read_raw:
+                        if isinstance(msg, OrderbookSnapshotRM):
+                            orderbook = Orderbook.from_snapshot(msg)
+                        else:
+                            assert isinstance(msg, OrderbookDeltaRM)
+                            assert isinstance(orderbook, Orderbook)
+                            orderbook.apply_delta(msg, in_place=True)
                     else:
-                        assert isinstance(msg, OrderbookDeltaRM)
-                        orderbook.apply_delta(msg, in_place=True)
+                        orderbook = msg
 
 
 class ReadonlyColeDB(ColeDBInterface):

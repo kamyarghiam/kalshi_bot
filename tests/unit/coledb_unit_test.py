@@ -899,3 +899,26 @@ def test_get_market_tickers():
     assert cole_db.get_market_tickers(EventTicker("INXD-23AUG31")) == [
         MarketTicker("INXD-23AUG31-B4512")
     ]
+
+
+def test_read_raw_coledb(cole_db: ColeDBInterface):
+    ticker = MarketTicker("test_read_raw_coledb")
+    snapshot = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[[2, 100]],  # type:ignore[list-item]
+        no=[[1, 20]],  # type:ignore[list-item]
+        ts=datetime.fromtimestamp(100000000).astimezone(ColeDBInterface.tz),
+    )
+    delta = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(31),
+        delta=QuantityDelta(12345),
+        side=Side.YES,
+        ts=datetime.fromtimestamp(200000000).astimezone(ColeDBInterface.tz),
+    )
+    cole_db.write(snapshot)
+    cole_db.write(delta)
+
+    reader = cole_db.read_raw(ticker)
+    assert next(reader) == snapshot
+    assert next(reader) == delta
