@@ -12,8 +12,8 @@ from typing import List, Union
 
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface, TradeType
-from helpers.types.markets import MarketTicker
-from helpers.types.money import BalanceCents, Price
+from helpers.types.markets import MarketResult, MarketTicker
+from helpers.types.money import BalanceCents, Cents, Price
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side
 from helpers.types.trades import Trade
 from helpers.types.websockets.response import (
@@ -715,6 +715,7 @@ def unit_test_you_missed_a_spot():
 def sim_historical_data():
     db = ColeDBInterface()
     e = ExchangeInterface(is_test_run=False)
+    total_pnl = Cents(0)
     for series_ticker in db.get_series_tickers():
         for event_ticker in db.get_event_tickers(series_ticker):
             for market_ticker in db.get_market_tickers(event_ticker):
@@ -723,15 +724,45 @@ def sim_historical_data():
                 )
                 ob_gen = db.read_raw(market_ticker)
                 trade_gen = (trade_to_tradeRM(t) for t in e.get_trades(market_ticker))
-                merged_gen = merge_historical_generators(
-                    ob_gen, trade_gen, "ts", "created_time"
-                )
+                merged_gen = merge_historical_generators(ob_gen, trade_gen, "ts", "ts")
+                seen_ob_msg = False
                 for msg in merged_gen:
+                    # We don't want to consume trades until we've seen an OB message
+                    if isinstance(msg, OrderbookSnapshotRM):
+                        seen_ob_msg = True
+                    elif isinstance(msg, TradeRM):
+                        hour = (
+                            datetime.datetime.fromtimestamp(msg.ts)
+                            .astimezone(ColeDBInterface.tz)
+                            .hour
+                        )
+                        if (hour < 10) or (hour > 16):
+                            # We want to only look at trade data in the times it was
+                            # collected (avoiding gaps)
+                            continue
+                    if not seen_ob_msg:
+                        continue
                     orders = strat.consume_next_step(msg)
+                    # Since we dont allow multiple trades per market,
+                    # we'll just stop as soon as we find an order
                     if orders:
                         print(orders[0])
-                # TODO: let's only run one market for now
-                return
+                        break
+                if orders:
+                    market = e.get_market(market_ticker)
+                    result = market.result
+                    # Skip the non-determined markets
+                    if result == MarketResult.YES or result == MarketResult.NO:
+                        revenue = (
+                            Cents(100) * orders[0].quantity
+                            if orders[0].side.value == result.value
+                            else Cents(0)
+                        )
+                        pnl = Cents(revenue - orders[0].cost)
+                        total_pnl += pnl
+                        print(f"   Result: {result}. Pnl: {pnl}")
+
+                print(f"Sim done on {market_ticker}. Total pnl: {total_pnl}")
 
 
 def trade_to_tradeRM(trade: Trade) -> TradeRM:

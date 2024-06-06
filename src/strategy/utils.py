@@ -497,12 +497,19 @@ def merge_historical_generators(
     """Merges two historical generator,
     given the attribute in each generator that has the ts.
 
-    Assumes generators each have at least one elem and
-    that each elem in the generators are already sorted
+    Assumes that each elem in the generators are already sorted
     """
-    gen1_elem: T = next(gen1)
+    try:
+        gen1_elem: T = next(gen1)
+    except StopIteration:
+        yield from gen2
+        return
     gen1_ts = get_time_as_datetime(gen1_elem, gen1_ts_attr)
-    gen2_elem: U = next(gen2)
+    try:
+        gen2_elem: U = next(gen2)
+    except StopIteration:
+        yield from gen1
+        return
     gen2_ts = get_time_as_datetime(gen2_elem, gen2_ts_attr)
 
     while True:
@@ -531,7 +538,7 @@ def merge_historical_generators(
 def get_time_as_datetime(o: Any, attr: str) -> datetime.datetime:
     ts = getattr(o, attr)
     if isinstance(ts, datetime.datetime):
-        return ts
+        return ts.astimezone(ColeDBInterface.tz)
     elif isinstance(ts, float) or isinstance(ts, int):
-        return datetime.datetime.fromtimestamp(ts)
+        return datetime.datetime.fromtimestamp(ts).astimezone(ColeDBInterface.tz)
     raise ValueError(f"Could not understand time type of {ts}")
