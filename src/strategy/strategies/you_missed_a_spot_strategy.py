@@ -14,6 +14,7 @@ from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookView
 from helpers.types.orders import Order, Quantity, Side, TradeType
+from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderbookDeltaRM, TradeRM
 from tests.fake_exchange import OrderbookSnapshotRM
 
@@ -44,8 +45,6 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
-    # TODO: don't allow buying on the same market twice, due to cross collaterlization
-    # and also someone can game your strat otherwise
     # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
     # TODO: sell orders
@@ -61,10 +60,12 @@ class YouMissedASpotStrategy:
     def __init__(
         self,
         tickers: List[MarketTicker],
+        portfolio: PortfolioHistory,
         levels_to_sweep: int = 2,
     ):
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
+        self.portfolio = portfolio
         self._sweeps: Dict[Tuple[MarketTicker, Side], Sweep] = {}
         for ticker in tickers:
             for side in Side:
@@ -100,7 +101,10 @@ class YouMissedASpotStrategy:
                 self._sweeps[(msg.market_ticker, maker_side)].register_level_clear(
                     msg, maker_price
                 )
-            if self.is_sweep(msg.market_ticker, maker_side):
+            if (
+                self.is_sweep(msg.market_ticker, maker_side)
+                and msg.market_ticker not in self.portfolio.positions
+            ):
                 self.set_sent_order(msg.market_ticker, maker_side)
                 order = self.get_order(msg, maker_side)
                 return order

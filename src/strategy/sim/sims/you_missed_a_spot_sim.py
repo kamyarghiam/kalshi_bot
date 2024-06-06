@@ -12,7 +12,7 @@ from typing import List, Union
 
 from exchange.interface import TradeType
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Price
+from helpers.types.money import BalanceCents, Price
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
@@ -20,6 +20,7 @@ from helpers.types.websockets.response import (
     TradeRM,
 )
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
+from strategy.utils import PortfolioHistory
 
 
 def test_take_yes_side_real_msgs():
@@ -27,7 +28,8 @@ def test_take_yes_side_real_msgs():
     # Msgs taken from demo exchange
     ticker = MarketTicker("TEST-TICKER")
     tickers = [ticker]
-    strat = YouMissedASpotStrategy(tickers)
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[],
@@ -85,7 +87,8 @@ def test_take_yes_side_real_msgs():
 def test_take_no_side():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
-    strat = YouMissedASpotStrategy(tickers)
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -164,7 +167,8 @@ def test_clear_ob_no_order():
     # When we clear an OB, we place no orders
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
-    strat = YouMissedASpotStrategy(tickers)
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -240,7 +244,8 @@ def test_clear_ob_no_order():
 def test_no_orders_real_msgs():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
-    strat = YouMissedASpotStrategy(tickers)
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -299,7 +304,8 @@ def test_multiple_trades_one_level():
     # Test when we have multiple trades that happen on the same level
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
-    strat = YouMissedASpotStrategy(tickers)
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -432,7 +438,8 @@ def test_multiple_trades_three_sweeps():
     # and we need three sweeps
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
-    strat = YouMissedASpotStrategy(tickers, levels_to_sweep=3)
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio, levels_to_sweep=3)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -556,6 +563,104 @@ def test_multiple_trades_three_sweeps():
     assert_order_valid(orders[0], Side.YES, ticker, Price(96))
     orders = strat.consume_next_step(trade_msg6)
     assert orders == []
+
+
+def test_dont_take_holding_position():
+    # Tests that we don't place orders on markets we're holding positions on
+    # We run it twice. The first time, it doesn't have a position (to sanity check
+    # that it returns an order). The second time, it has a position
+    for i in range(2):
+        ticker = MarketTicker("TOPALBUMBYBEY-24")
+        tickers = [ticker]
+        portfolio = PortfolioHistory(balance=BalanceCents(10000))
+        strat = YouMissedASpotStrategy(tickers, portfolio)
+        if i % 2 == 1:
+            # Hold a position on that ticker
+            portfolio.place_order(
+                Order(
+                    ticker=ticker,
+                    price=Price(96),
+                    quantity=Quantity(100),
+                    trade=TradeType.BUY,
+                    side=Side.YES,
+                )
+            )
+        snapshot_msg = OrderbookSnapshotRM(
+            market_ticker=ticker,
+            yes=[
+                (Price(95), Quantity(400)),
+                (Price(96), Quantity(400)),
+                (Price(97), Quantity(400)),
+                (Price(98), Quantity(280)),
+            ],
+            no=[],
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+        )
+        delta_msg1 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(98),
+            delta=QuantityDelta(-280),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+        )
+        delta_msg2 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(97),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+        )
+        delta_msg3 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(96),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 396245),
+        )
+        trade_msg1 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(98),
+            no_price=Price(2),
+            count=Quantity(280),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg2 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(97),
+            no_price=Price(3),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg3 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(96),
+            no_price=Price(4),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+
+        orders = strat.consume_next_step(snapshot_msg)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg2)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg3)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg2)
+        if i % 2 == 1:
+            assert (
+                orders == []
+            )  # If we we're holding a position, we'd place an order here
+        else:
+            assert len(orders) == 1
+        orders = strat.consume_next_step(trade_msg3)
+        assert orders == []
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
