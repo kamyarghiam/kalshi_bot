@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from datetime import datetime
 from time import sleep
 
@@ -16,7 +17,7 @@ from helpers.utils import (
     get_max_quantity_can_afford,
     send_alert_email,
 )
-from strategy.utils import merge_generators
+from strategy.utils import merge_historical_generators, merge_live_generators
 
 
 def test_basic_urls():
@@ -176,7 +177,7 @@ def test_to_internal_trade():
     assert trade.ticker == internal_trade.ticker
 
 
-def test_merge_generators():
+def test_merge_live_generators():
     def gen1():
         yield 0
         sleep(0.03)
@@ -188,7 +189,7 @@ def test_merge_generators():
         sleep(0.03)
         yield 3
 
-    gen = merge_generators(gen1(), gen2())
+    gen = merge_live_generators(gen1(), gen2())
     for i in range(4):
         assert next(gen) == i
 
@@ -218,3 +219,51 @@ def test_get_max_quantity_can_afford():
         )
         == 9
     )
+
+
+def test_merge_historical_generators():
+    @dataclass
+    class Something:
+        ts: int
+
+    @dataclass
+    class SomethingElse:
+        timestamp: datetime
+
+    gen1 = (x for x in [Something(5), Something(10), Something(11)])
+    gen2 = (x for x in [SomethingElse(datetime.fromtimestamp(4))])
+    merged = merge_historical_generators(gen1, gen2, "ts", "timestamp")
+    assert list(merged) == [
+        SomethingElse(datetime.fromtimestamp(4)),
+        Something(5),
+        Something(10),
+        Something(11),
+    ]
+
+    # Test first list runs out first
+    gen1 = (x for x in [Something(5), Something(10), Something(11)])
+    gen2 = (x for x in [SomethingElse(datetime.fromtimestamp(12))])
+    merged = merge_historical_generators(gen1, gen2, "ts", "timestamp")
+    assert list(merged) == [
+        Something(5),
+        Something(10),
+        Something(11),
+        SomethingElse(datetime.fromtimestamp(12)),
+    ]
+
+    # Test multiple values in both
+    gen1 = (x for x in [Something(5), Something(10)])
+    gen2 = (
+        x
+        for x in [
+            SomethingElse(datetime.fromtimestamp(7)),
+            SomethingElse(datetime.fromtimestamp(10)),
+        ]
+    )
+    merged = merge_historical_generators(gen1, gen2, "ts", "timestamp")
+    assert list(merged) == [
+        Something(5),
+        SomethingElse(datetime.fromtimestamp(7)),
+        Something(10),
+        SomethingElse(datetime.fromtimestamp(10)),
+    ]

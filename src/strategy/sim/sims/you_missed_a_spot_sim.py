@@ -10,7 +10,8 @@ import datetime
 import sys
 from typing import List, Union
 
-from exchange.interface import TradeType
+from data.coledb.coledb import ColeDBInterface
+from exchange.interface import ExchangeInterface, TradeType
 from helpers.types.markets import MarketTicker
 from helpers.types.money import BalanceCents, Price
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side
@@ -708,3 +709,16 @@ def unit_test_you_missed_a_spot():
         print(f"   Passed {function_name}")
 
     print("Passed unit tests!")
+
+
+def sim_historical_data():
+    db = ColeDBInterface()
+    e = ExchangeInterface(is_test_run=False)
+    for series_ticker in db.get_series_tickers():
+        for event_ticker in db.get_event_tickers(series_ticker):
+            for market_ticker in db.get_market_tickers(event_ticker):
+                db.read(market_ticker)
+                e.get_trades(market_ticker)
+
+                # TODO: let's only run one market for now
+                return

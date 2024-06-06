@@ -15,7 +15,7 @@ from helpers.types.websockets.response import (
     OrderFillWR,
 )
 from strategy.strategies.tan_model_inxz_strat import TanModelINXZStrategy
-from strategy.utils import PortfolioHistory, merge_generators
+from strategy.utils import PortfolioHistory, merge_live_generators
 
 
 def main(is_test_run: bool = True):
@@ -35,7 +35,7 @@ def main(is_test_run: bool = True):
             sub = OrderbookSubscription(ws, [ticker], send_order_fills=True)
             orderbook_gen = sub.continuous_receive()
             spy_data_gen = databento.stream_data()
-            gen = merge_generators(orderbook_gen, spy_data_gen)
+            gen = merge_live_generators(orderbook_gen, spy_data_gen)
             with Live(
                 generate_table(
                     num_snapshot_msgs,

@@ -19,6 +19,7 @@ from typing import (
     Optional,
     Sized,
     Tuple,
+    TypeVar,
 )
 
 import pandas as pd
@@ -464,8 +465,9 @@ def get_market_data_from_event_ticker(
     return [db.read_df(ticker, nrows=nrows) for ticker in market_tickers]
 
 
-def merge_generators(gen1: Generator, gen2: Generator):
-    """Given two generators, returns messages in order of receiving them"""
+def merge_live_generators(gen1: Generator, gen2: Generator):
+    """Given two generators that receive messages live,
+    returns messages in order of receiving them"""
     queue: Queue = Queue()
 
     def generator_listener(generator, queue):
@@ -480,3 +482,56 @@ def merge_generators(gen1: Generator, gen2: Generator):
 
     while True:
         yield queue.get()  # This will block until a message is available in the queue
+
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+
+def merge_historical_generators(
+    gen1: Generator[T, None, None],
+    gen2: Generator[U, None, None],
+    gen1_ts_attr: str,
+    gen2_ts_attr: str,
+) -> Generator[T | U, None, None]:
+    """Merges two historical generator,
+    given the attribute in each generator that has the ts.
+
+    Assumes generators each have at least one elem and
+    that each elem in the generators are already sorted
+    """
+    gen1_elem: T = next(gen1)
+    gen1_ts = get_time_as_datetime(gen1_elem, gen1_ts_attr)
+    gen2_elem: U = next(gen2)
+    gen2_ts = get_time_as_datetime(gen2_elem, gen2_ts_attr)
+
+    while True:
+        if gen1_ts <= gen2_ts:
+            yield gen1_elem
+            try:
+                gen1_elem = next(gen1)
+            except StopIteration:
+                yield gen2_elem
+                yield from gen2
+                break
+            else:
+                gen1_ts = get_time_as_datetime(gen1_elem, gen1_ts_attr)
+        else:
+            yield gen2_elem
+            try:
+                gen2_elem = next(gen2)
+            except StopIteration:
+                yield gen1_elem
+                yield from gen1
+                break
+            else:
+                gen2_ts = get_time_as_datetime(gen2_elem, gen2_ts_attr)
+
+
+def get_time_as_datetime(o: Any, attr: str) -> datetime.datetime:
+    ts = getattr(o, attr)
+    if isinstance(ts, datetime.datetime):
+        return ts
+    elif isinstance(ts, float) or isinstance(ts, int):
+        return datetime.datetime.fromtimestamp(ts)
+    raise ValueError(f"Could not understand time type of {ts}")
