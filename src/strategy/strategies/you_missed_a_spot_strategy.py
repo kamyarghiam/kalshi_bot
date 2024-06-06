@@ -40,20 +40,29 @@ class Sweep:
             assert self.smallest_maker_price is not None
             if trade_price < self.smallest_maker_price:
                 self.count += 1
+                # TODO: test this if we increase sweeps > 2
                 self.smallest_maker_price = trade_price
 
 
 class YouMissedASpotStrategy:
-    # TODO: test when you have multiple trades on the same level! and test
-    # sample sequence from notes. Also test sweeps on both sides (maybe get from demo)
+    # TODO: fix: add a side in the market ticker to sweep map
+    # TODO: Also test sweeps on both sides (maybe get from demo)
     # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
     # TODO: sell orders
-    def __init__(self, tickers: List[MarketTicker]):
+    def __init__(
+        self,
+        tickers: List[MarketTicker],
+        follow_up_qty: Quantity = Quantity(10),
+        passive_order_lifetime: timedelta = timedelta(hours=2),
+        levels_to_sweep: int = 2,
+    ):
         # What quantity should we place as a passive order followup
-        self.followup_qty = Quantity(10)
+        self.followup_qty = follow_up_qty
         # How long should an order stay alive for?
-        self.passive_order_lifetime = timedelta(hours=5)
+        self.passive_order_lifetime = passive_order_lifetime
+        # How many levels must be swept before we place an order?
+        self.levels_to_sweep = levels_to_sweep
         self._sweeps: Dict[MarketTicker, Sweep] = {
             ticker: Sweep() for ticker in tickers
         }
@@ -82,7 +91,7 @@ class YouMissedASpotStrategy:
     def is_sweep(self, ticker: MarketTicker):
         """Checks whether this trade sweeps at least two levels on the orderbook"""
         sweep_info = self._sweeps[ticker]
-        return (not sweep_info.sent_order) and sweep_info.count >= 2
+        return (not sweep_info.sent_order) and sweep_info.count >= self.levels_to_sweep
 
     def set_sent_order(self, ticker: MarketTicker):
         self._sweeps[ticker].sent_order = True

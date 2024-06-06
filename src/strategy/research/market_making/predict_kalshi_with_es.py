@@ -429,11 +429,13 @@ def graph_rolling_predictions():
     roll = es_df["prediction"].rolling(window=window_size)
     # 1 means buy, -1 means sell, 0 means no action
     orders = roll.apply(
-        lambda x: 0
-        if (x.max() - x.min() < price_increase)
-        else 1
-        if x.idxmin() < x.idxmax()
-        else -1
+        lambda x: (
+            0
+            if (x.max() - x.min() < price_increase)
+            else 1
+            if x.idxmin() < x.idxmax()
+            else -1
+        )
     )
 
     plt.scatter(times, bids, color="purple", label="Bids")

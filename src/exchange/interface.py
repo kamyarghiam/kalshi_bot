@@ -86,9 +86,11 @@ class ExchangeInterface:
         price = (
             {}
             if order.order_type == OrderType.MARKET
-            else {"yes_price": order.price}
-            if order.side == Side.YES
-            else {"no_price": order.price}
+            else (
+                {"yes_price": order.price}
+                if order.side == Side.YES
+                else {"no_price": order.price}
+            )
         )
         request = CreateOrderRequest(
             ticker=order.ticker,
@@ -98,9 +100,11 @@ class ExchangeInterface:
             count=order.quantity,
             side=order.side,
             expiration_ts=order.expiration_ts,
-            sell_position_floor=Quantity(0)
-            if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
-            else None,
+            sell_position_floor=(
+                Quantity(0)
+                if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
+                else None
+            ),
             **price,  # type:ignore[arg-type]
         )
         # Sometimes, we get issues when creating an order
@@ -175,9 +179,9 @@ class ExchangeInterface:
         return GetOrderbookResponse.model_validate(
             self._connection.get(
                 url=MARKETS_URL.add(f"{request.ticker}").add(ORDERBOOK_URL),
-                params=dict(depth=str(request.depth))
-                if request.depth is not None
-                else {},
+                params=(
+                    dict(depth=str(request.depth)) if request.depth is not None else {}
+                ),
             )
         ).orderbook.to_internal_orderbook(request.ticker)
 

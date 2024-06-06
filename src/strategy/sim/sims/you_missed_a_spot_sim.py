@@ -7,6 +7,7 @@ I put the tests in the sim because we don't want to run it as a part of
 the pytest testing suite every time, since the strategy may be retied at
 some point.
 """
+
 import datetime
 from typing import List, Union
 
@@ -419,3 +420,4 @@ def unit_test_you_missed_a_spot():
     test_take_no_side()
     test_clear_ob_no_order()
     test_multiple_trades_one_level()
+    print("Passed unit tests!")

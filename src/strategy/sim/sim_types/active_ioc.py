@@ -1,7 +1,6 @@
 """This file provides tools to test your strategy
 against the exchange without actually sending orders"""
 
-
 from datetime import timedelta
 from logging import Logger, getLogger
 
