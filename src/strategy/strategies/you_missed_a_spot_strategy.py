@@ -40,7 +40,6 @@ class Sweep:
             assert self.smallest_maker_price is not None
             if trade_price < self.smallest_maker_price:
                 self.count += 1
-                # TODO: test this if we increase sweeps > 2
                 self.smallest_maker_price = trade_price
 
 

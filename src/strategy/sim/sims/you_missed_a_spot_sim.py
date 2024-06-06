@@ -1,8 +1,6 @@
 """
 Sim tests for the YouMissedASpotStratgey.
 
-Unfortunately, unit tests fix the max number of levels swept to 2.
-
 I put the tests in the sim because we don't want to run it as a part of
 the pytest testing suite every time, since the strategy may be retied at
 some point.
@@ -415,9 +413,149 @@ def test_multiple_trades_one_level():
     assert orders == []
 
 
+def test_multiple_trades_three_sweeps():
+    # Test when we have multiple trades that happen on the same level
+    # and we need three sweeps
+    ticker = MarketTicker("TOPALBUMBYBEY-24")
+    tickers = [ticker]
+    strat = YouMissedASpotStrategy(tickers, levels_to_sweep=3)
+    snapshot_msg = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[
+            (Price(95), Quantity(100)),
+            (Price(96), Quantity(400)),
+            (Price(97), Quantity(400)),
+            (Price(98), Quantity(280)),
+        ],
+        no=[],
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+    )
+    delta_msg1 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(98),
+        delta=QuantityDelta(-140),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+    )
+    delta_msg2 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(98),
+        delta=QuantityDelta(-140),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393968),
+    )
+    delta_msg3 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(97),
+        delta=QuantityDelta(-200),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+    )
+    delta_msg4 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(97),
+        delta=QuantityDelta(-200),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395107),
+    )
+    delta_msg5 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(96),
+        delta=QuantityDelta(-200),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 396245),
+    )
+    delta_msg6 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(96),
+        delta=QuantityDelta(-200),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 396246),
+    )
+    trade_msg1 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(98),
+        no_price=Price(2),
+        count=Quantity(140),
+        taker_side=Side.NO,
+        ts=1717597260,
+    )
+    trade_msg2 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(98),
+        no_price=Price(2),
+        count=Quantity(140),
+        taker_side=Side.NO,
+        ts=1717597260,
+    )
+    trade_msg3 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(97),
+        no_price=Price(3),
+        count=Quantity(200),
+        taker_side=Side.NO,
+        ts=1717597260,
+    )
+    trade_msg4 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(97),
+        no_price=Price(3),
+        count=Quantity(200),
+        taker_side=Side.NO,
+        ts=1717597260,
+    )
+    trade_msg5 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(96),
+        no_price=Price(4),
+        count=Quantity(200),
+        taker_side=Side.NO,
+        ts=1717597260,
+    )
+    trade_msg6 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(96),
+        no_price=Price(4),
+        count=Quantity(200),
+        taker_side=Side.NO,
+        ts=1717597260,
+    )
+
+    no_order_msgs: List[Union[OrderbookSnapshotRM, OrderbookDeltaRM, TradeRM]] = [
+        snapshot_msg,
+        delta_msg1,
+        delta_msg2,
+        delta_msg3,
+        delta_msg4,
+        delta_msg5,
+        delta_msg6,
+        trade_msg1,
+        trade_msg2,
+        trade_msg3,
+        trade_msg4,
+    ]
+    for msg in no_order_msgs:
+        orders = strat.consume_next_step(msg)
+        assert orders == [], msg
+    orders = strat.consume_next_step(trade_msg5)
+    assert len(orders) == 1
+    assert orders[0] == Order(
+        ticker=ticker,
+        price=Price(96),
+        quantity=strat.followup_qty,
+        trade=TradeType.BUY,
+        side=Side.YES,
+        time_placed=orders[0].time_placed,
+        expiration_ts=orders[0].expiration_ts,
+    ), orders[0]
+    orders = strat.consume_next_step(trade_msg6)
+    assert orders == []
+
+
 def unit_test_you_missed_a_spot():
     test_take_yes_side()
     test_take_no_side()
     test_clear_ob_no_order()
     test_multiple_trades_one_level()
+    test_multiple_trades_three_sweeps()
     print("Passed unit tests!")
