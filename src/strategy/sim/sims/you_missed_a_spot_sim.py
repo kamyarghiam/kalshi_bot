@@ -78,25 +78,7 @@ def test_take_yes_side_real_msgs():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert orders[0] == Order(
-        ticker=ticker,
-        price=Price(95),
-        quantity=strat.followup_qty,
-        trade=TradeType.BUY,
-        side=Side.NO,
-        time_placed=orders[0].time_placed,
-        expiration_ts=orders[0].expiration_ts,
-    )
-    expiration_time_min = (
-        datetime.datetime.now() + strat.passive_order_lifetime
-    ).timestamp() - 2
-    expiration_time_max = (
-        datetime.datetime.now() + strat.passive_order_lifetime
-    ).timestamp() + 2
-    assert orders[0].expiration_ts is not None
-    assert (
-        expiration_time_min <= orders[0].expiration_ts < expiration_time_max
-    ), "Note, this may be flaky due to loose time bounds above"
+    assert_order_valid(orders[0], Side.NO, ticker, Price(95))
 
 
 def test_take_no_side():
@@ -172,26 +154,7 @@ def test_take_no_side():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert orders[0] == Order(
-        ticker=ticker,
-        price=Price(96),
-        quantity=strat.followup_qty,
-        trade=TradeType.BUY,
-        side=Side.YES,
-        time_placed=orders[0].time_placed,
-        expiration_ts=orders[0].expiration_ts,
-    )
-    expiration_time_min = (
-        datetime.datetime.now() + strat.passive_order_lifetime
-    ).timestamp() - 2
-    expiration_time_max = (
-        datetime.datetime.now() + strat.passive_order_lifetime
-    ).timestamp() + 2
-
-    assert orders[0].expiration_ts is not None
-    assert (
-        expiration_time_min <= orders[0].expiration_ts < expiration_time_max
-    ), "Note, this may be flaky due to loose time bounds above"
+    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
     orders = strat.consume_next_step(trade_msg3)
     assert orders == []
 
@@ -328,26 +291,7 @@ def test_no_orders_real_msgs():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert orders[0] == Order(
-        ticker=ticker,
-        price=Price(97),
-        quantity=strat.followup_qty,
-        trade=TradeType.BUY,
-        side=Side.YES,
-        time_placed=orders[0].time_placed,
-        expiration_ts=orders[0].expiration_ts,
-    ), orders[0]
-    expiration_time_min = (
-        datetime.datetime.now() + strat.passive_order_lifetime
-    ).timestamp() - 2
-    expiration_time_max = (
-        datetime.datetime.now() + strat.passive_order_lifetime
-    ).timestamp() + 2
-
-    assert orders[0].expiration_ts is not None
-    assert (
-        expiration_time_min <= orders[0].expiration_ts < expiration_time_max
-    ), "Note, this may be flaky due to loose time bounds above"
+    assert_order_valid(orders[0], Side.YES, ticker, Price(97))
 
 
 def test_multiple_trades_one_level():
@@ -473,15 +417,7 @@ def test_multiple_trades_one_level():
         assert orders == [], msg
     orders = strat.consume_next_step(trade_msg3)
     assert len(orders) == 1
-    assert orders[0] == Order(
-        ticker=ticker,
-        price=Price(96),
-        quantity=strat.followup_qty,
-        trade=TradeType.BUY,
-        side=Side.YES,
-        time_placed=orders[0].time_placed,
-        expiration_ts=orders[0].expiration_ts,
-    ), orders[0]
+    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
     orders = strat.consume_next_step(trade_msg4)
     assert orders == []
     orders = strat.consume_next_step(trade_msg5)
@@ -616,17 +552,43 @@ def test_multiple_trades_three_sweeps():
         assert orders == [], msg
     orders = strat.consume_next_step(trade_msg5)
     assert len(orders) == 1
-    assert orders[0] == Order(
-        ticker=ticker,
-        price=Price(96),
-        quantity=strat.followup_qty,
-        trade=TradeType.BUY,
-        side=Side.YES,
-        time_placed=orders[0].time_placed,
-        expiration_ts=orders[0].expiration_ts,
-    ), orders[0]
+    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
     orders = strat.consume_next_step(trade_msg6)
     assert orders == []
+
+
+TIME_BEFORE_TESTING = datetime.datetime.now()
+
+
+def assert_order_valid(
+    order: Order,
+    expected_side: Side,
+    expected_ticker: MarketTicker,
+    expected_price: Price,
+):
+    assert order == Order(
+        ticker=expected_ticker,
+        price=expected_price,
+        quantity=order.quantity,
+        trade=TradeType.BUY,
+        side=expected_side,
+        time_placed=order.time_placed,
+        expiration_ts=order.expiration_ts,
+    ), order
+    expiration_time_min = (
+        TIME_BEFORE_TESTING + YouMissedASpotStrategy.passive_order_lifetime_min_hours
+    ).timestamp()
+    expiration_time_max = (
+        datetime.datetime.now()
+        + YouMissedASpotStrategy.passive_order_lifetime_max_hours
+    ).timestamp()
+    assert order.expiration_ts is not None
+    assert expiration_time_min <= order.expiration_ts <= expiration_time_max
+    assert (
+        YouMissedASpotStrategy.followup_qty_min
+        <= order.quantity
+        <= YouMissedASpotStrategy.followup_qty_max
+    )
 
 
 def unit_test_you_missed_a_spot():

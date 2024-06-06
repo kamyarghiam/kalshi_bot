@@ -44,23 +44,27 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
+    # TODO: don't allow buying on the same market twice, due to cross collaterlization
+    # and also someone can game your strat otherwiase
     # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
     # TODO: sell orders
     # TODO: maybe work on multiple sweeps on the same market
     # TODO: maybe don't trade on the same market if you're holding a position already
     # TODO: review seed strategy and borrow concepts from there
+
+    # What quantity should we place as a passive order followup
+    followup_qty_min = Quantity(1)
+    followup_qty_max = Quantity(10)
+    # How long should an order stay alive for?
+    passive_order_lifetime_min_hours = timedelta(hours=2)
+    passive_order_lifetime_max_hours = timedelta(hours=5)
+
     def __init__(
         self,
         tickers: List[MarketTicker],
-        follow_up_qty: Quantity = Quantity(random.randint(1, 10)),
-        passive_order_lifetime: timedelta = timedelta(hours=random.randint(2, 5)),
         levels_to_sweep: int = 2,
     ):
-        # What quantity should we place as a passive order followup
-        self.followup_qty = follow_up_qty
-        # How long should an order stay alive for?
-        self.passive_order_lifetime = passive_order_lifetime
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
         self._sweeps: Dict[Tuple[MarketTicker, Side], Sweep] = {}
@@ -68,6 +72,19 @@ class YouMissedASpotStrategy:
             for side in Side:
                 self._sweeps[(ticker, side)] = Sweep()
         self._obs: Dict[MarketTicker, Orderbook] = {}
+
+    @property
+    def followup_qty(self) -> Quantity:
+        return Quantity(random.randint(self.followup_qty_min, self.followup_qty_max))
+
+    @property
+    def passive_order_lifetime(self) -> timedelta:
+        return timedelta(
+            seconds=random.randint(
+                int(self.passive_order_lifetime_min_hours.total_seconds()),
+                int(self.passive_order_lifetime_max_hours.total_seconds()),
+            )
+        )
 
     def consume_next_step(
         self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM
