@@ -29,23 +29,20 @@ class Sweep:
     # Whether we already sent an order for this sweep
     sent_order: bool = False
 
-    def register_level_clear(self, trade: TradeRM):
+    def register_level_clear(self, trade: TradeRM, maker_price: Price):
         """Call this function when a level was cleared"""
-        trade_price, _ = get_maker_price_and_side(trade)
         if trade.ts != self.ts:
             self.count = 1
             self.ts = trade.ts
-            self.smallest_maker_price = trade_price
+            self.smallest_maker_price = maker_price
         else:
             assert self.smallest_maker_price is not None
-            if trade_price < self.smallest_maker_price:
+            if maker_price < self.smallest_maker_price:
                 self.count += 1
-                self.smallest_maker_price = trade_price
+                self.smallest_maker_price = maker_price
 
 
 class YouMissedASpotStrategy:
-    # TODO: fix: add a side in the market ticker to sweep map
-    # TODO: Also test sweeps on both sides (maybe get from demo)
     # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
     # TODO: sell orders
@@ -62,9 +59,10 @@ class YouMissedASpotStrategy:
         self.passive_order_lifetime = passive_order_lifetime
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
-        self._sweeps: Dict[MarketTicker, Sweep] = {
-            ticker: Sweep() for ticker in tickers
-        }
+        self._sweeps: Dict[Tuple[MarketTicker, Side], Sweep] = {}
+        for ticker in tickers:
+            for side in Side:
+                self._sweeps[(ticker, side)] = Sweep()
         self._obs: Dict[MarketTicker, Orderbook] = {}
 
     def consume_next_step(
@@ -78,27 +76,28 @@ class YouMissedASpotStrategy:
             self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         else:
             assert isinstance(msg, TradeRM)
-            # Check whether a level was cleared, if so, call register_level_clear
-            if self.level_cleared(msg):
-                self._sweeps[msg.market_ticker].register_level_clear(msg)
-            if self.is_sweep(msg.market_ticker):
-                self.set_sent_order(msg.market_ticker)
-                order = self.get_order(msg)
+            maker_price, maker_side = get_maker_price_and_side(msg)
+            if self.level_cleared(msg, maker_price, maker_side):
+                self._sweeps[(msg.market_ticker, maker_side)].register_level_clear(
+                    msg, maker_price
+                )
+            if self.is_sweep(msg.market_ticker, maker_side):
+                self.set_sent_order(msg.market_ticker, maker_side)
+                order = self.get_order(msg, maker_side)
                 return order
         return []
 
-    def is_sweep(self, ticker: MarketTicker):
+    def is_sweep(self, ticker: MarketTicker, maker_side: Side):
         """Checks whether this trade sweeps at least two levels on the orderbook"""
-        sweep_info = self._sweeps[ticker]
+        sweep_info = self._sweeps[(ticker, maker_side)]
         return (not sweep_info.sent_order) and sweep_info.count >= self.levels_to_sweep
 
-    def set_sent_order(self, ticker: MarketTicker):
-        self._sweeps[ticker].sent_order = True
+    def set_sent_order(self, ticker: MarketTicker, maker_side: Side):
+        self._sweeps[(ticker, maker_side)].sent_order = True
 
-    def get_order(self, trade: TradeRM):
+    def get_order(self, trade: TradeRM, maker_side: Side):
         """Returns order we need to place"""
         ob = self._obs[trade.market_ticker]
-        _, maker_side = get_maker_price_and_side(trade)
         maker_side_ob = ob.get_side(maker_side)
         level = maker_side_ob.get_largest_price_level()
         if level:
@@ -118,15 +117,16 @@ class YouMissedASpotStrategy:
 
         return []
 
-    def level_cleared(self, trade: TradeRM) -> bool:
+    def level_cleared(
+        self, trade: TradeRM, maker_price: Price, maker_side: Side
+    ) -> bool:
         # Already in BID view due to how we apply deltas in consume_next_step
         ob = self._obs[trade.market_ticker]
-        trade_price, maker_side = get_maker_price_and_side(trade)
         ob_side = ob.get_side(maker_side)
         level = ob_side.get_largest_price_level()
         if level:
             price, _ = level
-            if trade_price > price:
+            if maker_price > price:
                 return True
         else:
             # If there are no more levels, we swept it
