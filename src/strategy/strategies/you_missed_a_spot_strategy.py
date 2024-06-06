@@ -45,12 +45,10 @@ class Sweep:
 
 class YouMissedASpotStrategy:
     # TODO: don't allow buying on the same market twice, due to cross collaterlization
-    # and also someone can game your strat otherwiase
+    # and also someone can game your strat otherwise
     # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
     # TODO: sell orders
-    # TODO: maybe work on multiple sweeps on the same market
-    # TODO: maybe don't trade on the same market if you're holding a position already
     # TODO: review seed strategy and borrow concepts from there
 
     # What quantity should we place as a passive order followup

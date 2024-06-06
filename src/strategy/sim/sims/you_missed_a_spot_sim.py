@@ -7,6 +7,7 @@ some point.
 """
 
 import datetime
+import sys
 from typing import List, Union
 
 from exchange.interface import TradeType
@@ -592,10 +593,13 @@ def assert_order_valid(
 
 
 def unit_test_you_missed_a_spot():
-    test_take_yes_side_real_msgs()
-    test_take_no_side()
-    test_no_orders_real_msgs()
-    test_clear_ob_no_order()
-    test_multiple_trades_one_level()
-    test_multiple_trades_three_sweeps()
+    """Runs all the unit tests defined above"""
+    current_module = sys.modules[__name__]
+    test_functions = [f for f in dir(current_module) if f.startswith("test")]
+    print("Starting tests...")
+    for function_name in test_functions:
+        function_to_call = getattr(sys.modules[__name__], function_name)
+        function_to_call()
+        print(f"   Passed {function_name}")
+
     print("Passed unit tests!")
