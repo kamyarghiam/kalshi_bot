@@ -4,19 +4,17 @@ liquidity on the orderbook after someone sweeps. The purpose is to
 provide liquidity after a large sweep
 """
 
+import time
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Dict, List, Tuple
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookView
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from helpers.types.websockets.response import (
-    OrderbookDeltaWR,
-    OrderbookSnapshotWR,
-    TradeRM,
-    TradeWR,
-)
+from helpers.types.websockets.response import OrderbookDeltaRM, TradeRM
+from tests.fake_exchange import OrderbookSnapshotRM
 
 
 @dataclass
@@ -28,6 +26,8 @@ class Sweep:
     # Represents smallest price seen so far in sweeps
     # As we sweep more levels, maker pay less for each level
     smallest_maker_price: Price | None = None
+    # Whether we already sent an order for this sweep
+    sent_order: bool = False
 
     def register_level_clear(self, trade: TradeRM):
         """Call this function when a level was cleared"""
@@ -40,40 +40,52 @@ class Sweep:
             assert self.smallest_maker_price is not None
             if trade_price < self.smallest_maker_price:
                 self.count += 1
+                self.smallest_maker_price = trade_price
 
 
 class YouMissedASpotStrategy:
     # TODO: test when you have multiple trades on the same level! and test
     # sample sequence from notes. Also test sweeps on both sides (maybe get from demo)
+    # TODO: think of and test other edge cases
     # TODO: also run sims on existing data
+    # TODO: sell orders
     def __init__(self, tickers: List[MarketTicker]):
-        self._followup_qty = Quantity(10)
+        # What quantity should we place as a passive order followup
+        self.followup_qty = Quantity(10)
+        # How long should an order stay alive for?
+        self.passive_order_lifetime = timedelta(hours=5)
         self._sweeps: Dict[MarketTicker, Sweep] = {
             ticker: Sweep() for ticker in tickers
         }
         self._obs: Dict[MarketTicker, Orderbook] = {}
 
     def consume_next_step(
-        self, msg: OrderbookSnapshotWR | OrderbookDeltaWR | TradeWR
+        self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM
     ) -> List[Order]:
-        if isinstance(msg, OrderbookSnapshotWR):
-            self._obs[msg.msg.market_ticker] = Orderbook.from_snapshot(
-                msg.msg
-            ).get_view(OrderbookView.BID)
-        elif isinstance(msg, OrderbookDeltaWR):
-            self._obs[msg.msg.market_ticker].apply_delta(msg.msg, in_place=True)
+        if isinstance(msg, OrderbookSnapshotRM):
+            self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg).get_view(
+                OrderbookView.BID
+            )
+        elif isinstance(msg, OrderbookDeltaRM):
+            self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         else:
-            assert isinstance(msg, TradeWR)
+            assert isinstance(msg, TradeRM)
             # Check whether a level was cleared, if so, call register_level_clear
-            if self.level_cleared(msg.msg):
-                self._sweeps[msg.msg.market_ticker].register_level_clear(msg.msg)
-            if self.is_sweep(msg.msg):
-                return self.get_order(msg.msg)
+            if self.level_cleared(msg):
+                self._sweeps[msg.market_ticker].register_level_clear(msg)
+            if self.is_sweep(msg.market_ticker):
+                self.set_sent_order(msg.market_ticker)
+                order = self.get_order(msg)
+                return order
         return []
 
-    def is_sweep(self, trade: TradeRM):
+    def is_sweep(self, ticker: MarketTicker):
         """Checks whether this trade sweeps at least two levels on the orderbook"""
-        return self._sweeps[trade.market_ticker].count >= 2
+        sweep_info = self._sweeps[ticker]
+        return (not sweep_info.sent_order) and sweep_info.count >= 2
+
+    def set_sent_order(self, ticker: MarketTicker):
+        self._sweeps[ticker].sent_order = True
 
     def get_order(self, trade: TradeRM):
         """Returns order we need to place"""
@@ -86,11 +98,13 @@ class YouMissedASpotStrategy:
             price, _ = level
             order = Order(
                 price=Price(price + 1),  # Place right above
-                quantity=self._followup_qty,
+                quantity=self.followup_qty,
                 trade=TradeType.BUY,
                 ticker=ob.market_ticker,
                 side=maker_side,
-                expiration_ts=None,
+                expiration_ts=int(
+                    time.time() + self.passive_order_lifetime.total_seconds()
+                ),
             )
             return [order]
 
