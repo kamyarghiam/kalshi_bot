@@ -717,6 +717,14 @@ def sim_historical_data():
     e = ExchangeInterface(is_test_run=False)
     total_pnl = Cents(0)
     for series_ticker in db.get_series_tickers():
+        try:
+            freq = e.get_series(series_ticker).frequency
+        except Exception:
+            print("error for", series_ticker)
+            continue
+        # Only want non-daily markets for analysis
+        if freq == "daily":
+            continue
         for event_ticker in db.get_event_tickers(series_ticker):
             for market_ticker in db.get_market_tickers(event_ticker):
                 strat = YouMissedASpotStrategy(

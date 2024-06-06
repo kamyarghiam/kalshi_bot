@@ -45,14 +45,14 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
+    # TODO: sell order before end of market! In sims, we're losing money
+    # because we're holding orders too long. Then re-run sim
     # TODO: think of and test other edge cases
-    # TODO: also run sims on existing data
-    # TODO: sell orders
     # TODO: review seed strategy and borrow concepts from there
 
     # What quantity should we place as a passive order followup
-    followup_qty_min = Quantity(50)
-    followup_qty_max = Quantity(100)
+    followup_qty_min = Quantity(1)
+    followup_qty_max = Quantity(10)
     # How long should an order stay alive for?
     passive_order_lifetime_min_hours = timedelta(hours=2)
     passive_order_lifetime_max_hours = timedelta(hours=5)
@@ -61,7 +61,7 @@ class YouMissedASpotStrategy:
         self,
         tickers: List[MarketTicker],
         portfolio: PortfolioHistory,
-        levels_to_sweep: int = 3,
+        levels_to_sweep: int = 2,
     ):
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
