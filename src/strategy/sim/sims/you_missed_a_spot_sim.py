@@ -21,8 +21,9 @@ from helpers.types.websockets.response import (
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 
 
-def test_take_yes_side():
+def test_take_yes_side_real_msgs():
     # Test normal config, taking from Yes side
+    # Msgs taken from demo exchange
     ticker = MarketTicker("TEST-TICKER")
     tickers = [ticker]
     strat = YouMissedASpotStrategy(tickers)
@@ -99,7 +100,6 @@ def test_take_yes_side():
 
 
 def test_take_no_side():
-    # TODO: get real messages from the demo exchange
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     strat = YouMissedASpotStrategy(tickers)
@@ -271,6 +271,83 @@ def test_clear_ob_no_order():
     assert orders == []
     orders = strat.consume_next_step(trade_msg3)
     assert orders == []
+
+
+def test_no_orders_real_msgs():
+    ticker = MarketTicker("TOPALBUMBYBEY-24")
+    tickers = [ticker]
+    strat = YouMissedASpotStrategy(tickers)
+    snapshot_msg = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[
+            (Price(96), Quantity(400)),
+            (Price(97), Quantity(400)),
+            (Price(98), Quantity(280)),
+        ],
+        no=[],
+        ts=datetime.datetime(2024, 6, 6, 14, 2, 56, 607282),
+    )
+    delta_msg1 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(98),
+        delta=QuantityDelta(-280),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 6, 14, 3, 17, 806060),
+    )
+    delta_msg2 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(97),
+        delta=QuantityDelta(-400),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 6, 14, 3, 17, 807019),
+    )
+    trade_msg1 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(98),
+        no_price=Price(2),
+        count=Quantity(280),
+        taker_side=Side.NO,
+        ts=1717675397,
+    )
+    trade_msg2 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(97),
+        no_price=Price(3),
+        count=Quantity(400),
+        taker_side=Side.NO,
+        ts=1717675397,
+    )
+
+    orders = strat.consume_next_step(snapshot_msg)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg1)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg2)
+    assert orders == []
+    orders = strat.consume_next_step(trade_msg1)
+    assert orders == []
+    orders = strat.consume_next_step(trade_msg2)
+    assert len(orders) == 1
+    assert orders[0] == Order(
+        ticker=ticker,
+        price=Price(97),
+        quantity=strat.followup_qty,
+        trade=TradeType.BUY,
+        side=Side.YES,
+        time_placed=orders[0].time_placed,
+        expiration_ts=orders[0].expiration_ts,
+    ), orders[0]
+    expiration_time_min = (
+        datetime.datetime.now() + strat.passive_order_lifetime
+    ).timestamp() - 2
+    expiration_time_max = (
+        datetime.datetime.now() + strat.passive_order_lifetime
+    ).timestamp() + 2
+
+    assert orders[0].expiration_ts is not None
+    assert (
+        expiration_time_min <= orders[0].expiration_ts < expiration_time_max
+    ), "Note, this may be flaky due to loose time bounds above"
 
 
 def test_multiple_trades_one_level():
@@ -553,8 +630,9 @@ def test_multiple_trades_three_sweeps():
 
 
 def unit_test_you_missed_a_spot():
-    test_take_yes_side()
+    test_take_yes_side_real_msgs()
     test_take_no_side()
+    test_no_orders_real_msgs()
     test_clear_ob_no_order()
     test_multiple_trades_one_level()
     test_multiple_trades_three_sweeps()
