@@ -46,7 +46,6 @@ class Sweep:
 
 class YouMissedASpotStrategy:
     # TODO: run sim on demo and test with a sweep
-    # TODO: add unit test for sell order
     # TODO: create sim env to test if you'd make money
     # TODO: think of and test other edge cases
     # TODO: review seed strategy and borrow concepts from there
