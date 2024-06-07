@@ -1011,3 +1011,19 @@ def test_portfolio_allow_side_cross():
     assert portfolio.orders[3].side == Side.NO
     assert portfolio.orders[3].quantity == 50
     assert portfolio.orders[3].trade == TradeType.BUY
+
+
+def test_holding_resting_order():
+    b = BalanceCents(5000)
+    portfolio = PortfolioHistory(b)
+    ticker = MarketTicker("ticker")
+    assert not portfolio.has_resting_orders(ticker)
+    order = Order(
+        ticker=ticker,
+        price=Price(5),
+        quantity=Quantity(100),
+        side=Side.YES,
+        trade=TradeType.BUY,
+    )
+    portfolio.reserve_order(order, OrderId("order_id"))
+    assert portfolio.has_resting_orders(ticker)

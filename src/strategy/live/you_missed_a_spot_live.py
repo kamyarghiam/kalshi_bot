@@ -22,7 +22,9 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
         for msg in gen:
             orders = strat.consume_next_step(msg.msg)
             for order in orders:
-                e.place_order(order)
+                order_id = e.place_order(order)
+                if order_id is not None:
+                    p.reserve_order(order, order_id)
 
 
 def cancel_all_open_buy_resting_orders(

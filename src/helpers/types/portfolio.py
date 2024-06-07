@@ -172,6 +172,7 @@ class ReservedOrder:
 
     qty_left: Quantity
     money_left: Cents
+    ticker: MarketTicker
 
 
 class PortfolioHistory:
@@ -188,11 +189,19 @@ class PortfolioHistory:
         self._cash_balance: BalanceCents = balance
         self._reserved_cash: BalanceCents = BalanceCents(0)
         self._positions: Dict[MarketTicker, Position] = {}
+        # Contains resting or in-flight orders
         self._reserved_orders: Dict[OrderId, ReservedOrder] = {}
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
         self.allow_side_cross = allow_side_cross
+
+    def has_resting_orders(self, t: MarketTicker) -> bool:
+        """Returns whether we're holding resting orders for this ticker"""
+        for order in self._reserved_orders.values():
+            if order.ticker == t:
+                return True
+        return False
 
     @classmethod
     def load_from_exchange(cls, e: "ExchangeInterface", allow_side_cross: bool = False):
@@ -347,13 +356,12 @@ class PortfolioHistory:
             self.sell(order)
 
     def reserve_order(self, order: Order, order_id: OrderId):
-        """Does not market the order as placed, but reserves funds for it"""
-        # TODO: test me
+        """Does not mark the order as placed, but reserves funds for it"""
         if order.trade == TradeType.BUY:
             total_cost = order.cost + order.worst_case_fee
             self.reserve(total_cost)
             self._reserved_orders[order_id] = ReservedOrder(
-                qty_left=order.quantity, money_left=total_cost
+                qty_left=order.quantity, money_left=total_cost, ticker=order.ticker
             )
 
     def receive_fill_message(self, fill: OrderFillRM):

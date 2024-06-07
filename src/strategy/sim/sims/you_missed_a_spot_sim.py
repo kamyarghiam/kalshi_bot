@@ -15,7 +15,7 @@ from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface, TradeType
 from helpers.types.markets import MarketResult, MarketTicker
 from helpers.types.money import BalanceCents, Cents, Price
-from helpers.types.orders import Order, Quantity, QuantityDelta, Side
+from helpers.types.orders import Order, OrderId, Quantity, QuantityDelta, Side
 from helpers.types.trades import Trade
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
@@ -702,6 +702,104 @@ def test_fill_msg():
     fill.market_ticker = MarketTicker("BAD_TICKER")
     orders = strat.consume_next_step(fill)
     assert orders == []
+
+
+def test_create_position_if_holding_resting_orders():
+    """Test that we don't create a position if we're holding
+    a resting order on that market"""
+    for i in range(2):
+        ticker = MarketTicker("TOPALBUMBYBEY-24")
+        tickers = [ticker]
+        portfolio = PortfolioHistory(balance=BalanceCents(10000))
+        strat = YouMissedASpotStrategy(tickers, portfolio)
+        if i % 2 == 1:
+            # Hold a position on that ticker
+            portfolio.reserve_order(
+                Order(
+                    ticker=ticker,
+                    price=Price(96),
+                    quantity=Quantity(100),
+                    trade=TradeType.BUY,
+                    side=Side.YES,
+                ),
+                OrderId("order_id"),
+            )
+        snapshot_msg = OrderbookSnapshotRM(
+            market_ticker=ticker,
+            yes=[
+                (Price(95), Quantity(400)),
+                (Price(96), Quantity(400)),
+                (Price(97), Quantity(400)),
+                (Price(98), Quantity(280)),
+            ],
+            no=[],
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+        )
+        delta_msg1 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(98),
+            delta=QuantityDelta(-280),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+        )
+        delta_msg2 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(97),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+        )
+        delta_msg3 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(96),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 396245),
+        )
+        trade_msg1 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(98),
+            no_price=Price(2),
+            count=Quantity(280),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg2 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(97),
+            no_price=Price(3),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg3 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(96),
+            no_price=Price(4),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+
+        orders = strat.consume_next_step(snapshot_msg)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg2)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg3)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg2)
+        if i % 2 == 1:
+            assert (
+                orders == []
+            )  # If we we're holding a position, we'd place an order here
+        else:
+            assert len(orders) == 1
+        orders = strat.consume_next_step(trade_msg3)
+        assert orders == []
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
