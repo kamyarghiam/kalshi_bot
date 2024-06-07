@@ -67,6 +67,7 @@ class YouMissedASpotStrategy:
         self.levels_to_sweep = levels_to_sweep
         self.portfolio = portfolio
         self._sweeps: Dict[Tuple[MarketTicker, Side], Sweep] = {}
+        self._tickers = set(tickers)
         for ticker in tickers:
             for side in Side:
                 self._sweeps[(ticker, side)] = Sweep()
@@ -122,6 +123,7 @@ class YouMissedASpotStrategy:
                     trade=TradeType.SELL,
                     ticker=msg.market_ticker,
                     side=msg.side,
+                    expiration_ts=None,
                 )
             ]
         return []
@@ -129,6 +131,9 @@ class YouMissedASpotStrategy:
     def consume_next_step(
         self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
     ) -> List[Order]:
+        # Avoid any actions on market tickers that we're not handling
+        if msg.market_ticker not in self._tickers:
+            return []
         if isinstance(msg, OrderbookSnapshotRM):
             self.handle_snapshot_msg(msg)
         elif isinstance(msg, OrderbookDeltaRM):

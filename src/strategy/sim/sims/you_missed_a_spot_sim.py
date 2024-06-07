@@ -685,6 +685,7 @@ def test_fill_msg():
     fill.yes_price = Price(40)
     fill.no_price = Price(60)
     fill.side = Side.NO
+    fill.market_ticker = ticker
 
     orders = strat.consume_next_step(fill)
     assert len(orders) == 1
@@ -694,7 +695,13 @@ def test_fill_msg():
         trade=TradeType.SELL,
         ticker=fill.market_ticker,
         side=Side.NO,
+        expiration_ts=None,
     )
+
+    # If the ticker is not a ticker that we're managing, then nothing should happen
+    fill.market_ticker = MarketTicker("BAD_TICKER")
+    orders = strat.consume_next_step(fill)
+    assert orders == []
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
