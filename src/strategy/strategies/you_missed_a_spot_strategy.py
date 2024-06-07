@@ -15,8 +15,12 @@ from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookView
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import OrderbookDeltaRM, OrderFillRM, TradeRM
-from tests.fake_exchange import OrderbookSnapshotRM
+from helpers.types.websockets.response import (
+    OrderbookDeltaRM,
+    OrderbookSnapshotRM,
+    OrderFillRM,
+    TradeRM,
+)
 
 
 @dataclass
@@ -45,7 +49,6 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
-    # TODO: run sim on demo and test with a sweep
     # TODO: create sim env to test if you'd make money
     # TODO: think of and test other edge cases
     # TODO: review seed strategy and borrow concepts from there
@@ -104,6 +107,7 @@ class YouMissedASpotStrategy:
             self.is_sweep(msg.market_ticker, maker_side)
             and msg.market_ticker not in self.portfolio.positions
         ):
+            print(f"Sweep! {msg}")
             self.set_sent_order(msg.market_ticker, maker_side)
             order = self.get_order(msg, maker_side)
             return order
@@ -131,7 +135,6 @@ class YouMissedASpotStrategy:
     def consume_next_step(
         self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
     ) -> List[Order]:
-        print(msg)
         # Avoid any actions on market tickers that we're not handling
         if msg.market_ticker not in self._tickers:
             return []
