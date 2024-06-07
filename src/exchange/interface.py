@@ -79,7 +79,7 @@ class ExchangeInterface:
         self._connection = Connection(test_client, is_test_run)
 
     def place_order(self, order: Order) -> OrderId | None:
-        """Attempts to place IOC order. If order executed, returns OrderID
+        """Attempts to place order. If order executed, returns OrderID
         NOTE: I haven't looked into the semantics of what happens if the
         order is partially filled"""
 

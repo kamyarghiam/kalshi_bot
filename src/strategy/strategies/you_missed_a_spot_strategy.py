@@ -131,6 +131,7 @@ class YouMissedASpotStrategy:
     def consume_next_step(
         self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
     ) -> List[Order]:
+        print(msg)
         # Avoid any actions on market tickers that we're not handling
         if msg.market_ticker not in self._tickers:
             return []
