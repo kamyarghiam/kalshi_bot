@@ -278,12 +278,10 @@ class Connection:
             # Limit is 10 queries per second and 600 queries per minute
             # TODO: this might be higher -- is it separate for reads and writes?
 
-            # For some reason, the rate limit is slightly lower in the demo env
-            transactions_per_sec = 9 if is_test_run else 10
             self._rate_limiter = RateLimiter(
                 [
-                    RateLimit(transactions=transactions_per_sec, seconds=1),
-                    RateLimit(transactions=600, seconds=60),
+                    RateLimit(transactions=30, seconds=1),
+                    RateLimit(transactions=1800, seconds=60),
                 ]
             )
 
