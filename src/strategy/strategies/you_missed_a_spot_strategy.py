@@ -49,7 +49,9 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
-    # TODO: dont error if we get portfolio error
+    # TODO: check in orders.py that those two fields in Order object exist
+    # TODO: check Kalshi docs if we can force a resting order or cancel
+    # TODO: add some logging or visibiltiy so you can see when things go wrong
     # TODO: test case where we get partial fill on order
     # (and this tries to place resting buy and sell orders)
     # TODO: create sim env to test if you'd make money
@@ -181,8 +183,10 @@ class YouMissedASpotStrategy:
                 expiration_ts=int(
                     time.time() + self.passive_order_lifetime.total_seconds()
                 ),
+                is_taker=False,
             )
-            return [order]
+            if self.portfolio.can_afford(order):
+                return [order]
 
         return []
 

@@ -687,6 +687,8 @@ def test_fill_msg():
     fill.side = Side.NO
     fill.market_ticker = ticker
 
+    portfolio.reserve_order(fill.to_order(), fill.order_id)
+
     orders = strat.consume_next_step(fill)
     assert len(orders) == 1
     assert orders[0] == Order(
@@ -802,6 +804,94 @@ def test_create_position_if_holding_resting_orders():
         assert orders == []
 
 
+def test_dont_make_position_when_cant_afford():
+    """If we cant afford a position, dont make it"""
+    for i in range(2):
+        ticker = MarketTicker("TOPALBUMBYBEY-24")
+        tickers = [ticker]
+        if i % 2 == 1:
+            portfolio = PortfolioHistory(balance=BalanceCents(0))
+        else:
+            portfolio = PortfolioHistory(balance=BalanceCents(10000))
+        strat = YouMissedASpotStrategy(tickers, portfolio)
+        snapshot_msg = OrderbookSnapshotRM(
+            market_ticker=ticker,
+            yes=[
+                (Price(95), Quantity(400)),
+                (Price(96), Quantity(400)),
+                (Price(97), Quantity(400)),
+                (Price(98), Quantity(280)),
+            ],
+            no=[],
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+        )
+        delta_msg1 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(98),
+            delta=QuantityDelta(-280),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+        )
+        delta_msg2 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(97),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+        )
+        delta_msg3 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(96),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 396245),
+        )
+        trade_msg1 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(98),
+            no_price=Price(2),
+            count=Quantity(280),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg2 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(97),
+            no_price=Price(3),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg3 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(96),
+            no_price=Price(4),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+
+        orders = strat.consume_next_step(snapshot_msg)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg2)
+        assert orders == []
+        orders = strat.consume_next_step(delta_msg3)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg2)
+        if i % 2 == 1:
+            assert (
+                orders == []
+            )  # If we we're holding a position, we'd place an order here
+        else:
+            assert len(orders) == 1
+        orders = strat.consume_next_step(trade_msg3)
+        assert orders == []
+
+
 TIME_BEFORE_TESTING = datetime.datetime.now()
 
 
@@ -811,7 +901,7 @@ def assert_order_valid(
     expected_ticker: MarketTicker,
     expected_price: Price,
 ):
-    assert order == Order(
+    expected_order = Order(
         ticker=expected_ticker,
         price=expected_price,
         quantity=order.quantity,
@@ -819,7 +909,9 @@ def assert_order_valid(
         side=expected_side,
         time_placed=order.time_placed,
         expiration_ts=order.expiration_ts,
-    ), order
+        is_taker=False,
+    )
+    assert order == expected_order, (order, expected_order)
     expiration_time_min = (
         TIME_BEFORE_TESTING + YouMissedASpotStrategy.passive_order_lifetime_min_hours
     ).timestamp()
