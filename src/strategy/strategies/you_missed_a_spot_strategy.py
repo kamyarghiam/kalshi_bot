@@ -50,7 +50,8 @@ class Sweep:
 
 class YouMissedASpotStrategy:
     # TODO: dont error if we get portfolio error
-    # TODO: load resting orders into portfolio
+    # TODO: test case where we get partial fill on order
+    # (and this tries to place resting buy and sell orders)
     # TODO: create sim env to test if you'd make money
     # TODO: think of and test other edge cases
     # TODO: review seed strategy and borrow concepts from there
@@ -108,7 +109,7 @@ class YouMissedASpotStrategy:
         if (
             self.is_sweep(msg.market_ticker, maker_side)
             and msg.market_ticker not in self.portfolio.positions
-            and not self.portfolio.has_resting_orders(msg.market_ticker)
+            and not self.portfolio.has_resting_or_inflight_orders(msg.market_ticker)
         ):
             print(f"Sweep! {msg}")
             self.set_sent_order(msg.market_ticker, maker_side)

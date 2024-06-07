@@ -19,8 +19,10 @@ from helpers.types.money import (
 )
 from helpers.types.orderbook import GetOrderbookRequest, Orderbook
 from helpers.types.orders import (
+    GetOrdersRequest,
     Order,
     OrderId,
+    OrderStatus,
     Quantity,
     QuantityDelta,
     Side,
@@ -171,6 +173,7 @@ class ReservedOrder:
     keep track of the quantity and money left per order"""
 
     qty_left: Quantity
+    # Represents max amount of money we need to save for this order
     money_left: Cents
     ticker: MarketTicker
 
@@ -196,8 +199,9 @@ class PortfolioHistory:
         self.max_exposure: Cents = Cents(0)
         self.allow_side_cross = allow_side_cross
 
-    def has_resting_orders(self, t: MarketTicker) -> bool:
-        """Returns whether we're holding resting orders for this ticker"""
+    def has_resting_or_inflight_orders(self, t: MarketTicker) -> bool:
+        """Returns whether we're holding resting order for the market
+        or if an order was sent and we haven't heard back from the exchange yet"""
         for order in self._reserved_orders.values():
             if order.ticker == t:
                 return True
@@ -211,6 +215,11 @@ class PortfolioHistory:
             BalanceCents(balance), allow_side_cross=allow_side_cross
         )
         portfolio._positions = {p.ticker: p for p in positions}
+        resting_orders = e.get_orders(
+            request=GetOrdersRequest(status=OrderStatus.RESTING)
+        )
+        for o in resting_orders:
+            portfolio.reserve_order(o.to_order(), o.order_id)
         return portfolio
 
     @property
@@ -360,28 +369,29 @@ class PortfolioHistory:
         if order.trade == TradeType.BUY:
             total_cost = order.cost + order.worst_case_fee
             self.reserve(total_cost)
-            self._reserved_orders[order_id] = ReservedOrder(
-                qty_left=order.quantity, money_left=total_cost, ticker=order.ticker
-            )
+        else:
+            assert order.trade == TradeType.SELL
+            # For sells, we don't need to reserve money
+            total_cost = Cents(0)
+        self._reserved_orders[order_id] = ReservedOrder(
+            qty_left=order.quantity, money_left=total_cost, ticker=order.ticker
+        )
 
     def receive_fill_message(self, fill: OrderFillRM):
         """Unreserve cash and place order in portfolio"""
         o = fill.to_order()
+        self._reserved_orders[fill.order_id].qty_left -= o.quantity
         if fill.action == TradeType.BUY:
             # Need to unreserve cash
             total_cost = o.cost + o.fee
-            if fill.order_id in self._reserved_orders:
-                self.reserve(Cents(-1 * total_cost))
-                self._reserved_orders[fill.order_id].qty_left -= o.quantity
-                self._reserved_orders[fill.order_id].money_left -= total_cost
+            self.reserve(Cents(-1 * total_cost))
+            self._reserved_orders[fill.order_id].money_left -= total_cost
 
-                if self._reserved_orders[fill.order_id].qty_left == 0:
-                    # Unlock remaining funds
-                    self.reserve(
-                        Cents(-1 * self._reserved_orders[fill.order_id].money_left)
-                    )
-                    # Remove reserved order
-                    del self._reserved_orders[fill.order_id]
+        if self._reserved_orders[fill.order_id].qty_left == 0:
+            # Unlock remaining funds
+            self.reserve(Cents(-1 * self._reserved_orders[fill.order_id].money_left))
+            # Remove reserved order
+            del self._reserved_orders[fill.order_id]
         self.place_order(o)
 
     def buy(self, order: Order):

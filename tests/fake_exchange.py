@@ -331,9 +331,11 @@ def kalshi_test_exchange_factory():
         markets: List[Market] = [
             Market(
                 # For some reason, they set the open markets to active
-                status=MarketStatus.ACTIVE
-                if status == MarketStatus.OPEN or status is None
-                else status,
+                status=(
+                    MarketStatus.ACTIVE
+                    if status == MarketStatus.OPEN or status is None
+                    else status
+                ),
                 ticker=MarketTicker("some_ticker"),
                 result=MarketResult.NOT_DETERMINED,
                 liquidity=1,
@@ -674,5 +676,6 @@ def get_random_get_order_response():
         OrderAPIResponse,
         custom_args={
             Price: lambda: Price(random.randint(1, 99)),
+            Quantity: lambda: Quantity(random.randint(0, 100)),
         },
     )

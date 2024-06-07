@@ -222,7 +222,21 @@ class OrderAPIResponse(ExternalApi):
     status: OrderStatus
     ticker: MarketTicker
     type: OrderType
+    # TODO: check that these fields exists in API
+    count: Quantity
+    expiration_ts: int | None = None
     # There are other fields, if you're interested
+
+    def to_order(self) -> Order:
+        return Order(
+            price=self.no_price if self.side == Side.NO else self.yes_price,
+            quantity=self.count,
+            trade=self.action,
+            ticker=self.ticker,
+            side=self.side,
+            is_taker=self.status != OrderStatus.RESTING,
+            expiration_ts=self.expiration_ts,
+        )
 
 
 class GetOrdersResponse(ExternalApiWithCursor):
