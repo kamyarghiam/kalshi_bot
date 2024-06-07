@@ -49,7 +49,6 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
-    # TODO: cancel all resting buy orders when program stops
     # TODO: don't place orders on markets you have resting orders on
     # TODO: create sim env to test if you'd make money
     # TODO: think of and test other edge cases
