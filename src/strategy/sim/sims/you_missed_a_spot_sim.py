@@ -7,6 +7,7 @@ some point.
 """
 
 import datetime
+import random
 import sys
 from typing import List, Union
 
@@ -19,10 +20,12 @@ from helpers.types.trades import Trade
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
+    OrderFillRM,
     TradeRM,
 )
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 from strategy.utils import PortfolioHistory, merge_historical_generators
+from tests.utils import random_data
 
 
 def test_take_yes_side_real_msgs():
@@ -663,6 +666,35 @@ def test_dont_take_holding_position():
             assert len(orders) == 1
         orders = strat.consume_next_step(trade_msg3)
         assert orders == []
+
+
+def test_fill_msg():
+    ticker = MarketTicker("TOPALBUMBYBEY-24")
+    tickers = [ticker]
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
+    assert not portfolio.has_open_positions()
+    fill: OrderFillRM = random_data(
+        OrderFillRM,
+        custom_args={
+            Quantity: lambda: Quantity(random.randint(0, 100)),
+            Price: lambda: Price(random.randint(1, 99)),
+        },
+    )
+    fill.action = TradeType.BUY
+    fill.yes_price = Price(40)
+    fill.no_price = Price(60)
+    fill.side = Side.NO
+
+    orders = strat.consume_next_step(fill)
+    assert len(orders) == 1
+    assert orders[0] == Order(
+        price=Price(64),
+        quantity=fill.count,
+        trade=TradeType.SELL,
+        ticker=fill.market_ticker,
+        side=Side.NO,
+    )
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()

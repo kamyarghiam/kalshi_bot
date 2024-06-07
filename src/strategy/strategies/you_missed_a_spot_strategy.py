@@ -15,7 +15,7 @@ from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, OrderbookView
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import OrderbookDeltaRM, TradeRM
+from helpers.types.websockets.response import OrderbookDeltaRM, OrderFillRM, TradeRM
 from tests.fake_exchange import OrderbookSnapshotRM
 
 
@@ -45,8 +45,9 @@ class Sweep:
 
 
 class YouMissedASpotStrategy:
-    # TODO: sell order before end of market! In sims, we're losing money
-    # because we're holding orders too long. Then re-run sim
+    # TODO: run sim on demo and test with a sweep
+    # TODO: add unit test for sell order
+    # TODO: create sim env to test if you'd make money
     # TODO: think of and test other edge cases
     # TODO: review seed strategy and borrow concepts from there
 
@@ -85,29 +86,62 @@ class YouMissedASpotStrategy:
             )
         )
 
+    def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
+        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg).get_view(
+            OrderbookView.BID
+        )
+
+    def handle_delta_msg(self, msg: OrderbookDeltaRM):
+        self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
+
+    def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
+        maker_price, maker_side = get_maker_price_and_side(msg)
+        if self.level_cleared(msg, maker_price, maker_side):
+            self._sweeps[(msg.market_ticker, maker_side)].register_level_clear(
+                msg, maker_price
+            )
+        if (
+            self.is_sweep(msg.market_ticker, maker_side)
+            and msg.market_ticker not in self.portfolio.positions
+        ):
+            self.set_sent_order(msg.market_ticker, maker_side)
+            order = self.get_order(msg, maker_side)
+            return order
+        return []
+
+    def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
+        assert isinstance(msg, OrderFillRM)
+        self.portfolio.receive_fill_message(msg)
+        # If it's a buy message, let's place a sell order immediately
+        if msg.action == TradeType.BUY:
+            price_bought = msg.yes_price if msg.side == Side.YES else msg.no_price
+            price_to_sell = Price(min(99, price_bought + 2 * self.levels_to_sweep))
+            return [
+                Order(
+                    price=price_to_sell,
+                    quantity=msg.count,
+                    trade=TradeType.SELL,
+                    ticker=msg.market_ticker,
+                    side=msg.side,
+                )
+            ]
+        return []
+
     def consume_next_step(
-        self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM
+        self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
     ) -> List[Order]:
         if isinstance(msg, OrderbookSnapshotRM):
-            self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg).get_view(
-                OrderbookView.BID
-            )
+            self.handle_snapshot_msg(msg)
         elif isinstance(msg, OrderbookDeltaRM):
-            self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
+            self.handle_delta_msg(msg)
+        elif isinstance(msg, TradeRM):
+            if orders := self.handle_trade_msg(msg):
+                return orders
+        elif isinstance(msg, OrderFillRM):
+            if orders := self.handle_order_fill_msg(msg):
+                return orders
         else:
-            assert isinstance(msg, TradeRM)
-            maker_price, maker_side = get_maker_price_and_side(msg)
-            if self.level_cleared(msg, maker_price, maker_side):
-                self._sweeps[(msg.market_ticker, maker_side)].register_level_clear(
-                    msg, maker_price
-                )
-            if (
-                self.is_sweep(msg.market_ticker, maker_side)
-                and msg.market_ticker not in self.portfolio.positions
-            ):
-                self.set_sent_order(msg.market_ticker, maker_side)
-                order = self.get_order(msg, maker_side)
-                return order
+            raise ValueError(f"Received unknown msg type: {msg}")
         return []
 
     def is_sweep(self, ticker: MarketTicker, maker_side: Side):
