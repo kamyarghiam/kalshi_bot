@@ -36,7 +36,6 @@ def cancel_all_open_buy_resting_orders(
     print("Cancelling all open resting buy orders")
     orders = e.get_orders(request=GetOrdersRequest(status=OrderStatus.RESTING))
     ticker_set = set(tickers)
-    print(f"Found {len(orders)} orders...")
     for order in orders:
         # We don't want to play around with markets we're not managing
         if order.ticker not in ticker_set:
@@ -49,6 +48,7 @@ def cancel_all_open_buy_resting_orders(
             except Exception:
                 print(f"Could not find order for {order.order_id}. Error: ")
                 traceback.print_exc()
+    print("Cancellation done")
 
 
 def main():

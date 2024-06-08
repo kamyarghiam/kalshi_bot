@@ -2,6 +2,7 @@ from datetime import datetime
 from functools import partial
 from types import TracebackType
 from typing import Callable, ContextManager, Generator, List, TypeVar
+from uuid import uuid1
 
 from fastapi.testclient import TestClient
 
@@ -96,7 +97,7 @@ class ExchangeInterface:
             ticker=order.ticker,
             action=order.trade,
             type=order.order_type,
-            client_order_id=str(hash(order)),
+            client_order_id=str(uuid1()),
             count=order.quantity,
             side=order.side,
             expiration_ts=order.expiration_ts,

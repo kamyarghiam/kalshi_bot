@@ -44,22 +44,24 @@ class LevelClear:
             self.count = 1
             self.ts = trade.ts
             self.smallest_maker_price = maker_price
+            self.sent_order = False
         else:
             assert self.smallest_maker_price is not None
             if maker_price < self.smallest_maker_price:
                 self.count += 1
                 self.smallest_maker_price = maker_price
+            else:
+                print("   level clear already registered at this price")
 
 
 class YouMissedASpotStrategy:
-    # TODO: test case where we get partial fill on order
-    # (and this tries to place resting buy and sell orders)
     # TODO: listen to manual order cancels and update portfolio?
     # TODO: related to above ^ need to listen to when resting orders expire
     # (from expire_ts or market close) so that we can remove them from the portfolio. To
     # solve above to problems, you can call sync_resting_orders periodically,
     # but this will slow down strat. Is there a way to listen to an order
     # lifecycle with websockets?
+    # TODO: look into one bad prod trade and see what went wrong
 
     # What quantity should we place as a passive order followup
     followup_qty_min = Quantity(1)
