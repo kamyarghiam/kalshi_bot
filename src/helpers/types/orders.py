@@ -213,10 +213,6 @@ class CreateOrderRequest(ExternalApi):
     buy_max_cost: Cents | None = None
 
 
-class BatchCreateOrderRequest(ExternalApi):
-    orders: List[CreateOrderRequest]
-
-
 class OrderStatus(str, Enum):
     RESTING = "resting"
     CANCELED = "canceled"
@@ -277,3 +273,11 @@ class GetOrdersResponse(ExternalApiWithCursor):
 
 class CancelOrderResponse(ExternalApi):
     order: OrderAPIResponse
+
+
+class BatchCreateOrderRequest(ExternalApi):
+    orders: List[CreateOrderRequest]
+
+
+class BatchCreateOrderResponse(ExternalApi):
+    orders: List[CreateOrderResponse]

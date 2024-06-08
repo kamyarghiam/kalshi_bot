@@ -52,6 +52,8 @@ from helpers.types.markets import (
 from helpers.types.money import BalanceCents, Cents, Price
 from helpers.types.orderbook import ApiOrderbook, GetOrderbookResponse
 from helpers.types.orders import (
+    BatchCreateOrderRequest,
+    BatchCreateOrderResponse,
     CancelOrderResponse,
     CreateOrderRequest,
     CreateOrderResponse,
@@ -319,6 +321,19 @@ def kalshi_test_exchange_factory():
             order=InnerCreateOrderResponse(
                 status=OrderStatus.EXECUTED, order_id=OrderId("some_order_id")
             ),
+        )
+
+    @router.post("/portfolio/orders/batched")
+    def create_batched_order(orders: BatchCreateOrderRequest):
+        return BatchCreateOrderResponse(
+            orders=[
+                CreateOrderResponse(
+                    order=InnerCreateOrderResponse(
+                        status=OrderStatus.RESTING,
+                        order_id=OrderId("some_batch_order_id"),
+                    )
+                )
+            ]
         )
 
     @router.get(SERIES_URL + "/{series_ticker}")

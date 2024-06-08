@@ -1,18 +1,21 @@
+import random
 from time import sleep
 
 import pytest
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
+from helpers.types.money import Price
 from helpers.types.orders import (
     GetOrdersRequest,
     Order,
     OrderId,
     OrderStatus,
     OrderType,
+    Quantity,
     TradeType,
 )
-from tests.utils import get_valid_order_on_demo_market
+from tests.utils import FactoryType, get_valid_order_on_demo_market, random_data
 
 
 def test_place_orders(exchange_interface: ExchangeInterface):
@@ -69,3 +72,20 @@ def test_cancel_order(exchange_interface: ExchangeInterface):
     order = exchange_interface.cancel_order(order_id)
     assert order.order_id == order_id
     assert order.status == OrderStatus.CANCELED
+
+
+@pytest.mark.usefixtures("local_only")
+def test_place_batch_orders(exchange_interface: ExchangeInterface):
+    orders = [
+        random_data(
+            Order,
+            custom_args={
+                Price: lambda: Price(random.randint(1, 99)),
+                Quantity: lambda: Quantity(random.randint(0, 100)),
+            },
+            factory_type=FactoryType.DATACLASS,
+        )
+    ]
+    resp = exchange_interface.place_batch_order(orders)
+    for o in resp:
+        assert o == OrderId("some_batch_order_id")

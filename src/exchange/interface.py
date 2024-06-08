@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from exchange.connection import Connection, Websocket
 from helpers.constants import (
+    BATCHED,
     EXCHANGE_STATUS_URL,
     MARKETS_URL,
     ORDERBOOK_URL,
@@ -35,6 +36,8 @@ from helpers.types.markets import (
 )
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.orders import (
+    BatchCreateOrderRequest,
+    BatchCreateOrderResponse,
     CancelOrderResponse,
     CreateOrderResponse,
     GetOrdersRequest,
@@ -92,6 +95,21 @@ class ExchangeInterface:
         ):
             return resp.order.order_id
         return None
+
+    def place_batch_order(self, orders: List[Order]) -> List[OrderId | None]:
+        """Places batch orders on exchange. Available for advanced API access only. Max
+        20 orders per batch. Returns OrderID if order was placed or None if it wasn't"""
+
+        request = BatchCreateOrderRequest(orders=[o.to_api_request() for o in orders])
+        raw_resp = self._connection.post(ORDERS_URL.add(BATCHED), request)
+        resp = BatchCreateOrderResponse.model_validate(raw_resp)
+        result: List[OrderId | None] = []
+        for o in resp.orders:
+            if o.order.status in (OrderStatus.EXECUTED, OrderStatus.RESTING):
+                result.append(o.order.order_id)
+            else:
+                result.append(None)
+        return result
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.model_validate(
