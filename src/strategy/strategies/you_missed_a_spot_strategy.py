@@ -1,7 +1,10 @@
 """
 This strategy is called you missed a spot because we spill some
 liquidity on the orderbook after someone sweeps. The purpose is to
-provide liquidity after a large sweep
+provide liquidity after a large sweep.
+
+A sweep is defined as X number of complete level clears. After
+we get filled, we place a sell order on the other side.
 """
 
 import random
@@ -25,14 +28,14 @@ from helpers.types.websockets.response import (
 
 @dataclass
 class LevelClear:
-    # Represents number of levels swept
+    # Represents number of levels cleared
     count: int = 0
-    # Represents timestamp of when sweep happened
+    # Represents timestamp of when clears happened
     ts: int | None = None
-    # Represents smallest price seen so far in sweeps
-    # As we sweep more levels, maker pay less for each level
+    # Represents smallest price seen so far in clears
+    # As we clear more levels, maker pay less for each level
     smallest_maker_price: Price | None = None
-    # Whether we already sent an order for this sweep
+    # Whether we already sent an order for this group of clears (sweep)
     sent_order: bool = False
 
     def register_level_clear(self, trade: TradeRM, maker_price: Price):
@@ -53,14 +56,19 @@ class YouMissedASpotStrategy:
     # TODO: check Kalshi docs if we can force an order to be resting (otherwise cancel)
     # TODO: test case where we get partial fill on order
     # (and this tries to place resting buy and sell orders)
-    # TODO: listen to order cancels and update portfolio? So you can manually intervene
+    # TODO: listen to manual order cancels and update portfolio?
+    # TODO: related to above ^ need to listen to when resting orders expire
+    # (from expire_ts) so that we can remove them from the portfolio. To
+    # solve above to problems, you can call sync_resting_orders periodically,
+    # but this will slow down strat. Is there a way to listen to an order
+    # lifecycle with websockets?
 
     # What quantity should we place as a passive order followup
     followup_qty_min = Quantity(1)
     followup_qty_max = Quantity(10)
     # How long should an order stay alive for?
-    passive_order_lifetime_min_hours = timedelta(hours=2)
-    passive_order_lifetime_max_hours = timedelta(hours=5)
+    passive_order_lifetime_min = timedelta(minutes=30)
+    passive_order_lifetime_max = timedelta(minutes=60)
 
     def __init__(
         self,
@@ -86,8 +94,8 @@ class YouMissedASpotStrategy:
     def passive_order_lifetime(self) -> timedelta:
         return timedelta(
             seconds=random.randint(
-                int(self.passive_order_lifetime_min_hours.total_seconds()),
-                int(self.passive_order_lifetime_max_hours.total_seconds()),
+                int(self.passive_order_lifetime_min.total_seconds()),
+                int(self.passive_order_lifetime_max.total_seconds()),
             )
         )
 

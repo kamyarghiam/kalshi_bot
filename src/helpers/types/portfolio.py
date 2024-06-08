@@ -215,11 +215,7 @@ class PortfolioHistory:
             BalanceCents(balance), allow_side_cross=allow_side_cross
         )
         portfolio._positions = {p.ticker: p for p in positions}
-        resting_orders = e.get_orders(
-            request=GetOrdersRequest(status=OrderStatus.RESTING)
-        )
-        for o in resting_orders:
-            portfolio.reserve_order(o.to_order(), o.order_id)
+        portfolio.sync_resting_orders(e)
         return portfolio
 
     @property
@@ -389,13 +385,30 @@ class PortfolioHistory:
                 resting_order.money_left -= total_cost
 
             if resting_order.qty_left == 0:
-                # Unlock remaining funds
-                self.reserve(Cents(-1 * resting_order.money_left))
-                # Remove reserved order
-                del self._resting_orders[fill.order_id]
+                self.unreserve_order(fill.order_id)
         else:
             print(f"Received manual fill! {fill}")
         self.place_order(o)
+
+    def unreserve_order(self, id_: OrderId):
+        """Unlocks a resrved order and its funds"""
+        resting_order = self._resting_orders[id_]
+        # Unlock remaining funds
+        self.reserve(Cents(-1 * resting_order.money_left))
+        # Remove reserved order
+        del self._resting_orders[id_]
+
+    def sync_resting_orders(self, e: "ExchangeInterface"):
+        """Syncs local resting orders with those on the exchange.
+
+        Should be called periodically to make sure you have up
+        to date view of the orders if they expire or get canceled"""
+        self._resting_orders = {}
+        resting_orders = e.get_orders(
+            request=GetOrdersRequest(status=OrderStatus.RESTING)
+        )
+        for o in resting_orders:
+            self.reserve_order(o.to_order(), o.order_id)
 
     def buy(self, order: Order):
         """Adds position to portfolio. Raises OutOfMoney error if we ran out of money"""

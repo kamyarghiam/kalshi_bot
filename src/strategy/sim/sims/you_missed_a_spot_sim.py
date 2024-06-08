@@ -913,11 +913,10 @@ def assert_order_valid(
     )
     assert order == expected_order, (order, expected_order)
     expiration_time_min = (
-        TIME_BEFORE_TESTING + YouMissedASpotStrategy.passive_order_lifetime_min_hours
+        TIME_BEFORE_TESTING + YouMissedASpotStrategy.passive_order_lifetime_min
     ).timestamp()
     expiration_time_max = (
-        datetime.datetime.now()
-        + YouMissedASpotStrategy.passive_order_lifetime_max_hours
+        datetime.datetime.now() + YouMissedASpotStrategy.passive_order_lifetime_max
     ).timestamp()
     assert order.expiration_ts is not None
     assert expiration_time_min <= order.expiration_ts <= expiration_time_max
