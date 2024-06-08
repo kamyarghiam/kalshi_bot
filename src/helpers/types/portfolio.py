@@ -403,7 +403,8 @@ class PortfolioHistory:
 
         Should be called periodically to make sure you have up
         to date view of the orders if they expire or get canceled"""
-        self._resting_orders = {}
+        for order_id in self._resting_orders.keys():
+            self.unreserve_order(order_id)
         resting_orders = e.get_orders(
             request=GetOrdersRequest(status=OrderStatus.RESTING)
         )

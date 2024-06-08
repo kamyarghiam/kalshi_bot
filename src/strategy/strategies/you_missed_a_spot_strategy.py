@@ -55,12 +55,6 @@ class LevelClear:
 
 
 class YouMissedASpotStrategy:
-    # TODO: listen to manual order cancels and update portfolio?
-    # TODO: related to above ^ need to listen to when resting orders expire
-    # (from expire_ts or market close) so that we can remove them from the portfolio. To
-    # solve above to problems, you can call sync_resting_orders periodically,
-    # but this will slow down strat. Is there a way to listen to an order
-    # lifecycle with websockets?
     # TODO: look into one bad prod trade and see what went wrong
 
     # What quantity should we place as a passive order followup

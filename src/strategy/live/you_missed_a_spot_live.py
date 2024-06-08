@@ -1,3 +1,4 @@
+import datetime
 import traceback
 from typing import List
 
@@ -6,11 +7,14 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
+from helpers.types.websockets.response import OrderbookDeltaRM
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 
 
 def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
     p = PortfolioHistory.load_from_exchange(e)
+    last_resting_order_sync = datetime.datetime.now()
+    sync_resting_orders_every = datetime.timedelta(minutes=1)
 
     strat = YouMissedASpotStrategy(tickers, p)
     with e.get_websocket() as ws:
@@ -25,6 +29,12 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
                 order_id = e.place_order(order)
                 if order_id is not None:
                     p.reserve_order(order, order_id)
+            if isinstance(msg.msg, OrderbookDeltaRM):
+                ts = msg.msg.ts
+                if ts - last_resting_order_sync > sync_resting_orders_every:
+                    print("Sync resting orders...")
+                    last_resting_order_sync = ts
+                    p.sync_resting_orders(e)
 
 
 def cancel_all_open_buy_resting_orders(
