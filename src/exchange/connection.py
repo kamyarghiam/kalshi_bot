@@ -7,7 +7,14 @@ import requests  # type:ignore
 from fastapi.testclient import TestClient
 from requests import JSONDecodeError, Session
 from starlette.testclient import WebSocketTestSession
-from tenacity import retry, retry_if_not_exception_type, stop_after_delay
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_exponential,
+)
 from websockets.sync.client import ClientConnection as ExternalWebsocket
 from websockets.sync.client import connect as external_websocket_connect
 
@@ -64,6 +71,11 @@ class SessionsWrapper:
         self.base_url = base_url
         self._session = Session()
 
+    @retry(
+        retry=retry_if_exception_type(requests.exceptions.ConnectionError),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        stop=stop_after_attempt(4),
+    )
     def request(self, method: str, url: URL, *args, **kwargs):
         return self._session.request(method, self.base_url.add(url), *args, **kwargs)
 
