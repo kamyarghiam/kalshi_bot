@@ -124,9 +124,10 @@ class YouMissedASpotStrategy:
 
     def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
         assert isinstance(msg, OrderFillRM)
+        is_manual_fill = self.portfolio.is_manual_fill(msg)
         self.portfolio.receive_fill_message(msg)
         # If it's a buy message, let's place a sell order immediately
-        if msg.action == TradeType.BUY:
+        if msg.action == TradeType.BUY and not is_manual_fill:
             price_bought = msg.yes_price if msg.side == Side.YES else msg.no_price
             price_to_sell = Price(min(99, price_bought + 2 * self.levels_to_sweep))
             return [
