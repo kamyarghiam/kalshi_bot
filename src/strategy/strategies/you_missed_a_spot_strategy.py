@@ -24,7 +24,7 @@ from helpers.types.websockets.response import (
 
 
 @dataclass
-class Sweep:
+class LevelClear:
     # Represents number of levels swept
     count: int = 0
     # Represents timestamp of when sweep happened
@@ -50,13 +50,9 @@ class Sweep:
 
 class YouMissedASpotStrategy:
     # TODO: check in orders.py that those two fields in Order object exist
-    # TODO: check Kalshi docs if we can force a resting order or cancel
-    # TODO: add some logging or visibiltiy so you can see when things go wrong
+    # TODO: check Kalshi docs if we can force an order to be resting (otherwise cancel)
     # TODO: test case where we get partial fill on order
     # (and this tries to place resting buy and sell orders)
-    # TODO: create sim env to test if you'd make money
-    # TODO: think of and test other edge cases
-    # TODO: review seed strategy and borrow concepts from there
 
     # What quantity should we place as a passive order followup
     followup_qty_min = Quantity(1)
@@ -74,11 +70,11 @@ class YouMissedASpotStrategy:
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
         self.portfolio = portfolio
-        self._sweeps: Dict[Tuple[MarketTicker, Side], Sweep] = {}
+        self._level_clears: Dict[Tuple[MarketTicker, Side], LevelClear] = {}
         self._tickers = set(tickers)
         for ticker in tickers:
             for side in Side:
-                self._sweeps[(ticker, side)] = Sweep()
+                self._level_clears[(ticker, side)] = LevelClear()
         self._obs: Dict[MarketTicker, Orderbook] = {}
 
     @property
@@ -105,18 +101,22 @@ class YouMissedASpotStrategy:
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         maker_price, maker_side = get_maker_price_and_side(msg)
         if self.level_cleared(msg, maker_price, maker_side):
-            self._sweeps[(msg.market_ticker, maker_side)].register_level_clear(
+            print(f"Level cleared {msg}")
+            self._level_clears[(msg.market_ticker, maker_side)].register_level_clear(
                 msg, maker_price
             )
-        if (
-            self.is_sweep(msg.market_ticker, maker_side)
-            and msg.market_ticker not in self.portfolio.positions
-            and not self.portfolio.has_resting_or_inflight_orders(msg.market_ticker)
-        ):
+        if self.is_sweep(msg.market_ticker, maker_side):
             print(f"Sweep! {msg}")
-            self.set_sent_order(msg.market_ticker, maker_side)
+            if msg.market_ticker in self.portfolio.positions:
+                print("   not buying bc already holding position in market")
+                return []
+            if self.portfolio.has_resting_orders(msg.market_ticker):
+                print("    not buying bc we have resting orders")
+                return []
             order = self.get_order(msg, maker_side)
-            return order
+            if order:
+                self.set_sent_order(msg.market_ticker, maker_side)
+                return order
         return []
 
     def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
@@ -158,13 +158,21 @@ class YouMissedASpotStrategy:
             raise ValueError(f"Received unknown msg type: {msg}")
         return []
 
-    def is_sweep(self, ticker: MarketTicker, maker_side: Side):
+    def is_sweep(self, ticker: MarketTicker, maker_side: Side) -> bool:
         """Checks whether this trade sweeps at least two levels on the orderbook"""
-        sweep_info = self._sweeps[(ticker, maker_side)]
-        return (not sweep_info.sent_order) and sweep_info.count >= self.levels_to_sweep
+        level_clear_info = self._level_clears[(ticker, maker_side)]
+        if level_clear_info.sent_order:
+            print("   not sweep because we already sent an order")
+            return False
+        cleared_multiple_levels = level_clear_info.count >= self.levels_to_sweep
+
+        if cleared_multiple_levels:
+            print(level_clear_info)
+
+        return cleared_multiple_levels
 
     def set_sent_order(self, ticker: MarketTicker, maker_side: Side):
-        self._sweeps[(ticker, maker_side)].sent_order = True
+        self._level_clears[(ticker, maker_side)].sent_order = True
 
     def get_order(self, trade: TradeRM, maker_side: Side):
         """Returns order we need to place"""
@@ -187,6 +195,10 @@ class YouMissedASpotStrategy:
             )
             if self.portfolio.can_afford(order):
                 return [order]
+            else:
+                print("    not sending bc we cant afford it")
+        else:
+            print("   not sending order bc level empty")
 
         return []
 

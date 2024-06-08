@@ -271,7 +271,7 @@ class TanModelINXZStrategy:
         if self.ticker not in portfolio.positions:
             # Make sure no orders are in flight (without this, we would duplicate orders
             # until we receive the ack from the exchange)
-            if len(portfolio.reserved_orders) == 0:
+            if len(portfolio.resting_orders) == 0:
                 return self.get_buy_orders(ob, spy_price, ts, portfolio)
         elif sell_orders := self.get_sell_orders(ob, ts, spy_price, portfolio):
             self.cool_down_until = ts + int(self.cool_down.total_seconds())

@@ -825,7 +825,7 @@ def test_portfolio_order_reserve():
         new_balance_2,
     )
 
-    assert len(portfolio._reserved_orders) == 3
+    assert len(portfolio._resting_orders) == 3
     reserved_cash_1 = original_balance - portfolio.balance
     assert portfolio._reserved_cash == reserved_cash_1
     # Let's say part of the first order is filled
@@ -865,7 +865,7 @@ def test_portfolio_order_reserve():
     balance_before_fill = portfolio.balance
     portfolio.receive_fill_message(fill2)
     # Order should be unlocked
-    assert len(portfolio._reserved_orders) == 2
+    assert len(portfolio._resting_orders) == 2
     # We're going to add back in the original amount and then remove away the new cost
     # new_balance_1 was the balance before reserving the second order
     new_balance_3 = new_balance_1 - Cents(4 * 50) - compute_fee(Price(4), Quantity(50))
@@ -888,7 +888,7 @@ def test_portfolio_order_reserve():
     )
     balance_before_fill = portfolio.balance
     portfolio.receive_fill_message(fill3)
-    assert len(portfolio._reserved_orders) == 1
+    assert len(portfolio._resting_orders) == 1
     # Since we got better fees, balance should be greater
     assert portfolio.balance > balance_before_fill
 
@@ -972,7 +972,7 @@ def test_load_from_exchange():
 
     portfolio = PortfolioHistory.load_from_exchange(mock_e)
     assert portfolio.has_open_positions()
-    assert portfolio.has_resting_or_inflight_orders(resting_order1.ticker)
+    assert portfolio.has_resting_orders(resting_order1.ticker)
     fill1 = OrderFillRM(
         trade_id=TradeId(1),
         order_id=resting_order1.order_id,
@@ -999,7 +999,7 @@ def test_load_from_exchange():
     )
 
     portfolio.receive_fill_message(fill1)
-    assert not portfolio.has_resting_or_inflight_orders(resting_order1.ticker)
+    assert not portfolio.has_resting_orders(resting_order1.ticker)
     # Should just place the order normally
     balance_after_manual_buy = original_balance - Cents(51 * 10)
     assert portfolio.balance == balance_after_manual_buy
@@ -1070,7 +1070,7 @@ def test_holding_resting_order():
     b = BalanceCents(5000)
     portfolio = PortfolioHistory(b)
     ticker = MarketTicker("ticker")
-    assert not portfolio.has_resting_or_inflight_orders(ticker)
+    assert not portfolio.has_resting_orders(ticker)
     order = Order(
         ticker=ticker,
         price=Price(5),
@@ -1079,4 +1079,4 @@ def test_holding_resting_order():
         trade=TradeType.BUY,
     )
     portfolio.reserve_order(order, OrderId("order_id"))
-    assert portfolio.has_resting_or_inflight_orders(ticker)
+    assert portfolio.has_resting_orders(ticker)

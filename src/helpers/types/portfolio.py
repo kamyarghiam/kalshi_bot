@@ -166,7 +166,7 @@ class PortfolioError(Exception):
 
 
 @dataclass
-class ReservedOrder:
+class RestingOrder:
     """When we reserve an order, we requested to place the
     order on the exchange, but we haven't received the ack yet.
     They order can be filled in multiple steps, so we need to
@@ -192,17 +192,17 @@ class PortfolioHistory:
         self._cash_balance: BalanceCents = balance
         self._reserved_cash: BalanceCents = BalanceCents(0)
         self._positions: Dict[MarketTicker, Position] = {}
-        # Contains resting or in-flight orders
-        self._reserved_orders: Dict[OrderId, ReservedOrder] = {}
+        self._resting_orders: Dict[OrderId, RestingOrder] = {}
+        # TODO: this will accumulate too much memory for high freq strats
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
         self.allow_side_cross = allow_side_cross
 
-    def has_resting_or_inflight_orders(self, t: MarketTicker) -> bool:
+    def has_resting_orders(self, t: MarketTicker) -> bool:
         """Returns whether we're holding resting order for the market
         or if an order was sent and we haven't heard back from the exchange yet"""
-        for order in self._reserved_orders.values():
+        for order in self._resting_orders.values():
             if order.ticker == t:
                 return True
         return False
@@ -253,8 +253,8 @@ class PortfolioHistory:
         return self._positions
 
     @property
-    def reserved_orders(self) -> Dict[OrderId, ReservedOrder]:
-        return self._reserved_orders
+    def resting_orders(self) -> Dict[OrderId, RestingOrder]:
+        return self._resting_orders
 
     def reserve(self, amount: Cents):
         """This function can be used to reserve or free up reserved cash
@@ -373,25 +373,25 @@ class PortfolioHistory:
             assert order.trade == TradeType.SELL
             # For sells, we don't need to reserve money
             total_cost = Cents(0)
-        self._reserved_orders[order_id] = ReservedOrder(
+        self._resting_orders[order_id] = RestingOrder(
             qty_left=order.quantity, money_left=total_cost, ticker=order.ticker
         )
 
     def receive_fill_message(self, fill: OrderFillRM):
         """Unreserve cash and place order in portfolio"""
         o = fill.to_order()
-        self._reserved_orders[fill.order_id].qty_left -= o.quantity
+        self._resting_orders[fill.order_id].qty_left -= o.quantity
         if fill.action == TradeType.BUY:
             # Need to unreserve cash
             total_cost = o.cost + o.fee
             self.reserve(Cents(-1 * total_cost))
-            self._reserved_orders[fill.order_id].money_left -= total_cost
+            self._resting_orders[fill.order_id].money_left -= total_cost
 
-        if self._reserved_orders[fill.order_id].qty_left == 0:
+        if self._resting_orders[fill.order_id].qty_left == 0:
             # Unlock remaining funds
-            self.reserve(Cents(-1 * self._reserved_orders[fill.order_id].money_left))
+            self.reserve(Cents(-1 * self._resting_orders[fill.order_id].money_left))
             # Remove reserved order
-            del self._reserved_orders[fill.order_id]
+            del self._resting_orders[fill.order_id]
         self.place_order(o)
 
     def buy(self, order: Order):
