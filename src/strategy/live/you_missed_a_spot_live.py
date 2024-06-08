@@ -35,6 +35,7 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
                     print("Sync resting orders...")
                     last_resting_order_sync = ts
                     p.sync_resting_orders(e)
+                    print("Done syncing")
 
 
 def cancel_all_open_buy_resting_orders(
