@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, List, Union
+from uuid import uuid1
 
 from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
@@ -160,6 +161,32 @@ class Order:
     def copy(self):
         return dataclasses.replace(self)
 
+    def to_api_request(self) -> "CreateOrderRequest":
+        price = (
+            {}
+            if self.order_type == OrderType.MARKET
+            else (
+                {"yes_price": self.price}
+                if self.side == Side.YES
+                else {"no_price": self.price}
+            )
+        )
+        return CreateOrderRequest(
+            ticker=self.ticker,
+            action=self.trade,
+            type=self.order_type,
+            client_order_id=str(uuid1()),
+            count=self.quantity,
+            side=self.side,
+            expiration_ts=self.expiration_ts,
+            sell_position_floor=(
+                Quantity(0)
+                if self.trade == TradeType.SELL and self.order_type == OrderType.LIMIT
+                else None
+            ),
+            **price,  # type:ignore[arg-type]
+        )
+
 
 class CreateOrderRequest(ExternalApi):
     model_config = ConfigDict(use_enum_values=True)
@@ -184,6 +211,10 @@ class CreateOrderRequest(ExternalApi):
     # If type = market and action = buy, buy_max_cost
     # represents the maximum cents that can be spent to acquire a position
     buy_max_cost: Cents | None = None
+
+
+class BatchCreateOrderRequest(ExternalApi):
+    orders: List[CreateOrderRequest]
 
 
 class OrderStatus(str, Enum):

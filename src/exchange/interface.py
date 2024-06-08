@@ -2,7 +2,6 @@ from datetime import datetime
 from functools import partial
 from types import TracebackType
 from typing import Callable, ContextManager, Generator, List, TypeVar
-from uuid import uuid1
 
 from fastapi.testclient import TestClient
 
@@ -37,7 +36,6 @@ from helpers.types.markets import (
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.orders import (
     CancelOrderResponse,
-    CreateOrderRequest,
     CreateOrderResponse,
     GetOrdersRequest,
     GetOrdersResponse,
@@ -45,10 +43,6 @@ from helpers.types.orders import (
     OrderAPIResponse,
     OrderId,
     OrderStatus,
-    OrderType,
-    Quantity,
-    Side,
-    TradeType,
 )
 from helpers.types.portfolio import (
     ApiMarketPosition,
@@ -84,30 +78,8 @@ class ExchangeInterface:
         NOTE: I haven't looked into the semantics of what happens if the
         order is partially filled"""
 
-        price = (
-            {}
-            if order.order_type == OrderType.MARKET
-            else (
-                {"yes_price": order.price}
-                if order.side == Side.YES
-                else {"no_price": order.price}
-            )
-        )
-        request = CreateOrderRequest(
-            ticker=order.ticker,
-            action=order.trade,
-            type=order.order_type,
-            client_order_id=str(uuid1()),
-            count=order.quantity,
-            side=order.side,
-            expiration_ts=order.expiration_ts,
-            sell_position_floor=(
-                Quantity(0)
-                if order.trade == TradeType.SELL and order.order_type == OrderType.LIMIT
-                else None
-            ),
-            **price,  # type:ignore[arg-type]
-        )
+        request = order.to_api_request()
+
         # Sometimes, we get issues when creating an order
         # So for now, we print to see what happened
         print(request.__repr__())
