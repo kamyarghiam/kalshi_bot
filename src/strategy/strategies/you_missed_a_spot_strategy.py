@@ -52,13 +52,11 @@ class LevelClear:
 
 
 class YouMissedASpotStrategy:
-    # TODO: check in orders.py that those two fields in Order object exist
-    # TODO: check Kalshi docs if we can force an order to be resting (otherwise cancel)
     # TODO: test case where we get partial fill on order
     # (and this tries to place resting buy and sell orders)
     # TODO: listen to manual order cancels and update portfolio?
     # TODO: related to above ^ need to listen to when resting orders expire
-    # (from expire_ts) so that we can remove them from the portfolio. To
+    # (from expire_ts or market close) so that we can remove them from the portfolio. To
     # solve above to problems, you can call sync_resting_orders periodically,
     # but this will slow down strat. Is there a way to listen to an order
     # lifecycle with websockets?

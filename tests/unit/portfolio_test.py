@@ -954,7 +954,7 @@ def test_load_from_exchange():
         status=OrderStatus.RESTING,
         ticker=MarketTicker("some_ticker3"),
         type=OrderType.LIMIT,
-        count=Quantity(10),
+        remaining_count=Quantity(10),
     )
     sell_order = OrderAPIResponse(
         client_order_id=OrderId("some_order_id2"),
@@ -966,7 +966,7 @@ def test_load_from_exchange():
         status=OrderStatus.RESTING,
         ticker=MarketTicker("some_ticker3"),
         type=OrderType.LIMIT,
-        count=Quantity(10),
+        remaining_count=Quantity(10),
     )
     mock_e.get_orders.return_value = [resting_order1]
 
@@ -981,7 +981,7 @@ def test_load_from_exchange():
         side=resting_order1.side,
         yes_price=resting_order1.yes_price,
         no_price=resting_order1.no_price,
-        count=resting_order1.count,
+        count=resting_order1.remaining_count,
         action=resting_order1.action,
         ts=123,
     )
@@ -993,7 +993,7 @@ def test_load_from_exchange():
         side=sell_order.side,
         yes_price=sell_order.yes_price,
         no_price=sell_order.no_price,
-        count=sell_order.count,
+        count=sell_order.remaining_count,
         action=sell_order.action,
         ts=124,
     )
