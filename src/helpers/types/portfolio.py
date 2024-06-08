@@ -380,18 +380,21 @@ class PortfolioHistory:
     def receive_fill_message(self, fill: OrderFillRM):
         """Unreserve cash and place order in portfolio"""
         o = fill.to_order()
-        self._resting_orders[fill.order_id].qty_left -= o.quantity
-        if fill.action == TradeType.BUY:
-            # Need to unreserve cash
-            total_cost = o.cost + o.fee
-            self.reserve(Cents(-1 * total_cost))
-            self._resting_orders[fill.order_id].money_left -= total_cost
+        if resting_order := self._resting_orders.get(fill.order_id):
+            resting_order.qty_left -= o.quantity
+            if fill.action == TradeType.BUY:
+                # Need to unreserve cash
+                total_cost = o.cost + o.fee
+                self.reserve(Cents(-1 * total_cost))
+                resting_order.money_left -= total_cost
 
-        if self._resting_orders[fill.order_id].qty_left == 0:
-            # Unlock remaining funds
-            self.reserve(Cents(-1 * self._resting_orders[fill.order_id].money_left))
-            # Remove reserved order
-            del self._resting_orders[fill.order_id]
+            if resting_order.qty_left == 0:
+                # Unlock remaining funds
+                self.reserve(Cents(-1 * resting_order.money_left))
+                # Remove reserved order
+                del self._resting_orders[fill.order_id]
+        else:
+            print(f"Received manual fill! {fill}")
         self.place_order(o)
 
     def buy(self, order: Order):

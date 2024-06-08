@@ -53,6 +53,7 @@ class YouMissedASpotStrategy:
     # TODO: check Kalshi docs if we can force an order to be resting (otherwise cancel)
     # TODO: test case where we get partial fill on order
     # (and this tries to place resting buy and sell orders)
+    # TODO: listen to order cancels and update portfolio? So you can manually intervene
 
     # What quantity should we place as a passive order followup
     followup_qty_min = Quantity(1)

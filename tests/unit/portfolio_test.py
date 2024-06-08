@@ -1080,3 +1080,48 @@ def test_holding_resting_order():
     )
     portfolio.reserve_order(order, OrderId("order_id"))
     assert portfolio.has_resting_orders(ticker)
+
+
+def test_reserve_order_manual_intervention():
+    original_balance = BalanceCents(5000)
+    portfolio = PortfolioHistory(original_balance)
+
+    # Test manual intervention (we place a trade on the website and receive fill)
+    order_id_1 = OrderId(1)
+    fill1 = OrderFillRM(
+        trade_id=TradeId(1),
+        order_id=order_id_1,
+        market_ticker=MarketTicker("some_ticker3"),
+        is_taker=True,
+        side=Side.YES,
+        yes_price=Price(51),
+        no_price=Price(49),
+        count=Quantity(10),
+        action=TradeType.BUY,
+        ts=123,
+    )
+    portfolio.receive_fill_message(fill1)
+    # Should just place the order normally
+    balance_after_manual_buy = (
+        original_balance - Cents(51 * 10) - compute_fee(Price(51), Quantity(10))
+    )
+    assert portfolio.balance == balance_after_manual_buy
+
+    new_balance = portfolio.balance
+    # And we can manually sell
+    fill2 = OrderFillRM(
+        trade_id=TradeId(1),
+        order_id=order_id_1,
+        market_ticker=MarketTicker("some_ticker3"),
+        is_taker=True,
+        side=Side.YES,
+        yes_price=Price(52),
+        no_price=Price(48),
+        count=Quantity(10),
+        action=TradeType.SELL,
+        ts=123,
+    )
+    portfolio.receive_fill_message(fill2)
+    assert portfolio.balance == new_balance + Cents(52 * 10) - compute_fee(
+        Price(52), Quantity(10)
+    )
