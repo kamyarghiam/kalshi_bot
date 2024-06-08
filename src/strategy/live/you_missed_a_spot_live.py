@@ -14,7 +14,7 @@ from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrateg
 def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
     p = PortfolioHistory.load_from_exchange(e)
     last_resting_order_sync = datetime.datetime.now()
-    sync_resting_orders_every = datetime.timedelta(minutes=1)
+    sync_resting_orders_every = datetime.timedelta(minutes=10)
 
     strat = YouMissedASpotStrategy(tickers, p)
     with e.get_websocket() as ws:
