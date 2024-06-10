@@ -81,6 +81,7 @@ class YouMissedASpotStrategy:
                 self._level_clears[(ticker, side)] = LevelClear()
         self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.min_position_per_trade < self.max_position_per_trade
+        assert self.min_position_per_trade > 0
         assert self.buy_order_lifetime_min < self.buy_order_lifetime_max
         assert self.profit_gap >= Price(1)
         # There are a lot of assumptions baked into this
