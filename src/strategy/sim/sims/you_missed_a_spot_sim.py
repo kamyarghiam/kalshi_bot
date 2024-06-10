@@ -14,7 +14,13 @@ from typing import List, Union
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
-from helpers.types.money import BalanceCents, Cents, Price, get_opposite_side_price
+from helpers.types.money import (
+    BalanceCents,
+    Cents,
+    Dollars,
+    Price,
+    get_opposite_side_price,
+)
 from helpers.types.orders import (
     Order,
     OrderId,
@@ -944,6 +950,9 @@ def test_get_followup_qty():
     max_qty = Quantity(int(strat.max_position_per_trade // price))
     for _ in range(100):
         assert strat.followup_qty_min <= strat.get_followup_qty(price) <= max_qty
+
+    # This is checked in the init. We check in tests too to double check
+    assert strat.max_position_per_trade >= Dollars(1) * strat.followup_qty_min
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
