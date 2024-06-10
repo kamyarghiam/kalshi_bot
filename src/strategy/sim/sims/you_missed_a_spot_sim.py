@@ -14,13 +14,7 @@ from typing import List, Union
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
-from helpers.types.money import (
-    BalanceCents,
-    Cents,
-    Dollars,
-    Price,
-    get_opposite_side_price,
-)
+from helpers.types.money import BalanceCents, Cents, Price, get_opposite_side_price
 from helpers.types.orders import (
     Order,
     OrderId,
@@ -948,11 +942,9 @@ def test_get_followup_qty():
     strat = YouMissedASpotStrategy(tickers, portfolio)
     price = Price(99)
     max_qty = Quantity(int(strat.max_position_per_trade // price))
+    min_qty = Quantity(int(strat.min_position_per_trade // price))
     for _ in range(100):
-        assert strat.followup_qty_min <= strat.get_followup_qty(price) <= max_qty
-
-    # This is checked in the init. We check in tests too to double check
-    assert strat.max_position_per_trade >= Dollars(1) * strat.followup_qty_min
+        assert min_qty <= strat.get_followup_qty(price) <= max_qty
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
@@ -984,10 +976,10 @@ def assert_order_valid(
     assert order.expiration_ts is not None
     assert expiration_time_min <= order.expiration_ts <= expiration_time_max
     assert (
-        YouMissedASpotStrategy.followup_qty_min
-        <= order.quantity
-        <= YouMissedASpotStrategy.followup_qty_max
-    )
+        YouMissedASpotStrategy.min_position_per_trade
+        <= expected_order.cost
+        <= YouMissedASpotStrategy.max_position_per_trade
+    ), expected_order
 
 
 def unit_test_you_missed_a_spot():

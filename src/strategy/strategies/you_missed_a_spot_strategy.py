@@ -7,6 +7,7 @@ A sweep is defined as X number of complete level clears. After
 we get filled, we place a sell order on the other side.
 """
 
+import math
 import random
 import time
 from dataclasses import dataclass
@@ -55,16 +56,13 @@ class LevelClear:
 
 
 class YouMissedASpotStrategy:
-    # What quantity should we place as a passive order followup
-    followup_qty_min = Quantity(10)
-    followup_qty_max = Quantity(50)
     # How long should a buy order stay alive for?
     buy_order_lifetime_min = timedelta(minutes=30)
     buy_order_lifetime_max = timedelta(minutes=60)
     # When we sell, how much higher should the price be
     profit_gap = Price(1)
-    # Maxmium we're willing to bet on per trade. Must be
-    # at least $1 * followup_qty_min
+    # Max/min we're willing to bet on per trade
+    min_position_per_trade = Dollars(2)
     max_position_per_trade = Dollars(15)
 
     def __init__(
@@ -82,15 +80,16 @@ class YouMissedASpotStrategy:
             for side in Side:
                 self._level_clears[(ticker, side)] = LevelClear()
         self._obs: Dict[MarketTicker, Orderbook] = {}
-        assert (
-            self.max_position_per_trade >= Dollars(1) * self.followup_qty_min
-        ), "Increase your max_position_per_trade or reduce followup_qty_min"
+        assert self.min_position_per_trade < self.max_position_per_trade
+        assert self.buy_order_lifetime_min < self.buy_order_lifetime_max
+        assert self.profit_gap >= Price(1)
+        # There are a lot of assumptions baked into this
+        assert self.levels_to_sweep >= 2
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
-        max_qty = Quantity(
-            int(min(self.followup_qty_max, self.max_position_per_trade // buy_price))
-        )
-        return Quantity(random.randint(self.followup_qty_min, max_qty))
+        min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
+        max_qty = Quantity(int(self.max_position_per_trade // buy_price))
+        return Quantity(random.randint(min_qty, max_qty))
 
     @property
     def passive_order_lifetime(self) -> timedelta:
