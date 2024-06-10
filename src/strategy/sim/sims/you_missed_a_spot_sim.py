@@ -12,10 +12,17 @@ import sys
 from typing import List, Union
 
 from data.coledb.coledb import ColeDBInterface
-from exchange.interface import ExchangeInterface, TradeType
+from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketResult, MarketTicker
-from helpers.types.money import BalanceCents, Cents, Price
-from helpers.types.orders import Order, OrderId, Quantity, QuantityDelta, Side
+from helpers.types.money import BalanceCents, Cents, Price, get_opposite_side_price
+from helpers.types.orders import (
+    Order,
+    OrderId,
+    Quantity,
+    QuantityDelta,
+    Side,
+    TradeType,
+)
 from helpers.types.trades import Trade
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
@@ -688,11 +695,10 @@ def test_fill_msg():
     fill.market_ticker = ticker
 
     portfolio.reserve_order(fill.to_order(), fill.order_id)
-
     orders = strat.consume_next_step(fill)
     assert len(orders) == 1
     assert orders[0] == Order(
-        price=Price(64),
+        price=Price(int(fill.no_price + strat.profit_gap)),
         quantity=fill.count,
         trade=TradeType.SELL,
         ticker=fill.market_ticker,
@@ -704,6 +710,42 @@ def test_fill_msg():
     fill.market_ticker = MarketTicker("BAD_TICKER")
     orders = strat.consume_next_step(fill)
     assert orders == []
+
+
+def test_dont_sell_below_profit_gap():
+    """Tests that sell orders are not made below the profit gap"""
+    ticker = MarketTicker("TOPALBUMBYBEY-24")
+    tickers = [ticker]
+    portfolio = PortfolioHistory(balance=BalanceCents(1000000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
+    assert (
+        strat.profit_gap >= 1
+    ), "We need at least 1 tick in profit for this test to work"
+    assert not portfolio.has_open_positions()
+    fill: OrderFillRM = random_data(
+        OrderFillRM,
+        custom_args={
+            Quantity: lambda: Quantity(random.randint(0, 100)),
+            Price: lambda: Price(random.randint(1, 99)),
+        },
+    )
+    fill.action = TradeType.BUY
+    fill.yes_price = Price(1)
+    # We go to the extreme. Profit gap is at least 1 cent. This should not sell
+    fill.no_price = Price(99)
+    fill.side = Side.NO
+    fill.market_ticker = ticker
+
+    portfolio.reserve_order(fill.to_order(), fill.order_id)
+    orders = strat.consume_next_step(fill)
+    assert orders == []
+
+    # but if no price is below profit gap, it should work
+    fill.no_price = Price(int(Price(99) - strat.profit_gap))
+    fill.yes_price = get_opposite_side_price(fill.no_price)
+    portfolio.reserve_order(fill.to_order(), fill.order_id)
+    orders = strat.consume_next_step(fill)
+    assert len(orders) == 1
 
 
 def test_create_position_if_holding_resting_orders():
@@ -890,6 +932,18 @@ def test_dont_make_position_when_cant_afford():
             assert len(orders) == 1
         orders = strat.consume_next_step(trade_msg3)
         assert orders == []
+
+
+def test_get_followup_qty():
+    """Tests that sell orders are not made below the profit gap"""
+    ticker = MarketTicker("TOPALBUMBYBEY-24")
+    tickers = [ticker]
+    portfolio = PortfolioHistory(balance=BalanceCents(1000000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
+    price = Price(99)
+    max_qty = Quantity(int(strat.max_position_per_trade // price))
+    for _ in range(100):
+        assert strat.followup_qty_min <= strat.get_followup_qty(price) <= max_qty
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()

@@ -14,7 +14,7 @@ from datetime import timedelta
 from typing import Dict, List, Tuple
 
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Price
+from helpers.types.money import Cents, Dollars, Price
 from helpers.types.orderbook import Orderbook, OrderbookView
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
@@ -55,14 +55,17 @@ class LevelClear:
 
 
 class YouMissedASpotStrategy:
-    # TODO: look into one bad prod trade and see what went wrong
-
     # What quantity should we place as a passive order followup
-    followup_qty_min = Quantity(1)
-    followup_qty_max = Quantity(10)
+    followup_qty_min = Quantity(10)
+    followup_qty_max = Quantity(50)
     # How long should an order stay alive for?
     passive_order_lifetime_min = timedelta(minutes=30)
     passive_order_lifetime_max = timedelta(minutes=60)
+    # When we sell, how much higher should the price be
+    profit_gap = Price(1)
+    # Maxmium we're willing to bet on per trade. Must be
+    # at least $1 * followup_qty_min
+    max_position_per_trade = Dollars(15)
 
     def __init__(
         self,
@@ -79,10 +82,15 @@ class YouMissedASpotStrategy:
             for side in Side:
                 self._level_clears[(ticker, side)] = LevelClear()
         self._obs: Dict[MarketTicker, Orderbook] = {}
+        assert (
+            self.max_position_per_trade >= Dollars(1) * self.followup_qty_min
+        ), "Increase your max_position_per_trade or reduce followup_qty_min"
 
-    @property
-    def followup_qty(self) -> Quantity:
-        return Quantity(random.randint(self.followup_qty_min, self.followup_qty_max))
+    def get_followup_qty(self, buy_price: Price) -> Quantity:
+        max_qty = Quantity(
+            int(min(self.followup_qty_max, self.max_position_per_trade // buy_price))
+        )
+        return Quantity(random.randint(self.followup_qty_min, max_qty))
 
     @property
     def passive_order_lifetime(self) -> timedelta:
@@ -129,17 +137,19 @@ class YouMissedASpotStrategy:
         # If it's a buy message, let's place a sell order immediately
         if msg.action == TradeType.BUY and not is_manual_fill:
             price_bought = msg.yes_price if msg.side == Side.YES else msg.no_price
-            price_to_sell = Price(min(99, price_bought + 2 * self.levels_to_sweep))
-            return [
-                Order(
-                    price=price_to_sell,
-                    quantity=msg.count,
-                    trade=TradeType.SELL,
-                    ticker=msg.market_ticker,
-                    side=msg.side,
-                    expiration_ts=None,
-                )
-            ]
+            # Dont sell it if it's under our profit gap
+            if (Cents(99) - price_bought) >= self.profit_gap:
+                price_to_sell = Price(price_bought + self.profit_gap)
+                return [
+                    Order(
+                        price=price_to_sell,
+                        quantity=msg.count,
+                        trade=TradeType.SELL,
+                        ticker=msg.market_ticker,
+                        side=msg.side,
+                        expiration_ts=None,
+                    )
+                ]
         return []
 
     def consume_next_step(
@@ -186,9 +196,10 @@ class YouMissedASpotStrategy:
         if level:
             # If level is empty, we don't want to place orders
             price, _ = level
+            price_to_buy = Price(price + 1)  # Place right above
             order = Order(
-                price=Price(price + 1),  # Place right above
-                quantity=self.followup_qty,
+                price=price_to_buy,
+                quantity=self.get_followup_qty(price_to_buy),
                 trade=TradeType.BUY,
                 ticker=ob.market_ticker,
                 side=maker_side,
