@@ -58,9 +58,9 @@ class YouMissedASpotStrategy:
     # What quantity should we place as a passive order followup
     followup_qty_min = Quantity(10)
     followup_qty_max = Quantity(50)
-    # How long should an order stay alive for?
-    passive_order_lifetime_min = timedelta(minutes=30)
-    passive_order_lifetime_max = timedelta(minutes=60)
+    # How long should a buy order stay alive for?
+    buy_order_lifetime_min = timedelta(minutes=30)
+    buy_order_lifetime_max = timedelta(minutes=60)
     # When we sell, how much higher should the price be
     profit_gap = Price(1)
     # Maxmium we're willing to bet on per trade. Must be
@@ -96,8 +96,8 @@ class YouMissedASpotStrategy:
     def passive_order_lifetime(self) -> timedelta:
         return timedelta(
             seconds=random.randint(
-                int(self.passive_order_lifetime_min.total_seconds()),
-                int(self.passive_order_lifetime_max.total_seconds()),
+                int(self.buy_order_lifetime_min.total_seconds()),
+                int(self.buy_order_lifetime_max.total_seconds()),
             )
         )
 
