@@ -1,4 +1,5 @@
 import datetime
+import time
 import traceback
 from typing import List
 
@@ -7,14 +8,15 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import OrderbookDeltaRM
+from helpers.types.websockets.response import TradeRM
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 
 
-def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
-    p = PortfolioHistory.load_from_exchange(e)
-    last_resting_order_sync = datetime.datetime.now()
-    sync_resting_orders_every = datetime.timedelta(minutes=10)
+def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHistory):
+    last_resting_order_sync = time.time()
+    sync_resting_orders_every = datetime.timedelta(minutes=10).total_seconds()
+    print_pnl_stats_every = datetime.timedelta(minutes=30).total_seconds()
+    last_pnl_print = time.time()
 
     strat = YouMissedASpotStrategy(tickers, p)
     with e.get_websocket() as ws:
@@ -29,13 +31,15 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker]):
                 order_id = e.place_order(order)
                 if order_id is not None:
                     p.reserve_order(order, order_id)
-            if isinstance(msg.msg, OrderbookDeltaRM):
+            if isinstance(msg.msg, TradeRM):
                 ts = msg.msg.ts
                 if ts - last_resting_order_sync > sync_resting_orders_every:
-                    print("Sync resting orders...")
                     last_resting_order_sync = ts
                     p.sync_resting_orders(e)
-                    print("Done syncing")
+                    print("Synced resting orders")
+                elif ts - last_pnl_print > print_pnl_stats_every:
+                    last_pnl_print = ts
+                    print(p)
 
 
 def cancel_all_open_buy_resting_orders(
@@ -65,10 +69,13 @@ def cancel_all_open_buy_resting_orders(
 def main():
     with ExchangeInterface(is_test_run=False) as e:
         tickers = [m.ticker for m in e.get_active_markets()]
+        p = PortfolioHistory.load_from_exchange(e)
         try:
-            run_live(e, tickers)
+            run_live(e, tickers, p)
         finally:
             cancel_all_open_buy_resting_orders(e, tickers)
+            print(p)
+            print(f"Unrealized pnl: {p.get_unrealized_pnl(e)}")
 
 
 if __name__ == "__main__":

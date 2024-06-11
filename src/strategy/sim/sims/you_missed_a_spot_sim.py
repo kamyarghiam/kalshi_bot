@@ -698,12 +698,17 @@ def test_fill_msg():
     orders = strat.consume_next_step(fill)
     assert len(orders) == 1
     assert orders[0] == Order(
-        price=Price(int(fill.no_price + strat.profit_gap)),
+        price=orders[0].price,
         quantity=fill.count,
         trade=TradeType.SELL,
         ticker=fill.market_ticker,
         side=Side.NO,
         expiration_ts=None,
+    )
+    assert (
+        fill.no_price + strat.min_profit_gap
+        <= orders[0].price
+        <= fill.no_price + strat.max_profit_gap
     )
 
     # If the ticker is not a ticker that we're managing, then nothing should happen
@@ -719,7 +724,7 @@ def test_dont_sell_below_profit_gap():
     portfolio = PortfolioHistory(balance=BalanceCents(1000000))
     strat = YouMissedASpotStrategy(tickers, portfolio)
     assert (
-        strat.profit_gap >= 1
+        strat.min_profit_gap >= 1
     ), "We need at least 1 tick in profit for this test to work"
     assert not portfolio.has_open_positions()
     fill: OrderFillRM = random_data(
@@ -741,7 +746,7 @@ def test_dont_sell_below_profit_gap():
     assert orders == []
 
     # but if no price is below profit gap, it should work
-    fill.no_price = Price(int(Price(99) - strat.profit_gap))
+    fill.no_price = Price(int(Price(99) - strat.max_profit_gap))
     fill.yes_price = get_opposite_side_price(fill.no_price)
     portfolio.reserve_order(fill.to_order(), fill.order_id)
     orders = strat.consume_next_step(fill)

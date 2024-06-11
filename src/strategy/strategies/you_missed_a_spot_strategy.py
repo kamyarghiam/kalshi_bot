@@ -60,10 +60,11 @@ class YouMissedASpotStrategy:
     buy_order_lifetime_min = timedelta(minutes=30)
     buy_order_lifetime_max = timedelta(minutes=60)
     # When we sell, how much higher should the price be
-    profit_gap = Price(1)
+    min_profit_gap = Price(1)
+    max_profit_gap = Price(3)
     # Max/min we're willing to bet on per trade
-    min_position_per_trade = Dollars(2)
-    max_position_per_trade = Dollars(15)
+    min_position_per_trade = Dollars(5)
+    max_position_per_trade = Dollars(20)
 
     def __init__(
         self,
@@ -83,7 +84,8 @@ class YouMissedASpotStrategy:
         assert self.min_position_per_trade < self.max_position_per_trade
         assert self.min_position_per_trade > 0
         assert self.buy_order_lifetime_min < self.buy_order_lifetime_max
-        assert self.profit_gap >= Price(1)
+        assert self.min_profit_gap >= Price(1)
+        assert self.max_profit_gap > self.min_profit_gap
         # There are a lot of assumptions baked into this
         assert self.levels_to_sweep >= 2
 
@@ -100,6 +102,10 @@ class YouMissedASpotStrategy:
                 int(self.buy_order_lifetime_max.total_seconds()),
             )
         )
+
+    @property
+    def profit_gap(self) -> Price:
+        return Price(random.randint(self.min_profit_gap, self.max_profit_gap))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
         self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg).get_view(
@@ -138,7 +144,7 @@ class YouMissedASpotStrategy:
         if msg.action == TradeType.BUY and not is_manual_fill:
             price_bought = msg.yes_price if msg.side == Side.YES else msg.no_price
             # Dont sell it if it's under our profit gap
-            if (Cents(99) - price_bought) >= self.profit_gap:
+            if (Cents(99) - price_bought) >= self.max_profit_gap:
                 price_to_sell = Price(price_bought + self.profit_gap)
                 return [
                     Order(
