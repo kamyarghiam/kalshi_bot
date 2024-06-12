@@ -57,14 +57,16 @@ class LevelClear:
 
 class YouMissedASpotStrategy:
     # How long should a buy order stay alive for?
-    buy_order_lifetime_min = timedelta(minutes=30)
-    buy_order_lifetime_max = timedelta(minutes=60)
+    buy_order_lifetime_min = timedelta(seconds=20)
+    buy_order_lifetime_max = timedelta(seconds=120)
     # When we sell, how much higher should the price be
-    min_profit_gap = Price(1)
+    min_profit_gap = Price(2)
     max_profit_gap = Price(3)
     # Max/min we're willing to bet on per trade
-    min_position_per_trade = Dollars(5)
-    max_position_per_trade = Dollars(20)
+    min_position_per_trade = Dollars(20)
+    max_position_per_trade = Dollars(50)
+    # We wont trade prices below this threshold
+    min_price_to_trade = Price(15)
 
     def __init__(
         self,
@@ -87,7 +89,7 @@ class YouMissedASpotStrategy:
         assert self.min_profit_gap >= Price(1)
         assert self.max_profit_gap > self.min_profit_gap
         # There are a lot of assumptions baked into this
-        assert self.levels_to_sweep >= 2
+        # assert self.levels_to_sweep >= 2
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
         min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
@@ -202,22 +204,24 @@ class YouMissedASpotStrategy:
         if level:
             # If level is empty, we don't want to place orders
             price, _ = level
-            price_to_buy = Price(price + 1)  # Place right above
-            order = Order(
-                price=price_to_buy,
-                quantity=self.get_followup_qty(price_to_buy),
-                trade=TradeType.BUY,
-                ticker=ob.market_ticker,
-                side=maker_side,
-                expiration_ts=int(
-                    time.time() + self.passive_order_lifetime.total_seconds()
-                ),
-                is_taker=False,
-            )
-            if self.portfolio.can_afford(order):
-                return [order]
-            else:
-                print("    not sending bc we cant afford it")
+            if price >= self.min_price_to_trade:
+                price_to_buy = Price(price + 1)  # Place right above
+                order = Order(
+                    price=price_to_buy,
+                    quantity=self.get_followup_qty(price_to_buy),
+                    trade=TradeType.BUY,
+                    ticker=ob.market_ticker,
+                    side=maker_side,
+                    expiration_ts=int(
+                        time.time() + self.passive_order_lifetime.total_seconds()
+                    ),
+                    is_taker=False,
+                )
+                if self.portfolio.can_afford(order):
+                    return [order]
+                else:
+                    print("    not sending bc we cant afford it")
+            print("    not sending because price is below threshold to trade")
         else:
             print("   not sending order bc level empty")
 
