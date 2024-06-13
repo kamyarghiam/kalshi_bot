@@ -18,7 +18,7 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
     print_pnl_stats_every = datetime.timedelta(minutes=5).total_seconds()
     last_pnl_print = time.time()
 
-    strat = YouMissedASpotStrategy(tickers, p, levels_to_sweep=1)
+    strat = YouMissedASpotStrategy(tickers, p)
     with e.get_websocket() as ws:
         sub = OrderbookSubscription(
             ws, tickers, send_trade_updates=True, send_order_fills=True
@@ -68,37 +68,43 @@ def cancel_all_open_buy_resting_orders(
 
 def main():
     with ExchangeInterface(is_test_run=False) as e:
-        tickers = [m.ticker for m in e.get_active_markets()]
-        series_to_freqs: Dict[SeriesTicker, str] = {}
-        tickers_to_trade = []
         print("Getting tickers...")
-        # Only get tickers that trade daily
-        for ticker in tickers:
-            series_ticker = to_series_ticker(ticker)
-            if series_ticker == SeriesTicker("INXD"):
-                # For some reason, they changed this series ticker
-                series_ticker = SeriesTicker("INX")
-            if series_ticker in series_to_freqs:
-                freq = series_to_freqs[series_ticker]
-            else:
-                try:
-                    series = e.get_series(series_ticker)
-                except Exception as ex:
-                    print(ex)
-                    continue
-                else:
-                    freq = series.frequency
-                    series_to_freqs[series_ticker] = freq
-            if freq == "daily":
-                tickers_to_trade.append(ticker)
+        tickers = [m.ticker for m in e.get_active_markets()]
         print("Got tickers!")
         p = PortfolioHistory.load_from_exchange(e)
         try:
-            run_live(e, tickers_to_trade, p)
+            run_live(e, tickers, p)
         finally:
-            cancel_all_open_buy_resting_orders(e, tickers_to_trade)
+            cancel_all_open_buy_resting_orders(e, tickers)
             print(p)
             print(f"Unrealized pnl: {p.get_unrealized_pnl(e)}")
+
+
+def only_get_daily_tickers(
+    all_tickers: List[MarketTicker], e: ExchangeInterface
+) -> List[MarketTicker]:
+    # Only get tickers that trade daily
+    series_to_freqs: Dict[SeriesTicker, str] = {}
+    tickers_to_trade = []
+    for ticker in all_tickers:
+        series_ticker = to_series_ticker(ticker)
+        if series_ticker == SeriesTicker("INXD"):
+            # For some reason, they changed this series ticker
+            series_ticker = SeriesTicker("INX")
+        if series_ticker in series_to_freqs:
+            freq = series_to_freqs[series_ticker]
+        else:
+            try:
+                series = e.get_series(series_ticker)
+            except Exception as ex:
+                print(ex)
+                continue
+            else:
+                freq = series.frequency
+                series_to_freqs[series_ticker] = freq
+        if freq == "daily":
+            tickers_to_trade.append(ticker)
+    return tickers_to_trade
 
 
 if __name__ == "__main__":

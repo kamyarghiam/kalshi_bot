@@ -201,16 +201,17 @@ class Orderbook:
 
     def get_bbo(
         self,
+        side: Side = Side.YES,
     ) -> BBO:
         """Returns tuple of bid and ask at bbo yes side, if it exists"""
         ob = self.get_view(OrderbookView.BID)
-        bid = ob.yes.get_largest_price_level()
+        bid = ob.get_side(side).get_largest_price_level()
         bid_side_bbo: SideBBO | None = None
         if bid is not None:
             bid_price, bid_qty = bid
             bid_side_bbo = SideBBO(price=bid_price, quantity=bid_qty)
 
-        ask = ob.no.get_largest_price_level()
+        ask = ob.get_side(Side.get_other_side(side)).get_largest_price_level()
         ask_side_bbo: SideBBO | None = None
         if ask is not None:
             # Need to take opposite price

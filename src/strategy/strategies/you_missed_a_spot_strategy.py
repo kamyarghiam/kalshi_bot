@@ -68,7 +68,7 @@ class YouMissedASpotStrategy:
     # We wont trade prices below this threshold
     min_price_to_trade = Price(10)
     # How many cents above best bid should we place order
-    price_above_best_bid = Cents(0)
+    price_above_best_bid = Cents(1)
 
     def __init__(
         self,
@@ -91,7 +91,7 @@ class YouMissedASpotStrategy:
         assert self.min_profit_gap >= Price(1)
         assert self.max_profit_gap > self.min_profit_gap
         # There are a lot of assumptions baked into this
-        # assert self.levels_to_sweep >= 2
+        assert self.levels_to_sweep >= 2
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
         min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
@@ -121,7 +121,7 @@ class YouMissedASpotStrategy:
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         maker_price, maker_side = get_maker_price_and_side(msg)
-        if self.level_cleared(msg, maker_price, maker_side):
+        if self.level_cleared(msg, maker_price, maker_side, msg.count):
             print(f"Level cleared {msg}")
             self._level_clears[(msg.market_ticker, maker_side)].register_level_clear(
                 msg, maker_price
@@ -201,13 +201,17 @@ class YouMissedASpotStrategy:
     def get_order(self, trade: TradeRM, maker_side: Side):
         """Returns order we need to place"""
         ob = self._obs[trade.market_ticker]
-        maker_side_ob = ob.get_side(maker_side)
-        level = maker_side_ob.get_largest_price_level()
-        if level:
+        bbo = ob.get_bbo(maker_side)
+        if bbo.bid:
             # If level is empty, we don't want to place orders
-            price, _ = level
+            price = bbo.bid.price
             if price >= self.min_price_to_trade:
                 price_to_buy = Price(int(price + self.price_above_best_bid))
+                # Check that we dont cross the spread
+                if bbo.ask:
+                    if bbo.ask.price == price_to_buy:
+                        # Just go one level down
+                        price_to_buy = price
                 order = Order(
                     price=price_to_buy,
                     quantity=self.get_followup_qty(price_to_buy),
@@ -230,15 +234,19 @@ class YouMissedASpotStrategy:
         return []
 
     def level_cleared(
-        self, trade: TradeRM, maker_price: Price, maker_side: Side
+        self, trade: TradeRM, maker_price: Price, maker_side: Side, qty_traded: Quantity
     ) -> bool:
         # Already in BID view due to how we apply deltas in consume_next_step
         ob = self._obs[trade.market_ticker]
         ob_side = ob.get_side(maker_side)
         level = ob_side.get_largest_price_level()
         if level:
-            price, _ = level
+            price, level_qty = level
             if maker_price > price:
+                return True
+            # New condition: if we take half the qty on a level,
+            # we consider it a sweep!
+            if maker_price == price and qty_traded > level_qty:
                 return True
         else:
             # If there are no more levels, we swept it
