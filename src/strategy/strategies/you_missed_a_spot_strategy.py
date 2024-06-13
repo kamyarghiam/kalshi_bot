@@ -149,8 +149,9 @@ class YouMissedASpotStrategy:
             has_fees = msg.is_taker
             if has_fees:
                 # This is for debugging to understand when we're taking fees
-                print("Fill message had fees!")
+                print("Fill message had fees! Not selling. Sell manually")
                 print(msg)
+                return []
             price_bought = msg.yes_price if msg.side == Side.YES else msg.no_price
             # Dont sell it if it's under our profit gap
             if (Cents(99) - price_bought) >= self.max_profit_gap:
