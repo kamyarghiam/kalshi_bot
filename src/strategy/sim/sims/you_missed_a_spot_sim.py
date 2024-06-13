@@ -703,6 +703,7 @@ def test_fill_msg():
     fill.no_price = Price(60)
     fill.side = Side.NO
     fill.market_ticker = ticker
+    fill.is_taker = False
 
     portfolio.reserve_order(fill.to_order(), fill.order_id)
     orders = strat.consume_next_step(fill)
@@ -750,6 +751,7 @@ def test_dont_sell_below_profit_gap():
     fill.no_price = Price(99)
     fill.side = Side.NO
     fill.market_ticker = ticker
+    fill.is_taker = False
 
     portfolio.reserve_order(fill.to_order(), fill.order_id)
     orders = strat.consume_next_step(fill)
