@@ -93,7 +93,9 @@ def test_take_yes_side_real_msgs():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.NO, ticker, Price(95))
+    assert_order_valid(
+        orders[0], Side.NO, ticker, Price(int(94 + strat.price_above_best_bid))
+    )
 
 
 def test_take_no_side():
@@ -170,7 +172,9 @@ def test_take_no_side():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
     orders = strat.consume_next_step(trade_msg3)
     assert orders == []
 
@@ -309,7 +313,9 @@ def test_no_orders_real_msgs():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(97))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(96 + strat.price_above_best_bid))
+    )
 
 
 def test_multiple_trades_one_level():
@@ -436,7 +442,9 @@ def test_multiple_trades_one_level():
         assert orders == [], msg
     orders = strat.consume_next_step(trade_msg3)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
     orders = strat.consume_next_step(trade_msg4)
     assert orders == []
     orders = strat.consume_next_step(trade_msg5)
@@ -572,7 +580,9 @@ def test_multiple_trades_three_sweeps():
         assert orders == [], msg
     orders = strat.consume_next_step(trade_msg5)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
     orders = strat.consume_next_step(trade_msg6)
     assert orders == []
 
@@ -950,6 +960,140 @@ def test_get_followup_qty():
     min_qty = Quantity(int(strat.min_position_per_trade // price))
     for _ in range(100):
         assert min_qty <= strat.get_followup_qty(price) <= max_qty
+
+
+def test_clear_level_with_partial_fill():
+    # Check that a partial fill clears a level (half fill)
+    ticker = MarketTicker("TEST-TICKER")
+    tickers = [ticker]
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
+    snapshot_msg = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[],
+        no=[
+            (Price(94), Quantity(400)),
+            (Price(95), Quantity(400)),
+            (Price(96), Quantity(400)),
+        ],
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+    )
+    delta_msg1 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(96),
+        delta=QuantityDelta(-400),
+        side=Side.NO,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+    )
+    delta_msg2 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(95),
+        delta=QuantityDelta(-201),
+        side=Side.NO,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+    )
+    trade_msg1 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(4),
+        no_price=Price(96),
+        count=Quantity(400),
+        taker_side=Side.YES,
+        ts=1717597259,
+    )
+    trade_msg2 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(5),
+        no_price=Price(95),
+        count=Quantity(201),
+        taker_side=Side.YES,
+        ts=1717597259,
+    )
+
+    orders = strat.consume_next_step(snapshot_msg)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg1)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg2)
+    assert orders == []
+    orders = strat.consume_next_step(trade_msg1)
+    assert orders == []
+    orders = strat.consume_next_step(trade_msg2)
+    assert len(orders) == 1
+    assert_order_valid(
+        orders[0], Side.NO, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
+
+
+def test_level_clear_but_have_to_move_price():
+    # we have to move the price down because there's a tight spread on the other side
+    ticker = MarketTicker("TEST-TICKER")
+    tickers = [ticker]
+    portfolio = PortfolioHistory(balance=BalanceCents(10000))
+    strat = YouMissedASpotStrategy(tickers, portfolio)
+    snapshot_msg = OrderbookSnapshotRM(
+        market_ticker=ticker,
+        yes=[],
+        no=[
+            (Price(94), Quantity(400)),
+            (Price(95), Quantity(400)),
+            (Price(96), Quantity(400)),
+        ],
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+    )
+    delta_msg1 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(96),
+        delta=QuantityDelta(-400),
+        side=Side.NO,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+    )
+    delta_msg2 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(95),
+        delta=QuantityDelta(-400),
+        side=Side.NO,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+    )
+    # This adds some liquidity on the other side
+    delta_msg3 = OrderbookDeltaRM(
+        market_ticker=ticker,
+        price=Price(5),
+        delta=QuantityDelta(400),
+        side=Side.YES,
+        ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+    )
+    trade_msg1 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(4),
+        no_price=Price(96),
+        count=Quantity(400),
+        taker_side=Side.YES,
+        ts=1717597259,
+    )
+    trade_msg2 = TradeRM(
+        market_ticker=ticker,
+        yes_price=Price(5),
+        no_price=Price(95),
+        count=Quantity(400),
+        taker_side=Side.YES,
+        ts=1717597259,
+    )
+
+    orders = strat.consume_next_step(snapshot_msg)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg1)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg2)
+    assert orders == []
+    orders = strat.consume_next_step(delta_msg3)
+    assert orders == []
+    orders = strat.consume_next_step(trade_msg1)
+    assert orders == []
+    orders = strat.consume_next_step(trade_msg2)
+    assert len(orders) == 1
+    assert_order_valid(
+        orders[0], Side.NO, ticker, Price(94)
+    )  # This is not one above best bid
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
