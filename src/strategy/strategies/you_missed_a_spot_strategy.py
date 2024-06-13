@@ -146,6 +146,11 @@ class YouMissedASpotStrategy:
         self.portfolio.receive_fill_message(msg)
         # If it's a buy message, let's place a sell order immediately
         if msg.action == TradeType.BUY and not is_manual_fill:
+            has_fees = msg.is_taker
+            if has_fees:
+                # This is for debugging to understand when we're taking fees
+                print("Fill message had fees!")
+                print(msg)
             price_bought = msg.yes_price if msg.side == Side.YES else msg.no_price
             # Dont sell it if it's under our profit gap
             if (Cents(99) - price_bought) >= self.max_profit_gap:
