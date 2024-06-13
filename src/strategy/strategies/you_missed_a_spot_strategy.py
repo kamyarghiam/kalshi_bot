@@ -60,8 +60,8 @@ class YouMissedASpotStrategy:
     buy_order_lifetime_min = timedelta(seconds=10)
     buy_order_lifetime_max = timedelta(seconds=120)
     # When we sell, how much higher should the price be
-    min_profit_gap = Price(1)
-    max_profit_gap = Price(2)
+    min_profit_gap = Price(2)
+    max_profit_gap = Price(3)
     # Max/min we're willing to bet on per trade
     min_position_per_trade = Dollars(2)
     max_position_per_trade = Dollars(5)
