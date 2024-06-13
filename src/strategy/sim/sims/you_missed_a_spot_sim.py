@@ -93,7 +93,9 @@ def test_take_yes_side_real_msgs():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.NO, ticker, Price(95))
+    assert_order_valid(
+        orders[0], Side.NO, ticker, Price(int(94 + strat.price_above_best_bid))
+    )
 
 
 def test_take_no_side():
@@ -170,7 +172,9 @@ def test_take_no_side():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
     orders = strat.consume_next_step(trade_msg3)
     assert orders == []
 
@@ -309,7 +313,9 @@ def test_no_orders_real_msgs():
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(97))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(96 + strat.price_above_best_bid))
+    )
 
 
 def test_multiple_trades_one_level():
@@ -436,7 +442,9 @@ def test_multiple_trades_one_level():
         assert orders == [], msg
     orders = strat.consume_next_step(trade_msg3)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
     orders = strat.consume_next_step(trade_msg4)
     assert orders == []
     orders = strat.consume_next_step(trade_msg5)
@@ -572,7 +580,9 @@ def test_multiple_trades_three_sweeps():
         assert orders == [], msg
     orders = strat.consume_next_step(trade_msg5)
     assert len(orders) == 1
-    assert_order_valid(orders[0], Side.YES, ticker, Price(96))
+    assert_order_valid(
+        orders[0], Side.YES, ticker, Price(int(95 + strat.price_above_best_bid))
+    )
     orders = strat.consume_next_step(trade_msg6)
     assert orders == []
 

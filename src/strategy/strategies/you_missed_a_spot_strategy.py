@@ -57,16 +57,18 @@ class LevelClear:
 
 class YouMissedASpotStrategy:
     # How long should a buy order stay alive for?
-    buy_order_lifetime_min = timedelta(seconds=20)
+    buy_order_lifetime_min = timedelta(seconds=10)
     buy_order_lifetime_max = timedelta(seconds=120)
     # When we sell, how much higher should the price be
-    min_profit_gap = Price(2)
-    max_profit_gap = Price(3)
+    min_profit_gap = Price(1)
+    max_profit_gap = Price(2)
     # Max/min we're willing to bet on per trade
-    min_position_per_trade = Dollars(20)
-    max_position_per_trade = Dollars(50)
+    min_position_per_trade = Dollars(2)
+    max_position_per_trade = Dollars(5)
     # We wont trade prices below this threshold
-    min_price_to_trade = Price(15)
+    min_price_to_trade = Price(10)
+    # How many cents above best bid should we place order
+    price_above_best_bid = Cents(0)
 
     def __init__(
         self,
@@ -205,7 +207,7 @@ class YouMissedASpotStrategy:
             # If level is empty, we don't want to place orders
             price, _ = level
             if price >= self.min_price_to_trade:
-                price_to_buy = Price(price + 1)  # Place right above
+                price_to_buy = Price(int(price + self.price_above_best_bid))
                 order = Order(
                     price=price_to_buy,
                     quantity=self.get_followup_qty(price_to_buy),

@@ -14,7 +14,7 @@ from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrateg
 
 def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHistory):
     last_resting_order_sync = time.time()
-    sync_resting_orders_every = datetime.timedelta(minutes=2).total_seconds()
+    sync_resting_orders_every = datetime.timedelta(minutes=1).total_seconds()
     print_pnl_stats_every = datetime.timedelta(minutes=5).total_seconds()
     last_pnl_print = time.time()
 
