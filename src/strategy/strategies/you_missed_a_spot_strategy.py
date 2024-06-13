@@ -57,8 +57,8 @@ class LevelClear:
 
 class YouMissedASpotStrategy:
     # How long should a buy order stay alive for?
-    buy_order_lifetime_min = timedelta(seconds=10)
-    buy_order_lifetime_max = timedelta(seconds=120)
+    buy_order_lifetime_min = timedelta(minutes=2)
+    buy_order_lifetime_max = timedelta(minutes=7)
     # When we sell, how much higher should the price be
     min_profit_gap = Price(1)
     max_profit_gap = Price(3)
