@@ -8,7 +8,7 @@ from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker, SeriesTicker, to_series_ticker
 from helpers.types.orders import GetOrdersRequest, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import TradeRM
+from helpers.types.websockets.response import OrderFillRM, TradeRM
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 
 
@@ -40,6 +40,8 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
                 elif ts - last_pnl_print > print_pnl_stats_every:
                     last_pnl_print = ts
                     print(p)
+            elif isinstance(msg.msg, OrderFillRM):
+                p.receive_fill_message(msg.msg)
 
 
 def cancel_all_open_buy_resting_orders(
