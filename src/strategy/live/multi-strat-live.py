@@ -1,3 +1,5 @@
+"""This live framework allows you to trade with multiple strategies"""
+
 import datetime
 import time
 import traceback
