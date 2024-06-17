@@ -373,12 +373,15 @@ class PortfolioHistory:
             qty_left=order.quantity, money_left=total_cost, ticker=order.ticker
         )
 
+    def has_order_id(self, order_id: OrderId) -> bool:
+        return order_id in self._resting_orders
+
     def is_manual_fill(self, fill: OrderFillRM) -> bool:
         """Returns whether this fill was made manually
 
         Assumes that we keep track of all resting orders"""
 
-        return fill.order_id not in self._resting_orders
+        return not self.has_order_id(fill.order_id)
 
     def receive_fill_message(self, fill: OrderFillRM):
         """Unreserve cash and place order in portfolio"""

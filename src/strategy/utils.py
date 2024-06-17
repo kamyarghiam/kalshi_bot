@@ -32,6 +32,12 @@ from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
 from helpers.types.portfolio import PortfolioHistory
+from helpers.types.websockets.response import (
+    OrderbookDeltaRM,
+    OrderbookSnapshotRM,
+    OrderFillRM,
+    TradeRM,
+)
 
 if TYPE_CHECKING:
     from strategy.features.derived.derived_feature import DerivedFeature
@@ -377,6 +383,18 @@ class Strategy(ABC):
     @abstractmethod
     def consume_next_step(
         self, update: ObservationSet, portfolio: PortfolioHistory
+    ) -> Iterable[Order]:
+        pass
+
+
+class BaseStrategy(ABC):
+    """
+    A non-fancy strategy
+    """
+
+    @abstractmethod
+    def consume_next_step(
+        self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
     ) -> Iterable[Order]:
         pass
 

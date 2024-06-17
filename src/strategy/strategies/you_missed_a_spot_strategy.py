@@ -25,6 +25,7 @@ from helpers.types.websockets.response import (
     OrderFillRM,
     TradeRM,
 )
+from strategy.utils import BaseStrategy
 
 
 @dataclass
@@ -55,7 +56,7 @@ class LevelClear:
                 print("   level clear already registered at this price")
 
 
-class YouMissedASpotStrategy:
+class YouMissedASpotStrategy(BaseStrategy):
     # How long should a buy order stay alive for?
     buy_order_lifetime_min = timedelta(minutes=10)
     buy_order_lifetime_max = timedelta(minutes=15)
@@ -141,9 +142,8 @@ class YouMissedASpotStrategy:
         return []
 
     def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
-        is_manual_fill = self.portfolio.is_manual_fill(msg)
         # If it's a buy message, let's place a sell order immediately
-        if msg.action == TradeType.BUY and not is_manual_fill:
+        if msg.action == TradeType.BUY:
             has_fees = msg.is_taker
             if has_fees:
                 # This is for debugging to understand when we're taking fees
