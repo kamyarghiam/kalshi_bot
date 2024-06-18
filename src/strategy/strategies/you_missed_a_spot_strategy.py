@@ -16,13 +16,14 @@ from typing import Dict, List, Tuple
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Dollars, Price
-from helpers.types.orderbook import Orderbook, OrderbookView
+from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
     OrderFillRM,
+    ResponseMessage,
     TradeRM,
 )
 from strategy.utils import BaseStrategy
@@ -75,6 +76,7 @@ class YouMissedASpotStrategy(BaseStrategy):
         self,
         tickers: List[MarketTicker],
         portfolio: PortfolioHistory,
+        obs: Dict[MarketTicker, Orderbook],
         levels_to_sweep: int = 2,
     ):
         # How many levels must be swept before we place an order?
@@ -85,7 +87,7 @@ class YouMissedASpotStrategy(BaseStrategy):
         for ticker in tickers:
             for side in Side:
                 self._level_clears[(ticker, side)] = LevelClear()
-        self._obs: Dict[MarketTicker, Orderbook] = {}
+        self._obs: Dict[MarketTicker, Orderbook] = obs
         assert self.min_position_per_trade < self.max_position_per_trade
         assert self.min_position_per_trade > 0
         assert self.buy_order_lifetime_min < self.buy_order_lifetime_max
@@ -113,12 +115,10 @@ class YouMissedASpotStrategy(BaseStrategy):
         return Price(random.randint(self.min_profit_gap, self.max_profit_gap))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
-        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg).get_view(
-            OrderbookView.BID
-        )
+        return
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
-        self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
+        return
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         maker_price, maker_side = get_maker_price_and_side(msg)
@@ -166,12 +166,7 @@ class YouMissedASpotStrategy(BaseStrategy):
                 ]
         return []
 
-    def consume_next_step(
-        self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
-    ) -> List[Order]:
-        # Avoid any actions on market tickers that we're not handling
-        if msg.market_ticker not in self._tickers:
-            return []
+    def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
         if isinstance(msg, OrderbookSnapshotRM):
             self.handle_snapshot_msg(msg)
         elif isinstance(msg, OrderbookDeltaRM):

@@ -9,12 +9,11 @@ some point.
 import datetime
 import random
 import sys
-from typing import List, Union
+from typing import Dict, List
 
-from data.coledb.coledb import ColeDBInterface
-from exchange.interface import ExchangeInterface
-from helpers.types.markets import MarketResult, MarketTicker
-from helpers.types.money import BalanceCents, Cents, Price, get_opposite_side_price
+from helpers.types.markets import MarketTicker
+from helpers.types.money import BalanceCents, Price, get_opposite_side_price
+from helpers.types.orderbook import Orderbook
 from helpers.types.orders import (
     Order,
     OrderId,
@@ -31,7 +30,7 @@ from helpers.types.websockets.response import (
     TradeRM,
 )
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
-from strategy.utils import PortfolioHistory, merge_historical_generators
+from strategy.utils import PortfolioHistory
 from tests.utils import random_data
 
 
@@ -41,7 +40,8 @@ def test_take_yes_side_real_msgs():
     ticker = MarketTicker("TEST-TICKER")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[],
@@ -83,12 +83,8 @@ def test_take_yes_side_real_msgs():
         ts=1717597259,
     )
 
-    orders = strat.consume_next_step(snapshot_msg)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg1)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg2)
-    assert orders == []
+    aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2])
+
     orders = strat.consume_next_step(trade_msg1)
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
@@ -102,7 +98,8 @@ def test_take_no_side():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -160,14 +157,7 @@ def test_take_no_side():
         ts=1717597260,
     )
 
-    orders = strat.consume_next_step(snapshot_msg)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg1)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg2)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg3)
-    assert orders == []
+    aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
     orders = strat.consume_next_step(trade_msg1)
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
@@ -184,7 +174,8 @@ def test_clear_ob_no_order():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -241,14 +232,7 @@ def test_clear_ob_no_order():
         ts=1717597260,
     )
 
-    orders = strat.consume_next_step(snapshot_msg)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg1)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg2)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg3)
-    assert orders == []
+    aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
     orders = strat.consume_next_step(trade_msg1)
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
@@ -261,7 +245,8 @@ def test_no_orders_real_msgs():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -303,12 +288,7 @@ def test_no_orders_real_msgs():
         ts=1717675397,
     )
 
-    orders = strat.consume_next_step(snapshot_msg)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg1)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg2)
-    assert orders == []
+    aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2])
     orders = strat.consume_next_step(trade_msg1)
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
@@ -323,7 +303,8 @@ def test_multiple_trades_one_level():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -426,7 +407,7 @@ def test_multiple_trades_one_level():
         ts=1717597260,
     )
 
-    no_order_msgs: List[Union[OrderbookSnapshotRM, OrderbookDeltaRM, TradeRM]] = [
+    ob_msgs: List[OrderbookSnapshotRM | OrderbookDeltaRM] = [
         snapshot_msg,
         delta_msg1,
         delta_msg2,
@@ -434,9 +415,9 @@ def test_multiple_trades_one_level():
         delta_msg4,
         delta_msg5,
         delta_msg6,
-        trade_msg1,
-        trade_msg2,
     ]
+    aply_ob_messages_to_obs(obs, ob_msgs)
+    no_order_msgs: List[TradeRM] = [trade_msg1, trade_msg2]
     for msg in no_order_msgs:
         orders = strat.consume_next_step(msg)
         assert orders == [], msg
@@ -459,7 +440,8 @@ def test_multiple_trades_three_sweeps():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio, levels_to_sweep=3)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs, levels_to_sweep=3)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[
@@ -562,7 +544,7 @@ def test_multiple_trades_three_sweeps():
         ts=1717597260,
     )
 
-    no_order_msgs: List[Union[OrderbookSnapshotRM, OrderbookDeltaRM, TradeRM]] = [
+    ob_msgs: List[OrderbookSnapshotRM | OrderbookDeltaRM] = [
         snapshot_msg,
         delta_msg1,
         delta_msg2,
@@ -570,11 +552,9 @@ def test_multiple_trades_three_sweeps():
         delta_msg4,
         delta_msg5,
         delta_msg6,
-        trade_msg1,
-        trade_msg2,
-        trade_msg3,
-        trade_msg4,
     ]
+    aply_ob_messages_to_obs(obs, ob_msgs)
+    no_order_msgs: List[TradeRM] = [trade_msg1, trade_msg2, trade_msg3, trade_msg4]
     for msg in no_order_msgs:
         orders = strat.consume_next_step(msg)
         assert orders == [], msg
@@ -595,7 +575,8 @@ def test_dont_take_holding_position():
         ticker = MarketTicker("TOPALBUMBYBEY-24")
         tickers = [ticker]
         portfolio = PortfolioHistory(balance=BalanceCents(10000))
-        strat = YouMissedASpotStrategy(tickers, portfolio)
+        obs: Dict[MarketTicker, Orderbook] = {}
+        strat = YouMissedASpotStrategy(tickers, portfolio, obs)
         if i % 2 == 1:
             # Hold a position on that ticker
             portfolio.place_order(
@@ -664,14 +645,7 @@ def test_dont_take_holding_position():
             ts=1717597260,
         )
 
-        orders = strat.consume_next_step(snapshot_msg)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg1)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg2)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg3)
-        assert orders == []
+        aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
         orders = strat.consume_next_step(trade_msg1)
         assert orders == []
         orders = strat.consume_next_step(trade_msg2)
@@ -689,7 +663,8 @@ def test_fill_msg():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     assert not portfolio.has_open_positions()
     fill: OrderFillRM = random_data(
         OrderFillRM,
@@ -733,7 +708,8 @@ def test_dont_sell_below_profit_gap():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(1000000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     assert (
         strat.min_profit_gap >= 1
     ), "We need at least 1 tick in profit for this test to work"
@@ -772,7 +748,8 @@ def test_create_position_if_holding_resting_orders():
         ticker = MarketTicker("TOPALBUMBYBEY-24")
         tickers = [ticker]
         portfolio = PortfolioHistory(balance=BalanceCents(10000))
-        strat = YouMissedASpotStrategy(tickers, portfolio)
+        obs: Dict[MarketTicker, Orderbook] = {}
+        strat = YouMissedASpotStrategy(tickers, portfolio, obs)
         if i % 2 == 1:
             # Hold a position on that ticker
             portfolio.reserve_order(
@@ -842,14 +819,7 @@ def test_create_position_if_holding_resting_orders():
             ts=1717597260,
         )
 
-        orders = strat.consume_next_step(snapshot_msg)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg1)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg2)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg3)
-        assert orders == []
+        aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
         orders = strat.consume_next_step(trade_msg1)
         assert orders == []
         orders = strat.consume_next_step(trade_msg2)
@@ -872,7 +842,8 @@ def test_dont_make_position_when_cant_afford():
             portfolio = PortfolioHistory(balance=BalanceCents(0))
         else:
             portfolio = PortfolioHistory(balance=BalanceCents(10000))
-        strat = YouMissedASpotStrategy(tickers, portfolio)
+        obs: Dict[MarketTicker, Orderbook] = {}
+        strat = YouMissedASpotStrategy(tickers, portfolio, obs)
         snapshot_msg = OrderbookSnapshotRM(
             market_ticker=ticker,
             yes=[
@@ -930,14 +901,7 @@ def test_dont_make_position_when_cant_afford():
             ts=1717597260,
         )
 
-        orders = strat.consume_next_step(snapshot_msg)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg1)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg2)
-        assert orders == []
-        orders = strat.consume_next_step(delta_msg3)
-        assert orders == []
+        aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
         orders = strat.consume_next_step(trade_msg1)
         assert orders == []
         orders = strat.consume_next_step(trade_msg2)
@@ -956,7 +920,8 @@ def test_get_followup_qty():
     ticker = MarketTicker("TOPALBUMBYBEY-24")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(1000000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     price = Price(99)
     max_qty = Quantity(int(strat.max_position_per_trade // price))
     min_qty = Quantity(int(strat.min_position_per_trade // price))
@@ -969,7 +934,8 @@ def test_clear_level_with_partial_fill():
     ticker = MarketTicker("TEST-TICKER")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[],
@@ -1011,12 +977,7 @@ def test_clear_level_with_partial_fill():
         ts=1717597259,
     )
 
-    orders = strat.consume_next_step(snapshot_msg)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg1)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg2)
-    assert orders == []
+    aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2])
     orders = strat.consume_next_step(trade_msg1)
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
@@ -1031,7 +992,8 @@ def test_level_clear_but_have_to_move_price():
     ticker = MarketTicker("TEST-TICKER")
     tickers = [ticker]
     portfolio = PortfolioHistory(balance=BalanceCents(10000))
-    strat = YouMissedASpotStrategy(tickers, portfolio)
+    obs: Dict[MarketTicker, Orderbook] = {}
+    strat = YouMissedASpotStrategy(tickers, portfolio, obs)
     snapshot_msg = OrderbookSnapshotRM(
         market_ticker=ticker,
         yes=[],
@@ -1081,14 +1043,7 @@ def test_level_clear_but_have_to_move_price():
         ts=1717597259,
     )
 
-    orders = strat.consume_next_step(snapshot_msg)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg1)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg2)
-    assert orders == []
-    orders = strat.consume_next_step(delta_msg3)
-    assert orders == []
+    aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
     orders = strat.consume_next_step(trade_msg1)
     assert orders == []
     orders = strat.consume_next_step(trade_msg2)
@@ -1099,6 +1054,19 @@ def test_level_clear_but_have_to_move_price():
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()
+
+
+def aply_ob_messages_to_obs(
+    obs: Dict[MarketTicker, Orderbook],
+    msgs: List[OrderbookSnapshotRM | OrderbookDeltaRM],
+):
+    for msg in msgs:
+        if isinstance(msg, OrderbookSnapshotRM):
+            obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
+        elif isinstance(msg, OrderbookDeltaRM):
+            obs[msg.market_ticker].apply_delta(msg, True)
+        else:
+            raise ValueError("Should only input snapshots and deltas to this function")
 
 
 def assert_order_valid(
@@ -1144,67 +1112,6 @@ def unit_test_you_missed_a_spot():
         print(f"   Passed {function_name}")
 
     print("Passed unit tests!")
-
-
-def sim_historical_data():
-    db = ColeDBInterface()
-    e = ExchangeInterface(is_test_run=False)
-    total_pnl = Cents(0)
-    for series_ticker in db.get_series_tickers():
-        try:
-            freq = e.get_series(series_ticker).frequency
-        except Exception:
-            print("error for", series_ticker)
-            continue
-        # Only want non-daily markets for analysis
-        if freq == "daily":
-            continue
-        for event_ticker in db.get_event_tickers(series_ticker):
-            for market_ticker in db.get_market_tickers(event_ticker):
-                strat = YouMissedASpotStrategy(
-                    [market_ticker], PortfolioHistory(BalanceCents(10000))
-                )
-                ob_gen = db.read_raw(market_ticker)
-                trade_gen = (trade_to_tradeRM(t) for t in e.get_trades(market_ticker))
-                merged_gen = merge_historical_generators(ob_gen, trade_gen, "ts", "ts")
-                seen_ob_msg = False
-                for msg in merged_gen:
-                    # We don't want to consume trades until we've seen an OB message
-                    if isinstance(msg, OrderbookSnapshotRM):
-                        seen_ob_msg = True
-                    elif isinstance(msg, TradeRM):
-                        hour = (
-                            datetime.datetime.fromtimestamp(msg.ts)
-                            .astimezone(ColeDBInterface.tz)
-                            .hour
-                        )
-                        if (hour < 10) or (hour > 16):
-                            # We want to only look at trade data in the times it was
-                            # collected (avoiding gaps)
-                            continue
-                    if not seen_ob_msg:
-                        continue
-                    orders = strat.consume_next_step(msg)
-                    # Since we dont allow multiple trades per market,
-                    # we'll just stop as soon as we find an order
-                    if orders:
-                        print(orders[0])
-                        break
-                if orders:
-                    market = e.get_market(market_ticker)
-                    result = market.result
-                    # Skip the non-determined markets
-                    if result == MarketResult.YES or result == MarketResult.NO:
-                        revenue = (
-                            Cents(100) * orders[0].quantity
-                            if orders[0].side.value == result.value
-                            else Cents(0)
-                        )
-                        pnl = Cents(revenue - orders[0].cost)
-                        total_pnl += pnl
-                        print(f"   Result: {result}. Pnl: {pnl}")
-
-                print(f"Sim done on {market_ticker}. Total pnl: {total_pnl}")
 
 
 def trade_to_tradeRM(trade: Trade) -> TradeRM:

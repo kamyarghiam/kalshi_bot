@@ -32,12 +32,7 @@ from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import (
-    OrderbookDeltaRM,
-    OrderbookSnapshotRM,
-    OrderFillRM,
-    TradeRM,
-)
+from helpers.types.websockets.response import ResponseMessage
 
 if TYPE_CHECKING:
     from strategy.features.derived.derived_feature import DerivedFeature
@@ -393,9 +388,7 @@ class BaseStrategy(ABC):
     """
 
     @abstractmethod
-    def consume_next_step(
-        self, msg: OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
-    ) -> Iterable[Order]:
+    def consume_next_step(self, msg: ResponseMessage) -> Iterable[Order]:
         pass
 
 

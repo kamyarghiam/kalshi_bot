@@ -6,12 +6,19 @@ import traceback
 from contextlib import suppress
 from typing import Dict, List
 
+from data.reading.orderbook import OrderbookDeltaRM
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker, SeriesTicker, to_series_ticker
+from helpers.types.orderbook import Orderbook
 from helpers.types.orders import GetOrdersRequest, OrderId, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import OrderFillRM, TradeRM
+from helpers.types.websockets.response import (
+    OrderbookSnapshotRM,
+    OrderFillRM,
+    ResponseMessage,
+    TradeRM,
+)
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 from strategy.utils import BaseStrategy
 
@@ -21,8 +28,9 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
     sync_resting_orders_every = datetime.timedelta(minutes=5).total_seconds()
     print_pnl_stats_every = datetime.timedelta(minutes=5).total_seconds()
     last_pnl_print = time.time()
-
-    strategies: List[BaseStrategy] = [YouMissedASpotStrategy(tickers, p)]
+    orderbooks: Dict[MarketTicker, Orderbook] = {}
+    # Register new strats here
+    strategies: List[BaseStrategy] = [YouMissedASpotStrategy(tickers, p, orderbooks)]
     # Mapping of an order ID to what
     order_id_to_index: Dict[OrderId, int] = {}
     with e.get_websocket() as ws:
@@ -31,10 +39,15 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
         )
         gen = sub.continuous_receive()
         print("Starting strat!")
-        for msg in gen:
-            # A little bit of message management
-            if isinstance(msg.msg, TradeRM):
-                ts = msg.msg.ts
+        for raw_msg in gen:
+            msg: ResponseMessage = raw_msg.msg
+            # If None, give this message to everyone.
+            # If it's -1, give it to no one.
+            # Otherwise, only give it to strats[idx].
+            strat_idx_to_give_msg: None | int = None
+
+            if isinstance(msg, TradeRM):
+                ts = msg.ts
                 if ts - last_resting_order_sync > sync_resting_orders_every:
                     last_resting_order_sync = ts
                     p.sync_resting_orders(e)
@@ -42,26 +55,24 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
                 elif ts - last_pnl_print > print_pnl_stats_every:
                     last_pnl_print = ts
                     print(p)
-
-            # If None, give this message to everyone.
-            # If it's -1, give it to no one.
-            # Otherwise, only give it to strats[idx].
-            strat_idx_to_give_msg: None | int = None
-
-            if isinstance(msg.msg, OrderFillRM):
-                p.receive_fill_message(msg.msg)
-                strat_idx_to_give_msg = order_id_to_index.get(msg.msg.order_id, -1)
+            elif isinstance(msg, OrderbookSnapshotRM):
+                orderbooks[msg.market_ticker] = Orderbook.from_snapshot(msg)
+            elif isinstance(msg, OrderbookDeltaRM):
+                orderbooks[msg.market_ticker].apply_delta(msg, in_place=True)
+            elif isinstance(msg, OrderFillRM):
+                p.receive_fill_message(msg)
+                strat_idx_to_give_msg = order_id_to_index.get(msg.order_id, -1)
                 # If the order was fully filled, remove it from the map
-                if not p.has_order_id(msg.msg.order_id):
+                if not p.has_order_id(msg.order_id):
                     with suppress(KeyError):
-                        del order_id_to_index[msg.msg.order_id]
+                        del order_id_to_index[msg.order_id]
 
             # Feed message to the strats
             for i, strat in enumerate(strategies):
                 if strat_idx_to_give_msg is not None and strat_idx_to_give_msg != i:
                     continue
 
-                orders = strat.consume_next_step(msg.msg)
+                orders = strat.consume_next_step(msg)
                 for order in orders:
                     order_id = e.place_order(order)
                     if order_id is not None:
