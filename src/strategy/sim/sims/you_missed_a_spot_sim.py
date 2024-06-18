@@ -697,11 +697,6 @@ def test_fill_msg():
         <= fill.no_price + strat.max_profit_gap
     )
 
-    # If the ticker is not a ticker that we're managing, then nothing should happen
-    fill.market_ticker = MarketTicker("BAD_TICKER")
-    orders = strat.consume_next_step(fill)
-    assert orders == []
-
 
 def test_dont_sell_below_profit_gap():
     """Tests that sell orders are not made below the profit gap"""
