@@ -65,8 +65,8 @@ class YouMissedASpotStrategy(BaseStrategy):
     min_profit_gap = Price(1)
     max_profit_gap = Price(3)
     # Max/min we're willing to bet on per trade
-    min_position_per_trade = Dollars(10)
-    max_position_per_trade = Dollars(20)
+    min_position_per_trade = Dollars(5)
+    max_position_per_trade = Dollars(15)
     # We wont trade prices below this threshold
     min_price_to_trade = Price(10)
     # How many cents above best bid should we place order
