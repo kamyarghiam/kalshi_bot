@@ -61,6 +61,9 @@ class OrderbookSide:
 
         self._reset_cache()
 
+    def __len__(self) -> int:
+        return len(self.levels)
+
     def is_empty(self):
         return len(self.levels) == 0
 

@@ -33,6 +33,9 @@ from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrateg
 from strategy.utils import PortfolioHistory
 from tests.utils import random_data
 
+YouMissedASpotStrategy.min_levels_on_both_sides = Quantity(0)
+YouMissedASpotStrategy.min_quantity_on_both_sides = Quantity(0)
+
 
 def test_take_yes_side_real_msgs():
     # Test normal config, taking from Yes side
@@ -1046,6 +1049,90 @@ def test_level_clear_but_have_to_move_price():
     assert_order_valid(
         orders[0], Side.NO, ticker, Price(94)
     )  # This is not one above best bid
+
+
+def test_not_enough_qty_or_levels():
+    """Tests case when we dont have enough quantity or levels to trade"""
+    for i in range(3):
+        ticker = MarketTicker("TOPALBUMBYBEY-24")
+        tickers = [ticker]
+        portfolio = PortfolioHistory(balance=BalanceCents(10000))
+        obs: Dict[MarketTicker, Orderbook] = {}
+        strat = YouMissedASpotStrategy(tickers, portfolio, obs)
+        if i % 3 == 1:
+            strat.min_quantity_on_both_sides = Quantity(10000)
+        elif i % 3 == 2:
+            strat.min_quantity_on_both_sides = Quantity(0)
+            strat.min_levels_on_both_sides = 10
+
+        snapshot_msg = OrderbookSnapshotRM(
+            market_ticker=ticker,
+            yes=[
+                (Price(95), Quantity(400)),
+                (Price(96), Quantity(400)),
+                (Price(97), Quantity(400)),
+                (Price(98), Quantity(280)),
+            ],
+            no=[],
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 47, 401303),
+        )
+        delta_msg1 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(98),
+            delta=QuantityDelta(-280),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 393967),
+        )
+        delta_msg2 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(97),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 395106),
+        )
+        delta_msg3 = OrderbookDeltaRM(
+            market_ticker=ticker,
+            price=Price(96),
+            delta=QuantityDelta(-400),
+            side=Side.YES,
+            ts=datetime.datetime(2024, 6, 5, 16, 20, 59, 396245),
+        )
+        trade_msg1 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(98),
+            no_price=Price(2),
+            count=Quantity(280),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg2 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(97),
+            no_price=Price(3),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+        trade_msg3 = TradeRM(
+            market_ticker=ticker,
+            yes_price=Price(96),
+            no_price=Price(4),
+            count=Quantity(400),
+            taker_side=Side.NO,
+            ts=1717597260,
+        )
+
+        aply_ob_messages_to_obs(obs, [snapshot_msg, delta_msg1, delta_msg2, delta_msg3])
+        orders = strat.consume_next_step(trade_msg1)
+        assert orders == []
+        orders = strat.consume_next_step(trade_msg2)
+        if i % 3 == 0:
+            assert len(orders) == 1
+        else:
+            assert orders == []
+
+        orders = strat.consume_next_step(trade_msg3)
+        assert orders == []
 
 
 TIME_BEFORE_TESTING = datetime.datetime.now()

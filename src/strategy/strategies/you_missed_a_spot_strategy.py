@@ -71,6 +71,10 @@ class YouMissedASpotStrategy(BaseStrategy):
     min_price_to_trade = Price(10)
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
+    # At least how many levels should be on both sides so we trade?
+    min_levels_on_both_sides: int = 3
+    # At least how much quantity should be on both sides so we trade?
+    min_quantity_on_both_sides: Quantity = Quantity(5000)
 
     def __init__(
         self,
@@ -197,9 +201,17 @@ class YouMissedASpotStrategy(BaseStrategy):
     def set_sent_order(self, ticker: MarketTicker, maker_side: Side):
         self._level_clears[(ticker, maker_side)].sent_order = True
 
-    def get_order(self, trade: TradeRM, maker_side: Side):
+    def get_order(self, trade: TradeRM, maker_side: Side) -> List[Order]:
         """Returns order we need to place"""
         ob = self._obs[trade.market_ticker]
+        for side in Side:
+            ob_side = ob.get_side(side)
+            if len(ob_side) < self.min_levels_on_both_sides:
+                print(f"    not sending bc not enough levels on side {side}")
+                return []
+            if ob_side.get_total_quantity() < self.min_quantity_on_both_sides:
+                print(f"   not sending bc not enough qty on side {ob_side}")
+                return []
         bbo = ob.get_bbo(maker_side)
         if bbo.bid:
             # If level is empty, we don't want to place orders
