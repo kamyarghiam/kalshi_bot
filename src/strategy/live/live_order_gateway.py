@@ -78,7 +78,7 @@ class OrderGateway:
             for raw_msg in gen:
                 self._process_response_msg(raw_msg.msg)
 
-    def _process_orderfill_msg(self, msg: OrderFillRM) -> int:
+    def _process_order_fill_msg(self, msg: OrderFillRM) -> int:
         """Processes order fill message and returns the index
         of the strategy that the fille belongs to"""
         print(f"Got order fill: {msg}")
@@ -121,7 +121,7 @@ class OrderGateway:
         if isinstance(msg, TradeRM):
             self._check_timed_callbacks(msg.ts)
         elif isinstance(msg, OrderFillRM):
-            strat_idx_to_give_msg = self._process_orderfill_msg(msg)
+            strat_idx_to_give_msg = self._process_order_fill_msg(msg)
 
         # Feed message to the strats
         for i, strat in enumerate(self.strategies):
@@ -184,11 +184,20 @@ class OrderGateway:
             return
         for timed_cb in self.timed_callbacks:
             if ts - timed_cb.last_time_called_sec > timed_cb.frequency_sec:
-                print(f"Running {timed_cb.f.__name__}")
+                print(f"Running {self._get_function_name(timed_cb.f)}")
                 # Run function
                 timed_cb.f()
                 # Update last run time
                 timed_cb.last_time_called_sec = ts
+
+    @staticmethod
+    def _get_function_name(f: Callable | partial) -> str:
+        """Helper function that gets the name of a funciton"""
+        if isinstance(f, partial):
+            return f.func.__name__
+        elif isinstance(f, Callable):  # type:ignore[arg-type]
+            return f.__name__
+        return "COULD_NOT_FIGURE_OUT_NAME"
 
 
 def main():
