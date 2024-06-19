@@ -107,6 +107,7 @@ class OrderGateway:
     def _place_order(self, order: Order, strat_index: int):
         order_id = self.exchange.place_order(order)
         if order_id is not None:
+            print("Order placed!")
             self.portfolio.reserve_order(order, order_id)
             self._order_id_to_index[order_id] = strat_index
 
@@ -130,7 +131,7 @@ class OrderGateway:
             if len(orders) > 0:
                 print(f"{strat.__class__.__name__} has orders")
             for order in orders:
-                print(f"Attempting to buy order: {order}")
+                print(f"Attempting to place order: {order}")
                 if self._is_order_valid(order):
                     self._place_order(order, i)
 
@@ -179,7 +180,6 @@ class OrderGateway:
 
     def _check_timed_callbacks(self, ts: int):
         """Compares current ts to timed callbacks and runs them if necessary"""
-        print("Checking timed callbacks")
         if len(self.timed_callbacks) == 0:
             return
         for timed_cb in self.timed_callbacks:
