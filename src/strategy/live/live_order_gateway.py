@@ -1,16 +1,22 @@
 """The purpose of the order gateway is to provide a parent to the strategies.
 
-The order gateway runs the stragtegies in their own separate processes, listens
+The order gateway runs the strategies in their own separate processes, listens
 to the exchange, sends orders to the strategies, and relays orders from the
-strategies to the exchange."""
+strategies to the exchange
 
+Note that orders are listend to on another thread so that we can act immediately
+when we get an order from a strategy.
+"""
+
+import os
 import time
 import traceback
-from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Callable, Dict, List
+from multiprocessing import Process, Queue
+from threading import Thread
+from typing import Callable, Dict, List, Tuple
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
@@ -26,7 +32,7 @@ from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
-from strategy.utils import BaseStrategy
+from strategy.utils import BaseStrategy, StrategyName
 
 
 @dataclass
@@ -48,20 +54,51 @@ class OrderGateway:
         # If tickers are none, we get all tickers
         self.tickers = tickers or [m.ticker for m in exchange.get_active_markets()]
         self.strategies: List[BaseStrategy] = []
+        # These are the queues that the strats pull msgs from
+        self.strategy_queues: List[Queue[ResponseMessage | None]] = []
+        # This the queue that strategies publish their orders on
+        self.order_queue: Queue[Tuple[StrategyName, List[Order]] | None] = Queue()
+        # Thread that the order queue is being processed on
+        self.order_queue_thread: None | Thread = None
+        # These are the processes that the strategies are running on
+        self.processes: List[Process] = []
         self.timed_callbacks: List[TimedCallback] = []
         self.portfolio = portfolio
         self.exchange = exchange
 
         # Mapping of an order ID to what index the strategy it belongs to is at
-        self._order_id_to_index: Dict[OrderId, int] = {}
+        self._order_id_to_name: Dict[OrderId, StrategyName] = {}
 
     def run(self):
         try:
+            self._run_strategies_in_separate_processes()
+            self._run_process_order_queue_in_separte_process()
             self._run_gateway_loop()
         finally:
-            print("Stapping strategies!")
+            print("Stopping strategies!")
             print(self.portfolio)
             self.cancel_all_open_buy_resting_orders()
+            self._stop_strategies()
+            self._stop_order_queue()
+
+    def _stop_strategies(self):
+        for queue in self.strategy_queues:
+            # None shuts them down
+            queue.put_nowait(None)
+        for p in self.processes:
+            p.join()
+
+    def _stop_order_queue(self):
+        self.order_queue.put_nowait(None)
+        if self.order_queue_thread is not None:
+            self.order_queue_thread.join()
+
+    def _run_strategies_in_separate_processes(self):
+        print("Putting strategies in a separate process...")
+        for strategy, queue in zip(self.strategies, self.strategy_queues):
+            p = Process(target=run_strategy, args=(strategy, queue, self.order_queue))
+            p.start()
+            self.processes.append(p)
 
     def _run_gateway_loop(self):
         """Main event loop, private function so we can wrap it"""
@@ -78,17 +115,16 @@ class OrderGateway:
             for raw_msg in gen:
                 self._process_response_msg(raw_msg.msg)
 
-    def _process_order_fill_msg(self, msg: OrderFillRM) -> int:
+    def _process_order_fill_msg(self, msg: OrderFillRM) -> StrategyName | None:
         """Processes order fill message and returns the index
         of the strategy that the fille belongs to"""
-        print(f"Got order fill: {msg}")
         self.portfolio.receive_fill_message(msg)
-        strat_idx_to_give_msg = self._order_id_to_index.get(msg.order_id, -1)
+        strategy_name = self._order_id_to_name.get(msg.order_id, None)
+        print(f"Got order fill for strategy {strategy_name}: {msg}")
         # If the order was fully filled, remove it from the map
-        if not self.portfolio.has_order_id(msg.order_id):
-            with suppress(KeyError):
-                del self._order_id_to_index[msg.order_id]
-        return strat_idx_to_give_msg
+        if strategy_name is not None and not self.portfolio.has_order_id(msg.order_id):
+            del self._order_id_to_name[msg.order_id]
+        return strategy_name
 
     def _is_order_valid(self, order: Order) -> bool:
         # Only check for buy orders
@@ -104,40 +140,49 @@ class OrderGateway:
                 return False
         return True
 
-    def _place_order(self, order: Order, strat_index: int):
+    def _place_order(self, order: Order, strategy_name: StrategyName):
         order_id = self.exchange.place_order(order)
         if order_id is not None:
             print("Order placed!")
             self.portfolio.reserve_order(order, order_id)
-            self._order_id_to_index[order_id] = strat_index
+            self._order_id_to_name[order_id] = strategy_name
 
     def _process_response_msg(self, msg: ResponseMessage):
         """Processes websocket messages from the exchange"""
-        # If None, give this message to everyone.
-        # If it's -1, give it to no one.
+        # If None, dont give message to anyone
+        # If it's "all_strategies", give it to everyone
         # Otherwise, only give it to strats[idx].
-        strat_idx_to_give_msg: None | int = None
+        all_strategies = StrategyName("##ALL_STRATEGIES##")
+        strategy_name: None | StrategyName = all_strategies
 
         if isinstance(msg, TradeRM):
             self._check_timed_callbacks(msg.ts)
         elif isinstance(msg, OrderFillRM):
-            strat_idx_to_give_msg = self._process_order_fill_msg(msg)
+            strategy_name = self._process_order_fill_msg(msg)
 
         # Feed message to the strats
-        for i, strat in enumerate(self.strategies):
-            if strat_idx_to_give_msg is not None and strat_idx_to_give_msg != i:
-                continue
-            orders = strat.consume_next_step(msg)
-            if len(orders) > 0:
-                print(f"{strat.__class__.__name__} has orders")
+        for strategy, queue in zip(self.strategies, self.strategy_queues):
+            if strategy_name == all_strategies or strategy_name == strategy.name:
+                queue.put_nowait(msg)
+
+    def _run_process_order_queue_in_separte_process(self):
+        thread = Thread(target=self._process_order_queue)
+        thread.start()
+        self.order_queue_thread = thread
+
+    def _process_order_queue(self):
+        """Sees if strats want to place any orders"""
+        for strat_name, orders in iter(self.order_queue.get, None):
+            print(f"Received orders from strategy {strat_name}")
             for order in orders:
                 print(f"Attempting to place order: {order}")
                 if self._is_order_valid(order):
-                    self._place_order(order, i)
+                    self._place_order(order, strat_name)
 
     def register_strategy(self, strategy: BaseStrategy):
         """Allows you to register a new strategy to run"""
         self.strategies.append(strategy)
+        self.strategy_queues.append(Queue())
 
     def register_timed_callback(self, f: Callable, frequency: timedelta):
         """Allows you to schedule a function to be called in intervals
@@ -198,6 +243,20 @@ class OrderGateway:
         elif isinstance(f, Callable):  # type:ignore[arg-type]
             return f.__name__
         return "COULD_NOT_FIGURE_OUT_NAME"
+
+
+def run_strategy(
+    strategy: BaseStrategy,
+    read_queue: Queue[ResponseMessage | None],
+    write_queue: Queue[Tuple[StrategyName, List[Order]] | None],
+):
+    """The code running in a separate process for the strategy"""
+    print(f"Starting {strategy.name} in process {os.getpid()}")
+    for msg in iter(read_queue.get, None):
+        orders = strategy.consume_next_step(msg)
+        if len(orders) > 0:
+            write_queue.put_nowait((strategy.name, orders))
+    print(f"Ending {strategy.name}")
 
 
 def main():

@@ -382,6 +382,10 @@ class Strategy(ABC):
         pass
 
 
+class StrategyName(str):
+    """Name of a strategy"""
+
+
 class BaseStrategy(ABC):
     """
     A non-fancy strategy
@@ -390,6 +394,10 @@ class BaseStrategy(ABC):
     @abstractmethod
     def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
         pass
+
+    @property
+    def name(self) -> StrategyName:
+        return StrategyName(self.__class__.__name__)
 
 
 class SpyStrategy(ABC):
