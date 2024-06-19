@@ -1,4 +1,8 @@
-"""This live framework allows you to trade with multiple strategies"""
+"""RETIRED. THIS FRAMEWORK HAS BEEN DEPRACATED IN FAVOR
+OF LIVE ORDER GATEWAY
+
+
+This live framework allows you to trade with multiple strategies"""
 
 import datetime
 import time
@@ -6,19 +10,12 @@ import traceback
 from contextlib import suppress
 from typing import Dict, List
 
-from data.reading.orderbook import OrderbookDeltaRM
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker, SeriesTicker, to_series_ticker
-from helpers.types.orderbook import Orderbook
 from helpers.types.orders import GetOrdersRequest, OrderId, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
-from helpers.types.websockets.response import (
-    OrderbookSnapshotRM,
-    OrderFillRM,
-    ResponseMessage,
-    TradeRM,
-)
+from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 from strategy.utils import BaseStrategy
@@ -29,13 +26,10 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
     sync_resting_orders_every = datetime.timedelta(minutes=5).total_seconds()
     print_pnl_stats_every = datetime.timedelta(minutes=5).total_seconds()
     last_pnl_print = time.time()
-    obs: Dict[MarketTicker, Orderbook] = {}
     # Register new strats here
     strategies: List[BaseStrategy] = [
-        YouMissedASpotStrategy(obs),
-        GraveyardStrategy(
-            obs,
-        ),
+        YouMissedASpotStrategy(),
+        GraveyardStrategy(),
     ]
     # Mapping of an order ID to what
     order_id_to_index: Dict[OrderId, int] = {}
@@ -61,10 +55,6 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
                 elif ts - last_pnl_print > print_pnl_stats_every:
                     last_pnl_print = ts
                     print(p)
-            elif isinstance(msg, OrderbookSnapshotRM):
-                obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
-            elif isinstance(msg, OrderbookDeltaRM):
-                obs[msg.market_ticker].apply_delta(msg, in_place=True)
             elif isinstance(msg, OrderFillRM):
                 print(f"Got order fill: {msg}")
                 p.receive_fill_message(msg)
@@ -81,16 +71,18 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
 
                 orders = strat.consume_next_step(msg)
                 for order in orders:
-                    if order.ticker in p.positions:
-                        print(f"Attempting to buy order: {order}")
-                        print("    not buying, already holding position in market")
-                        continue
-                    if p.has_resting_orders(order.ticker):
-                        print("    not buying bc we have resting orders")
-                        continue
-                    if not p.can_afford(order):
-                        print("    not buying because we cant afford it")
-                        continue
+                    # Only check for buy orders
+                    if order.trade == TradeType.BUY:
+                        if order.ticker in p.positions:
+                            print(f"Attempting to buy order: {order}")
+                            print("    not buying, already holding position in market")
+                            continue
+                        if p.has_resting_orders(order.ticker):
+                            print("    not buying bc we have resting orders")
+                            continue
+                        if not p.can_afford(order):
+                            print("    not buying because we cant afford it")
+                            continue
                     order_id = e.place_order(order)
                     if order_id is not None:
                         p.reserve_order(order, order_id)

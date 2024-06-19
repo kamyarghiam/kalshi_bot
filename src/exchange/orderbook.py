@@ -75,9 +75,9 @@ class OrderbookSubscription:
         self._pending_msgs: PendingMessages[
             OrderbookSubscription.MESSAGE_TYPES_TO_RECEIVE
         ] = PendingMessages()
-        self._send_order_fills = send_order_fills
-        self._send_trade_updates = send_trade_updates
-        self._send_orderbook_updates = send_orderbook_updates
+        self.send_order_fills = send_order_fills
+        self.send_trade_updates = send_trade_updates
+        self.send_orderbook_updates = send_orderbook_updates
         self._subscribe()
 
     def continuous_receive(
@@ -179,11 +179,11 @@ class OrderbookSubscription:
 
     def _get_subscription_request(self):
         channels = []
-        if self._send_orderbook_updates:
+        if self.send_orderbook_updates:
             channels.append(Channel.ORDER_BOOK_DELTA)
-        if self._send_order_fills:
+        if self.send_order_fills:
             channels.append(Channel.FILL)
-        if self._send_trade_updates:
+        if self.send_trade_updates:
             channels.append(Channel.TRADE)
 
         return WebsocketRequest(

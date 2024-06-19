@@ -52,9 +52,8 @@ class GraveyardStrategy(BaseStrategy):
 
     def __init__(
         self,
-        obs: Dict[MarketTicker, Orderbook],
     ):
-        self._obs = obs
+        self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
@@ -76,6 +75,7 @@ class GraveyardStrategy(BaseStrategy):
         return Price(random.randint(self.min_profit_gap, self.max_profit_gap))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
+        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
         ob = self._obs[msg.market_ticker]
         for side in Side:
             ob_side = ob.get_side(side)
@@ -118,7 +118,7 @@ class GraveyardStrategy(BaseStrategy):
         return []
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
-        return
+        self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
 
     def handle_trade_msg(self, msg: TradeRM):
         return

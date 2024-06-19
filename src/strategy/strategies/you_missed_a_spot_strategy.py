@@ -79,14 +79,13 @@ class YouMissedASpotStrategy(BaseStrategy):
 
     def __init__(
         self,
-        obs: Dict[MarketTicker, Orderbook],
         levels_to_sweep: int = 2,
     ):
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
         self._level_clears: Dict[Tuple[MarketTicker, Side], LevelClear] = {}
         self._tickers: Set[MarketTicker] = set()
-        self._obs: Dict[MarketTicker, Orderbook] = obs
+        self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.min_position_per_trade < self.max_position_per_trade
         assert self.min_position_per_trade > 0
         assert self.buy_order_lifetime_min < self.buy_order_lifetime_max
@@ -119,9 +118,10 @@ class YouMissedASpotStrategy(BaseStrategy):
             self._tickers.add(msg.market_ticker)
             for side in Side:
                 self._level_clears[(msg.market_ticker, side)] = LevelClear()
+        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
-        return
+        self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         maker_price, maker_side = get_maker_price_and_side(msg)
