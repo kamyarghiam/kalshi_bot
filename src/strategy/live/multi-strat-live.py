@@ -148,9 +148,9 @@ def main():
         try:
             run_live(e, tickers, p)
         finally:
-            cancel_all_open_buy_resting_orders(e, tickers)
+            print("Stopping strategies!")
             print(p)
-            print(f"Unrealized pnl: {p.get_unrealized_pnl(e)}")
+            cancel_all_open_buy_resting_orders(e, tickers)
 
 
 if __name__ == "__main__":

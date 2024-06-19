@@ -181,13 +181,23 @@ class RestingOrder:
 class PortfolioHistory:
     _pickle_file = Path("last_portfolio.pickle")
 
-    def __init__(self, balance: BalanceCents, allow_side_cross: bool = False):
+    def __init__(
+        self,
+        balance: BalanceCents,
+        allow_side_cross: bool = False,
+        consider_reserved_cash: bool = True,
+    ):
         """This class allows us to keep track of a portfolio
         in real time as well as historical information about the portfolio.
 
         allow_side_cross: When set to true, if we are holding a contract on one side,
         we are allowed to buy contracts on the opposite side before selling on the
-        side we're holding"""
+        side we're
+
+        consider_reserved_cash: when we reserve orders, should we substract that
+        amount from the balance available to Trade? Turn off for market making
+        strats that want to use funds beyond what we have
+        """
 
         self._cash_balance: BalanceCents = balance
         self._reserved_cash: BalanceCents = BalanceCents(0)
@@ -198,6 +208,7 @@ class PortfolioHistory:
         self.realized_pnl: Cents = Cents(0)
         self.max_exposure: Cents = Cents(0)
         self.allow_side_cross = allow_side_cross
+        self.consider_reserved_cash = consider_reserved_cash
 
     def has_resting_orders(self, t: MarketTicker) -> bool:
         """Returns whether we're holding resting order for the market
@@ -338,7 +349,13 @@ class PortfolioHistory:
         return self._positions[ticker] if ticker in self._positions else None
 
     def can_afford(self, order: Order) -> bool:
-        return self.balance >= order.cost + order.worst_case_fee
+        assert order.trade == TradeType.BUY
+        if self.consider_reserved_cash:
+            balance = self.balance
+        else:
+            # Consider raw cash only
+            balance = self._cash_balance
+        return balance >= order.cost + order.worst_case_fee
 
     def holding_other_side(self, order: Order):
         if order.ticker in self._positions:

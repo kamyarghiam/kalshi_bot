@@ -773,6 +773,19 @@ def test_portfolio_reserve():
     # No error
     portfolio.place_order(buy_o)
 
+    # If we dont consider reserved cash, we can purchase
+    portfolio = PortfolioHistory(BalanceCents(5000), consider_reserved_cash=False)
+    buy_o = Order(
+        price=Price(10),
+        quantity=Quantity(100),
+        trade=TradeType.BUY,
+        ticker=MarketTicker("some_ticker"),
+        side=Side.NO,
+    )
+    portfolio.reserve(Cents(5000))
+    # No error
+    portfolio.place_order(buy_o)
+
 
 def test_portfolio_order_reserve():
     # Should not reserve on sells

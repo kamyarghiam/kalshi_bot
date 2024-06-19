@@ -117,14 +117,23 @@ class GraveyardStrategy(BaseStrategy):
                                 ),
                                 is_taker=False,
                             )
-                            if (
-                                self._portfolio.can_afford(order)
-                                and not self._portfolio.has_resting_orders(
-                                    msg.market_ticker
-                                )
-                                and msg.market_ticker not in self._portfolio.positions
-                            ):
-                                return [order]
+                            can_afford = self._portfolio.can_afford(order)
+                            has_resting_orders = self._portfolio.has_resting_orders(
+                                msg.market_ticker
+                            )
+                            holding_position = (
+                                msg.market_ticker in self._portfolio.positions
+                            )
+                            if not can_afford:
+                                print(f"   graveyard not buy, cant afford {order}")
+                                return []
+                            if has_resting_orders:
+                                print(f"   graveyard not buy, resting orders {order}")
+                                return []
+                            if holding_position:
+                                print(f"   graveyard not buy, hodling position {order}")
+                                return []
+                            return [order]
         return []
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
