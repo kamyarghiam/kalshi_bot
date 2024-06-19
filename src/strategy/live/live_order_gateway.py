@@ -15,7 +15,13 @@ from typing import Callable, Dict, List
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.orders import GetOrdersRequest, OrderId, OrderStatus, TradeType
+from helpers.types.orders import (
+    GetOrdersRequest,
+    Order,
+    OrderId,
+    OrderStatus,
+    TradeType,
+)
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
@@ -46,6 +52,9 @@ class OrderGateway:
         self.portfolio = portfolio
         self.exchange = exchange
 
+        # Mapping of an order ID to what index the strategy it belongs to is at
+        self._order_id_to_index: Dict[OrderId, int] = {}
+
     def run(self):
         try:
             self._run_gateway_loop()
@@ -57,8 +66,6 @@ class OrderGateway:
     def _run_gateway_loop(self):
         """Main event loop, private function so we can wrap it"""
 
-        # Mapping of an order ID to what
-        order_id_to_index: Dict[OrderId, int] = {}
         with self.exchange.get_websocket() as ws:
             sub = OrderbookSubscription(
                 ws, self.tickers, send_trade_updates=True, send_order_fills=True
@@ -69,50 +76,63 @@ class OrderGateway:
             gen = sub.continuous_receive()
             print("Starting order gateway!")
             for raw_msg in gen:
-                msg: ResponseMessage = raw_msg.msg
-                # If None, give this message to everyone.
-                # If it's -1, give it to no one.
-                # Otherwise, only give it to strats[idx].
-                strat_idx_to_give_msg: None | int = None
+                self._process_response_msg(raw_msg.msg)
 
-                if isinstance(msg, TradeRM):
-                    self._check_timed_callbacks(msg.ts)
-                elif isinstance(msg, OrderFillRM):
-                    print(f"Got order fill: {msg}")
-                    self.portfolio.receive_fill_message(msg)
-                    strat_idx_to_give_msg = order_id_to_index.get(msg.order_id, -1)
-                    # If the order was fully filled, remove it from the map
-                    if not self.portfolio.has_order_id(msg.order_id):
-                        with suppress(KeyError):
-                            del order_id_to_index[msg.order_id]
+    def _process_orderfill_msg(self, msg: OrderFillRM) -> int:
+        """Processes order fill message and returns the index
+        of the strategy that the fille belongs to"""
+        print(f"Got order fill: {msg}")
+        self.portfolio.receive_fill_message(msg)
+        strat_idx_to_give_msg = self._order_id_to_index.get(msg.order_id, -1)
+        # If the order was fully filled, remove it from the map
+        if not self.portfolio.has_order_id(msg.order_id):
+            with suppress(KeyError):
+                del self._order_id_to_index[msg.order_id]
+        return strat_idx_to_give_msg
 
-                # Feed message to the strats
-                for i, strat in enumerate(self.strategies):
-                    if strat_idx_to_give_msg is not None and strat_idx_to_give_msg != i:
-                        continue
+    def _is_order_valid(self, order: Order) -> bool:
+        # Only check for buy orders
+        if order.trade == TradeType.BUY:
+            if order.ticker in self.portfolio.positions:
+                print("    not buying, already holding position in market")
+                return False
+            if self.portfolio.has_resting_orders(order.ticker):
+                print("    not buying bc we have resting orders")
+                return False
+            if not self.portfolio.can_afford(order):
+                print("    not buying because we cant afford it")
+                return False
+        return True
 
-                    orders = strat.consume_next_step(msg)
-                    if len(orders) > 0:
-                        print(f"{strat.__class__.__name__} has orders")
-                    for order in orders:
-                        # Only check for buy orders
-                        if order.trade == TradeType.BUY:
-                            if order.ticker in self.portfolio.positions:
-                                print(f"Attempting to buy order: {order}")
-                                print(
-                                    "    not buying, already holding position in market"
-                                )
-                                continue
-                            if self.portfolio.has_resting_orders(order.ticker):
-                                print("    not buying bc we have resting orders")
-                                continue
-                            if not self.portfolio.can_afford(order):
-                                print("    not buying because we cant afford it")
-                                continue
-                        order_id = self.exchange.place_order(order)
-                        if order_id is not None:
-                            self.portfolio.reserve_order(order, order_id)
-                            order_id_to_index[order_id] = i
+    def _place_order(self, order: Order, strat_index: int):
+        order_id = self.exchange.place_order(order)
+        if order_id is not None:
+            self.portfolio.reserve_order(order, order_id)
+            self._order_id_to_index[order_id] = strat_index
+
+    def _process_response_msg(self, msg: ResponseMessage):
+        """Processes websocket messages from the exchange"""
+        # If None, give this message to everyone.
+        # If it's -1, give it to no one.
+        # Otherwise, only give it to strats[idx].
+        strat_idx_to_give_msg: None | int = None
+
+        if isinstance(msg, TradeRM):
+            self._check_timed_callbacks(msg.ts)
+        elif isinstance(msg, OrderFillRM):
+            strat_idx_to_give_msg = self._process_orderfill_msg(msg)
+
+        # Feed message to the strats
+        for i, strat in enumerate(self.strategies):
+            if strat_idx_to_give_msg is not None and strat_idx_to_give_msg != i:
+                continue
+            orders = strat.consume_next_step(msg)
+            if len(orders) > 0:
+                print(f"{strat.__class__.__name__} has orders")
+            for order in orders:
+                print(f"Attempting to buy order: {order}")
+                if self._is_order_valid(order):
+                    self._place_order(order, i)
 
     def register_strategy(self, strategy: BaseStrategy):
         """Allows you to register a new strategy to run"""
@@ -159,10 +179,12 @@ class OrderGateway:
 
     def _check_timed_callbacks(self, ts: int):
         """Compares current ts to timed callbacks and runs them if necessary"""
+        print("Checking timed callbacks")
         if len(self.timed_callbacks) == 0:
             return
         for timed_cb in self.timed_callbacks:
             if ts - timed_cb.last_time_called_sec > timed_cb.frequency_sec:
+                print(f"Running {timed_cb.f.__name__}")
                 # Run function
                 timed_cb.f()
                 # Update last run time
