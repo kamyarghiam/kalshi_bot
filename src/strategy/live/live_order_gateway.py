@@ -247,8 +247,8 @@ class OrderGateway:
 
 def run_strategy(
     strategy: BaseStrategy,
-    read_queue: Queue[ResponseMessage | None],
-    write_queue: Queue[Tuple[StrategyName, List[Order]] | None],
+    read_queue: "Queue[ResponseMessage | None]",
+    write_queue: "Queue[Tuple[StrategyName, List[Order]] | None]",
 ):
     """The code running in a separate process for the strategy"""
     print(f"Starting {strategy.name} in process {os.getpid()}")
