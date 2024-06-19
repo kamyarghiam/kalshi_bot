@@ -69,6 +69,8 @@ class YouMissedASpotStrategy(BaseStrategy):
     max_position_per_trade = Dollars(15)
     # We wont trade prices below this threshold
     min_price_to_trade = Price(10)
+    # What is the maximum price the market can be at so we trade
+    max_price_to_trade = Price(96)
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
     # At least how many levels should be on both sides so we trade?
@@ -99,6 +101,7 @@ class YouMissedASpotStrategy(BaseStrategy):
         assert self.max_profit_gap > self.min_profit_gap
         # There are a lot of assumptions baked into this
         assert self.levels_to_sweep >= 2
+        assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
         min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
@@ -216,7 +219,7 @@ class YouMissedASpotStrategy(BaseStrategy):
         if bbo.bid:
             # If level is empty, we don't want to place orders
             price = bbo.bid.price
-            if price >= self.min_price_to_trade:
+            if self.min_price_to_trade <= price <= self.max_price_to_trade:
                 price_to_buy = Price(int(price + self.price_above_best_bid))
                 # Check that we dont cross the spread
                 if bbo.ask:

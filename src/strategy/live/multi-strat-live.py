@@ -67,6 +67,7 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
             elif isinstance(msg, OrderbookDeltaRM):
                 obs[msg.market_ticker].apply_delta(msg, in_place=True)
             elif isinstance(msg, OrderFillRM):
+                print(f"Got order fill: {msg}")
                 p.receive_fill_message(msg)
                 strat_idx_to_give_msg = order_id_to_index.get(msg.order_id, -1)
                 # If the order was fully filled, remove it from the map
@@ -139,7 +140,7 @@ def only_get_daily_tickers(
 
 
 def main():
-    with ExchangeInterface(is_test_run=True) as e:
+    with ExchangeInterface(is_test_run=False) as e:
         print("Getting tickers...")
         tickers = [m.ticker for m in e.get_active_markets()]
         print("Got tickers!")

@@ -31,22 +31,25 @@ class GraveyardStrategy(BaseStrategy):
     # At least many levels should the active side have
     min_levels_on_active_side: int = 3
     # At least how much quantity on active side
-    min_quantity_on_active_side: Quantity = Quantity(100)
+    min_quantity_on_active_side: Quantity = Quantity(500)
     # At most how much can the dead side have
     max_levels_on_dead_side: int = 2
     # At most how quantity can the dead side have
-    max_quantity_on_dead_side: Quantity = Quantity(100)
+    max_quantity_on_dead_side: Quantity = Quantity(500)
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
     # How long should a buy order stay alive for?
     buy_order_lifetime_min = timedelta(minutes=10)
     buy_order_lifetime_max = timedelta(minutes=15)
     # When we sell, how much higher should the price be
-    min_profit_gap = Price(1)
-    max_profit_gap = Price(3)
+    min_profit_gap = Price(2)
+    max_profit_gap = Price(4)
     # Max/min we're willing to bet on per trade
     min_position_per_trade = Dollars(5)
-    max_position_per_trade = Dollars(15)
+    max_position_per_trade = Dollars(20)
+
+    # What is the maximum price the market can be at so we trade
+    max_price_to_trade = Price(89)
 
     def __init__(
         self,
@@ -55,6 +58,7 @@ class GraveyardStrategy(BaseStrategy):
     ):
         self._obs = obs
         self._portfolio = portfolio
+        assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
         min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
@@ -94,26 +98,33 @@ class GraveyardStrategy(BaseStrategy):
                     if bbo.bid:
                         # If level is empty, we don't want to place orders
                         price = bbo.bid.price
-                        price_to_buy = Price(int(price + self.price_above_best_bid))
-                        # Check that we dont cross the spread
-                        if bbo.ask:
-                            if bbo.ask.price == price_to_buy:
-                                # Just go one level down
-                                price_to_buy = price
-                        order = Order(
-                            price=price_to_buy,
-                            quantity=self.get_followup_qty(price_to_buy),
-                            trade=TradeType.BUY,
-                            ticker=ob.market_ticker,
-                            side=active_side,
-                            expiration_ts=int(
-                                time.time()
-                                + self.passive_order_lifetime.total_seconds()
-                            ),
-                            is_taker=False,
-                        )
-                        if self._portfolio.can_afford(order):
-                            return [order]
+                        if price <= self.max_price_to_trade:
+                            price_to_buy = Price(int(price + self.price_above_best_bid))
+                            # Check that we dont cross the spread
+                            if bbo.ask:
+                                if bbo.ask.price == price_to_buy:
+                                    # Just go one level down
+                                    price_to_buy = price
+                            order = Order(
+                                price=price_to_buy,
+                                quantity=self.get_followup_qty(price_to_buy),
+                                trade=TradeType.BUY,
+                                ticker=ob.market_ticker,
+                                side=active_side,
+                                expiration_ts=int(
+                                    time.time()
+                                    + self.passive_order_lifetime.total_seconds()
+                                ),
+                                is_taker=False,
+                            )
+                            if (
+                                self._portfolio.can_afford(order)
+                                and not self._portfolio.has_resting_orders(
+                                    msg.market_ticker
+                                )
+                                and msg.market_ticker not in self._portfolio.positions
+                            ):
+                                return [order]
         return []
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
@@ -123,6 +134,7 @@ class GraveyardStrategy(BaseStrategy):
         return
 
     def handle_order_fill_msg(self, msg: OrderFillRM):
+        print("Graveyard strat got fill msg")
         # If it's a buy message, let's place a sell order immediately
         if msg.action == TradeType.BUY:
             has_fees = msg.is_taker
