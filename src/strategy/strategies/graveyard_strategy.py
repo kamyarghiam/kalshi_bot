@@ -28,13 +28,13 @@ from strategy.utils import BaseStrategy
 
 class GraveyardStrategy(BaseStrategy):
     # At least many levels should the active side have
-    min_levels_on_active_side: int = 3
+    min_levels_on_active_side: int = 4
     # At least how much quantity on active side
-    min_quantity_on_active_side: Quantity = Quantity(500)
+    min_quantity_on_active_side: Quantity = Quantity(700)
     # At most how much can the dead side have
     max_levels_on_dead_side: int = 2
     # At most how quantity can the dead side have
-    max_quantity_on_dead_side: Quantity = Quantity(500)
+    max_quantity_on_dead_side: Quantity = Quantity(200)
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
     # How long should a buy order stay alive for?
