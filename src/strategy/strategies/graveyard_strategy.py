@@ -9,7 +9,7 @@ the other side
 import math
 import random
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 from helpers.types.markets import MarketTicker
@@ -46,15 +46,18 @@ class GraveyardStrategy(BaseStrategy):
     # Max/min we're willing to bet on per trade
     min_position_per_trade = Dollars(5)
     max_position_per_trade = Dollars(20)
-
     # What is the maximum price the market can be at so we trade
     max_price_to_trade = Price(89)
+    # Time between the last time of checking if a market is dead
+    time_between_dead_market_check = timedelta(minutes=1)
 
     def __init__(
         self,
     ):
         self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
+        # The timestamp of the last time we checked if a market was dead
+        self._last_checked_ts: Dict[MarketTicker, datetime] = {}
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
         min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
@@ -74,9 +77,15 @@ class GraveyardStrategy(BaseStrategy):
     def profit_gap(self) -> Price:
         return Price(random.randint(self.min_profit_gap, self.max_profit_gap))
 
-    def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
-        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
-        ob = self._obs[msg.market_ticker]
+    def get_orders_if_dead_market(self, ob: Orderbook, ts: datetime) -> List[Order]:
+        # Dont run this check too frequently for a market
+        if ob.market_ticker in self._last_checked_ts:
+            if (
+                ts - self._last_checked_ts[ob.market_ticker]
+                < self.time_between_dead_market_check
+            ):
+                return []
+        self._last_checked_ts[ob.market_ticker] = ts
         for side in Side:
             ob_side = ob.get_side(side)
             if (
@@ -117,8 +126,14 @@ class GraveyardStrategy(BaseStrategy):
                             return [order]
         return []
 
+    def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
+        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
+        ob = self._obs[msg.market_ticker]
+        return self.get_orders_if_dead_market(ob, msg.ts)
+
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
+        return self.get_orders_if_dead_market(self._obs[msg.market_ticker], msg.ts)
 
     def handle_trade_msg(self, msg: TradeRM):
         return
