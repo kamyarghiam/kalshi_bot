@@ -19,6 +19,7 @@ from helpers.types.websockets.response import (
     ResponseMessage,
     TradeRM,
 )
+from strategy.strategies.graveyard_strategy import GraveyardStrategy
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 from strategy.utils import BaseStrategy
 
@@ -28,9 +29,15 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
     sync_resting_orders_every = datetime.timedelta(minutes=5).total_seconds()
     print_pnl_stats_every = datetime.timedelta(minutes=5).total_seconds()
     last_pnl_print = time.time()
-    orderbooks: Dict[MarketTicker, Orderbook] = {}
+    obs: Dict[MarketTicker, Orderbook] = {}
     # Register new strats here
-    strategies: List[BaseStrategy] = [YouMissedASpotStrategy(tickers, p, orderbooks)]
+    strategies: List[BaseStrategy] = [
+        YouMissedASpotStrategy(tickers, p, obs),
+        GraveyardStrategy(
+            p,
+            obs,
+        ),
+    ]
     # Mapping of an order ID to what
     order_id_to_index: Dict[OrderId, int] = {}
     with e.get_websocket() as ws:
@@ -56,9 +63,9 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
                     last_pnl_print = ts
                     print(p)
             elif isinstance(msg, OrderbookSnapshotRM):
-                orderbooks[msg.market_ticker] = Orderbook.from_snapshot(msg)
+                obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
             elif isinstance(msg, OrderbookDeltaRM):
-                orderbooks[msg.market_ticker].apply_delta(msg, in_place=True)
+                obs[msg.market_ticker].apply_delta(msg, in_place=True)
             elif isinstance(msg, OrderFillRM):
                 p.receive_fill_message(msg)
                 strat_idx_to_give_msg = order_id_to_index.get(msg.order_id, -1)
@@ -104,20 +111,6 @@ def cancel_all_open_buy_resting_orders(
     print("Cancellation done")
 
 
-def main():
-    with ExchangeInterface(is_test_run=False) as e:
-        print("Getting tickers...")
-        tickers = [m.ticker for m in e.get_active_markets()]
-        print("Got tickers!")
-        p = PortfolioHistory.load_from_exchange(e)
-        try:
-            run_live(e, tickers, p)
-        finally:
-            cancel_all_open_buy_resting_orders(e, tickers)
-            print(p)
-            print(f"Unrealized pnl: {p.get_unrealized_pnl(e)}")
-
-
 def only_get_daily_tickers(
     all_tickers: List[MarketTicker], e: ExchangeInterface
 ) -> List[MarketTicker]:
@@ -143,6 +136,20 @@ def only_get_daily_tickers(
         if freq == "daily":
             tickers_to_trade.append(ticker)
     return tickers_to_trade
+
+
+def main():
+    with ExchangeInterface(is_test_run=True) as e:
+        print("Getting tickers...")
+        tickers = [m.ticker for m in e.get_active_markets()]
+        print("Got tickers!")
+        p = PortfolioHistory.load_from_exchange(e)
+        try:
+            run_live(e, tickers, p)
+        finally:
+            cancel_all_open_buy_resting_orders(e, tickers)
+            print(p)
+            print(f"Unrealized pnl: {p.get_unrealized_pnl(e)}")
 
 
 if __name__ == "__main__":
