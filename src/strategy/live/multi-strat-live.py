@@ -82,15 +82,14 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
                 orders = strat.consume_next_step(msg)
                 for order in orders:
                     if order.ticker in p.positions:
-                        print(
-                            f"  not buying, already holding position in market: {order}"
-                        )
+                        print(f"Attempting to buy order: {order}")
+                        print("    not buying, already holding position in market")
                         continue
                     if p.has_resting_orders(order.ticker):
-                        print(f"    not buying bc we have resting orders: {order}")
+                        print("    not buying bc we have resting orders")
                         continue
                     if not p.can_afford(order):
-                        print(f"    not buying because we cant afford it: {order}")
+                        print("    not buying because we cant afford it")
                         continue
                     order_id = e.place_order(order)
                     if order_id is not None:
