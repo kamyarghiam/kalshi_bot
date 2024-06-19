@@ -92,6 +92,8 @@ class OrderGateway:
                         continue
 
                     orders = strat.consume_next_step(msg)
+                    if len(orders) > 0:
+                        print(f"{strat.__class__.__name__} has orders")
                     for order in orders:
                         # Only check for buy orders
                         if order.trade == TradeType.BUY:

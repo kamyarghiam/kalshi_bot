@@ -388,7 +388,7 @@ class BaseStrategy(ABC):
     """
 
     @abstractmethod
-    def consume_next_step(self, msg: ResponseMessage) -> Iterable[Order]:
+    def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
         pass
 
 
@@ -401,7 +401,7 @@ class SpyStrategy(ABC):
         changed_ticker: MarketTicker | None,
         ts: datetime.datetime,
         portfolio: PortfolioHistory,
-    ) -> Iterable[Order]:
+    ) -> List[Order]:
         pass
 
 
