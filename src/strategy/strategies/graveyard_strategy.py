@@ -16,7 +16,6 @@ from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Dollars, Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
@@ -53,11 +52,9 @@ class GraveyardStrategy(BaseStrategy):
 
     def __init__(
         self,
-        portfolio: PortfolioHistory,
         obs: Dict[MarketTicker, Orderbook],
     ):
         self._obs = obs
-        self._portfolio = portfolio
         assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
@@ -117,22 +114,6 @@ class GraveyardStrategy(BaseStrategy):
                                 ),
                                 is_taker=False,
                             )
-                            can_afford = self._portfolio.can_afford(order)
-                            has_resting_orders = self._portfolio.has_resting_orders(
-                                msg.market_ticker
-                            )
-                            holding_position = (
-                                msg.market_ticker in self._portfolio.positions
-                            )
-                            if not can_afford:
-                                print(f"   graveyard not buy, cant afford {order}")
-                                return []
-                            if has_resting_orders:
-                                print(f"   graveyard not buy, resting orders {order}")
-                                return []
-                            if holding_position:
-                                print(f"   graveyard not buy, hodling position {order}")
-                                return []
                             return [order]
         return []
 

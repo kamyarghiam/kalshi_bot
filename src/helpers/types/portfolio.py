@@ -219,11 +219,18 @@ class PortfolioHistory:
         return False
 
     @classmethod
-    def load_from_exchange(cls, e: "ExchangeInterface", allow_side_cross: bool = False):
+    def load_from_exchange(
+        cls,
+        e: "ExchangeInterface",
+        allow_side_cross: bool = False,
+        consider_reserved_cash: bool = True,
+    ):
         positions = [p.to_position() for p in e.get_positions()]
         balance = e.get_portfolio_balance().balance
         portfolio = PortfolioHistory(
-            BalanceCents(balance), allow_side_cross=allow_side_cross
+            BalanceCents(balance),
+            allow_side_cross=allow_side_cross,
+            consider_reserved_cash=consider_reserved_cash,
         )
         portfolio._positions = {p.ticker: p for p in positions}
         portfolio.sync_resting_orders(e)

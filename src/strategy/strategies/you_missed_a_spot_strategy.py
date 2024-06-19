@@ -12,13 +12,12 @@ import random
 import time
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Dollars, Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side, TradeType
-from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
@@ -74,25 +73,19 @@ class YouMissedASpotStrategy(BaseStrategy):
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
     # At least how many levels should be on both sides so we trade?
-    min_levels_on_both_sides: int = 3
+    min_levels_on_both_sides: int = 2
     # At least how much quantity should be on both sides so we trade?
-    min_quantity_on_both_sides: Quantity = Quantity(5000)
+    min_quantity_on_both_sides: Quantity = Quantity(200)
 
     def __init__(
         self,
-        tickers: List[MarketTicker],
-        portfolio: PortfolioHistory,
         obs: Dict[MarketTicker, Orderbook],
         levels_to_sweep: int = 2,
     ):
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
-        self.portfolio = portfolio
         self._level_clears: Dict[Tuple[MarketTicker, Side], LevelClear] = {}
-        self._tickers = set(tickers)
-        for ticker in tickers:
-            for side in Side:
-                self._level_clears[(ticker, side)] = LevelClear()
+        self._tickers: Set[MarketTicker] = set()
         self._obs: Dict[MarketTicker, Orderbook] = obs
         assert self.min_position_per_trade < self.max_position_per_trade
         assert self.min_position_per_trade > 0
@@ -122,7 +115,10 @@ class YouMissedASpotStrategy(BaseStrategy):
         return Price(random.randint(self.min_profit_gap, self.max_profit_gap))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
-        return
+        if msg.market_ticker not in self._tickers:
+            self._tickers.add(msg.market_ticker)
+            for side in Side:
+                self._level_clears[(msg.market_ticker, side)] = LevelClear()
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
         return
@@ -136,12 +132,6 @@ class YouMissedASpotStrategy(BaseStrategy):
             )
         if self.is_sweep(msg.market_ticker, maker_side):
             print(f"Sweep! {msg}")
-            if msg.market_ticker in self.portfolio.positions:
-                print("   not buying bc already holding position in market")
-                return []
-            if self.portfolio.has_resting_orders(msg.market_ticker):
-                print("    not buying bc we have resting orders")
-                return []
             order = self.get_order(msg, maker_side)
             if order:
                 self.set_sent_order(msg.market_ticker, maker_side)
@@ -213,7 +203,7 @@ class YouMissedASpotStrategy(BaseStrategy):
                 print(f"    not sending bc not enough levels on side {side}")
                 return []
             if ob_side.get_total_quantity() < self.min_quantity_on_both_sides:
-                print(f"   not sending bc not enough qty on side {ob_side}")
+                print(f"   not sending bc not enough qty on side {side}")
                 return []
         bbo = ob.get_bbo(maker_side)
         if bbo.bid:
@@ -237,10 +227,7 @@ class YouMissedASpotStrategy(BaseStrategy):
                     ),
                     is_taker=False,
                 )
-                if self.portfolio.can_afford(order):
-                    return [order]
-                else:
-                    print("    not sending bc we cant afford it")
+                return [order]
             print("    not sending because price is below threshold to trade")
         else:
             print("   not sending order bc level empty")

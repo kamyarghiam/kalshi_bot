@@ -32,9 +32,8 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
     obs: Dict[MarketTicker, Orderbook] = {}
     # Register new strats here
     strategies: List[BaseStrategy] = [
-        YouMissedASpotStrategy(tickers, p, obs),
+        YouMissedASpotStrategy(obs),
         GraveyardStrategy(
-            p,
             obs,
         ),
     ]
@@ -82,6 +81,17 @@ def run_live(e: ExchangeInterface, tickers: List[MarketTicker], p: PortfolioHist
 
                 orders = strat.consume_next_step(msg)
                 for order in orders:
+                    if order.ticker in p.positions:
+                        print(
+                            f"  not buying, already holding position in market: {order}"
+                        )
+                        continue
+                    if p.has_resting_orders(order.ticker):
+                        print(f"    not buying bc we have resting orders: {order}")
+                        continue
+                    if not p.can_afford(order):
+                        print(f"    not buying because we cant afford it: {order}")
+                        continue
                     order_id = e.place_order(order)
                     if order_id is not None:
                         p.reserve_order(order, order_id)
@@ -144,7 +154,7 @@ def main():
         print("Getting tickers...")
         tickers = [m.ticker for m in e.get_active_markets()]
         print("Got tickers!")
-        p = PortfolioHistory.load_from_exchange(e)
+        p = PortfolioHistory.load_from_exchange(e, consider_reserved_cash=False)
         try:
             run_live(e, tickers, p)
         finally:
