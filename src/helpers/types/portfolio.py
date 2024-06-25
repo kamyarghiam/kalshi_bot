@@ -35,15 +35,20 @@ if TYPE_CHECKING:
 
 
 class Position:
-    def __init__(self, order: Order):
-        if order.trade != TradeType.BUY:
-            raise ValueError("Order must be a buy order to open a new position")
-        self.ticker = order.ticker
+    def __init__(self, ticker: MarketTicker, side: Side):
+        self.ticker = ticker
+        self.side: Side = side
         # We can be holding a position at several different price points
-        self.prices: List[Price] = [order.price]
-        self.quantities: List[Quantity] = [order.quantity]
-        self.fees: List[Cents] = [order.fee]
-        self.side: Side = order.side
+        self.prices: List[Price] = []
+        self.quantities: List[Quantity] = []
+        self.fees: List[Cents] = []
+
+    @classmethod
+    def from_order(cls, order: Order) -> "Position":
+        c = cls(order.ticker, order.side)
+        # First order must be a buy order
+        c.buy(order)
+        return c
 
     def __eq__(self, other) -> bool:
         return (
@@ -474,7 +479,7 @@ class PortfolioHistory:
         if order.ticker in self._positions:
             self._positions[order.ticker].buy(order)
         else:
-            self._positions[order.ticker] = Position(order)
+            self._positions[order.ticker] = Position.from_order(order)
         self.orders.append(order)
         # TODO: optimize a little?
         self.max_exposure = max(self.get_positions_value(), self.max_exposure)
@@ -661,7 +666,7 @@ class ApiMarketPosition(ExternalApi):
             ticker=self.ticker,
             side=side,
         )
-        return Position(order)
+        return Position.from_order(order)
 
 
 class GetMarketPositionsResponse(ExternalApiWithCursor):

@@ -33,7 +33,7 @@ from tests.utils import almost_equal
 
 
 def test_empty_position():
-    position = Position(
+    position = Position.from_order(
         Order(
             ticker=MarketTicker("hi"),
             price=Price(10),
@@ -79,7 +79,7 @@ def test_add_remove_get_value_positions():
         quantity=Quantity(200),
         trade=TradeType.BUY,
     )
-    position = Position(order1)
+    position = Position.from_order(order1)
     position.buy(order2)
     position.buy(order3)
 
@@ -184,7 +184,7 @@ def test_add_remove_get_value_positions():
 
 
 def test_add_duplicate_price_point():
-    position = Position(
+    position = Position.from_order(
         Order(
             ticker=MarketTicker("hi"),
             price=Price(10),
@@ -528,11 +528,11 @@ def test_position_error_scenarios():
         trade=TradeType.SELL,
     )
     with pytest.raises(ValueError) as err:
-        Position(order)
-    assert err.match("Order must be a buy order to open a new position")
+        Position.from_order(order)
+    assert err.match("Not a buy order")
 
     order.trade = TradeType.BUY
-    position = Position(order)
+    position = Position.from_order(order)
 
     bad_order = copy.deepcopy(order)
     bad_order.trade = TradeType.SELL
@@ -596,7 +596,7 @@ def test_position_error_scenarios():
 
 
 def test_position_print():
-    position = Position(
+    position = Position.from_order(
         Order(
             ticker=MarketTicker("hi"),
             price=Price(10),
