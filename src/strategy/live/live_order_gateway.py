@@ -16,18 +16,12 @@ from datetime import timedelta
 from functools import partial
 from multiprocessing import Process, Queue
 from threading import Thread
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, List, Tuple
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
-from helpers.types.orders import (
-    GetOrdersRequest,
-    Order,
-    OrderId,
-    OrderStatus,
-    TradeType,
-)
+from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
@@ -65,9 +59,6 @@ class OrderGateway:
         self.timed_callbacks: List[TimedCallback] = []
         self.portfolio = portfolio
         self.exchange = exchange
-
-        # Mapping of an order ID to what index the strategy it belongs to is at
-        self._order_id_to_name: Dict[OrderId, StrategyName] = {}
 
     def run(self):
         try:
@@ -115,19 +106,6 @@ class OrderGateway:
             for raw_msg in gen:
                 self._process_response_msg(raw_msg.msg)
 
-    def _process_order_fill_msg(self, msg: OrderFillRM) -> StrategyName | None:
-        """Processes order fill message and returns the index
-        of the strategy that the fille belongs to"""
-        self.portfolio.receive_fill_message(msg)
-        strategy_name = self._order_id_to_name.get(msg.order_id, None)
-        print(f"Got order fill for strategy {strategy_name}: {msg}")
-        # If the order was fully filled, remove it from the map
-        if strategy_name is not None and not self.portfolio.has_order_id(
-            msg.market_ticker, msg.order_id
-        ):
-            del self._order_id_to_name[msg.order_id]
-        return strategy_name
-
     def _is_order_valid(self, order: Order) -> bool:
         # Only check for buy orders
         if order.trade == TradeType.BUY:
@@ -146,8 +124,7 @@ class OrderGateway:
         order_id = self.exchange.place_order(order)
         if order_id is not None:
             print("Order placed!")
-            self.portfolio.reserve_order(order, order_id)
-            self._order_id_to_name[order_id] = strategy_name
+            self.portfolio.reserve_order(order, order_id, strategy_name)
 
     def _process_response_msg(self, msg: ResponseMessage):
         """Processes websocket messages from the exchange"""
@@ -155,12 +132,12 @@ class OrderGateway:
         # If it's "all_strategies", give it to everyone
         # Otherwise, only give it to strats[idx].
         all_strategies = StrategyName("##ALL_STRATEGIES##")
-        strategy_name: None | StrategyName = all_strategies
+        strategy_name: StrategyName | None = all_strategies
 
         if isinstance(msg, TradeRM):
             self._check_timed_callbacks(msg.ts)
         elif isinstance(msg, OrderFillRM):
-            strategy_name = self._process_order_fill_msg(msg)
+            strategy_name = self.portfolio.receive_fill_message(msg)
 
         # Feed message to the strats
         for strategy, queue in zip(self.strategies, self.strategy_queues):

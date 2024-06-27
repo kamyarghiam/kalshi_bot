@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 from matplotlib import pyplot as plt
 
@@ -33,6 +33,7 @@ from helpers.types.websockets.response import OrderFillRM
 
 if TYPE_CHECKING:
     from exchange.interface import ExchangeInterface
+    from strategy.utils import StrategyName
 
 
 class Position:
@@ -185,6 +186,8 @@ class RestingOrder:
     money_left: Cents
     ticker: MarketTicker
     side: Side
+    # Name of the strategy that added this resting order
+    strategy_name: Union["StrategyName", None] = None
 
 
 class PortfolioHistory:
@@ -409,7 +412,12 @@ class PortfolioHistory:
         else:
             self.sell(order)
 
-    def reserve_order(self, order: Order, order_id: OrderId):
+    def reserve_order(
+        self,
+        order: Order,
+        order_id: OrderId,
+        strategy_name: Union["StrategyName", None] = None,
+    ):
         """Does not mark the order as placed, but reserves funds for it"""
         if order.trade == TradeType.BUY:
             total_cost = order.cost + order.worst_case_fee
@@ -424,6 +432,7 @@ class PortfolioHistory:
             money_left=total_cost,
             ticker=order.ticker,
             side=order.side,
+            strategy_name=strategy_name,
         )
         self.add_resting_order(ro)
 
@@ -437,10 +446,15 @@ class PortfolioHistory:
 
         return not self.has_order_id(fill.market_ticker, fill.order_id)
 
-    def receive_fill_message(self, fill: OrderFillRM):
-        """Unreserve cash and place order in portfolio"""
+    def receive_fill_message(self, fill: OrderFillRM) -> Union["StrategyName", None]:
+        """Unreserve cash and place order in portfolio
+
+        Returns name of strategy that the fill is for, if possible"""
         o = fill.to_order()
+        strategy_name: Union["StrategyName", None] = None
         if resting_order := self.resting_orders(fill.market_ticker).get(fill.order_id):
+            strategy_name = resting_order.strategy_name
+            print(f"Got order fill for strategy {strategy_name}: {fill}")
             resting_order.qty_left -= o.quantity
             if fill.action == TradeType.BUY:
                 # Need to unreserve cash
@@ -453,6 +467,7 @@ class PortfolioHistory:
         else:
             print(f"Received manual fill! {fill}")
         self.place_order(o)
+        return strategy_name
 
     def unreserve_order(self, ticker: MarketTicker, id_: OrderId):
         """Unlocks a resrved order and its funds"""
@@ -467,14 +482,18 @@ class PortfolioHistory:
 
         Should be called periodically to make sure you have up
         to date view of the orders if they expire or get canceled"""
+        order_id_to_strategy: Dict[OrderId, "StrategyName" | None] = {}
         for ticker, position in self._positions.items():
-            for order_id in position.resting_orders:
+            for order_id, resting_order in position.resting_orders.items():
+                order_id_to_strategy[order_id] = resting_order.strategy_name
                 self.unreserve_order(ticker, order_id)
         resting_orders = e.get_orders(
             request=GetOrdersRequest(status=OrderStatus.RESTING)
         )
         for o in resting_orders:
-            self.reserve_order(o.to_order(), o.order_id)
+            self.reserve_order(
+                o.to_order(), o.order_id, order_id_to_strategy.get(o.order_id)
+            )
 
     def buy(self, order: Order):
         """Adds position to portfolio. Raises OutOfMoney error if we ran out of money"""
