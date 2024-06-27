@@ -398,7 +398,7 @@ def kalshi_test_exchange_factory():
         if cursor is None:
             ticker_start = 0
             for position in positions:
-                position.ticker = MarketTicker(str(ticker_start))
+                position.ticker = MarketTicker("positions" + str(ticker_start))
                 ticker_start += 1
             return GetMarketPositionsResponse(
                 cursor=Cursor("1"),
@@ -407,7 +407,7 @@ def kalshi_test_exchange_factory():
         elif cursor == Cursor("1"):
             ticker_start = 10
             for position in positions:
-                position.ticker = MarketTicker(str(ticker_start))
+                position.ticker = MarketTicker("positions" + str(ticker_start))
                 ticker_start += 1
             return GetMarketPositionsResponse(
                 cursor=Cursor("2"),
@@ -416,7 +416,7 @@ def kalshi_test_exchange_factory():
         elif cursor == Cursor("2"):
             ticker_start = 20
             for position in positions:
-                position.ticker = MarketTicker(str(ticker_start))
+                position.ticker = MarketTicker("positions" + str(ticker_start))
                 ticker_start += 1
             return GetMarketPositionsResponse(
                 cursor=Cursor(""),

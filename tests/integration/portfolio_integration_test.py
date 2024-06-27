@@ -118,4 +118,5 @@ def test_load_portfolio_from_exchange(exchange_interface: ExchangeInterface):
         assert position.fees[0] == req.fee
     else:
         p = PortfolioHistory.load_from_exchange(exchange_interface)
-        assert len(p.positions) == 15
+        # 15 orders from loading the positions and 6 from the resting orders
+        assert len(p.positions) == 21

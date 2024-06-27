@@ -122,7 +122,9 @@ class OrderGateway:
         strategy_name = self._order_id_to_name.get(msg.order_id, None)
         print(f"Got order fill for strategy {strategy_name}: {msg}")
         # If the order was fully filled, remove it from the map
-        if strategy_name is not None and not self.portfolio.has_order_id(msg.order_id):
+        if strategy_name is not None and not self.portfolio.has_order_id(
+            msg.market_ticker, msg.order_id
+        ):
             del self._order_id_to_name[msg.order_id]
         return strategy_name
 

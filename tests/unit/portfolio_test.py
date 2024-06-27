@@ -838,7 +838,7 @@ def test_portfolio_order_reserve():
         new_balance_2,
     )
 
-    assert len(portfolio._resting_orders) == 3
+    assert len(portfolio.resting_orders()) == 3
     reserved_cash_1 = original_balance - portfolio.balance
     assert portfolio._reserved_cash == reserved_cash_1
     # Let's say part of the first order is filled
@@ -878,7 +878,7 @@ def test_portfolio_order_reserve():
     balance_before_fill = portfolio.balance
     portfolio.receive_fill_message(fill2)
     # Order should be unlocked
-    assert len(portfolio._resting_orders) == 2
+    assert len(portfolio.resting_orders()) == 2
     # We're going to add back in the original amount and then remove away the new cost
     # new_balance_1 was the balance before reserving the second order
     new_balance_3 = new_balance_1 - Cents(4 * 50) - compute_fee(Price(4), Quantity(50))
@@ -901,7 +901,7 @@ def test_portfolio_order_reserve():
     )
     balance_before_fill = portfolio.balance
     portfolio.receive_fill_message(fill3)
-    assert len(portfolio._resting_orders) == 1
+    assert len(portfolio.resting_orders()) == 1
     # Since we got better fees, balance should be greater
     assert portfolio.balance > balance_before_fill
 

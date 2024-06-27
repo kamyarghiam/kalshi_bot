@@ -2,6 +2,7 @@ import math
 import pickle
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
@@ -42,6 +43,7 @@ class Position:
         self.prices: List[Price] = []
         self.quantities: List[Quantity] = []
         self.fees: List[Cents] = []
+        self.resting_orders: Dict[OrderId, RestingOrder] = {}
 
     @classmethod
     def from_order(cls, order: Order) -> "Position":
@@ -177,10 +179,12 @@ class RestingOrder:
     They order can be filled in multiple steps, so we need to
     keep track of the quantity and money left per order"""
 
+    order_id: OrderId
     qty_left: Quantity
     # Represents max amount of money we need to save for this order
     money_left: Cents
     ticker: MarketTicker
+    side: Side
 
 
 class PortfolioHistory:
@@ -207,7 +211,6 @@ class PortfolioHistory:
         self._cash_balance: BalanceCents = balance
         self._reserved_cash: BalanceCents = BalanceCents(0)
         self._positions: Dict[MarketTicker, Position] = {}
-        self._resting_orders: Dict[OrderId, RestingOrder] = {}
         # TODO: this will accumulate too much memory for high freq strats
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
@@ -218,10 +221,7 @@ class PortfolioHistory:
     def has_resting_orders(self, t: MarketTicker) -> bool:
         """Returns whether we're holding resting order for the market
         or if an order was sent and we haven't heard back from the exchange yet"""
-        for order in self._resting_orders.values():
-            if order.ticker == t:
-                return True
-        return False
+        return len(self.resting_orders(t)) > 0
 
     @classmethod
     def load_from_exchange(
@@ -271,9 +271,29 @@ class PortfolioHistory:
     def positions(self):
         return self._positions
 
-    @property
-    def resting_orders(self) -> Dict[OrderId, RestingOrder]:
-        return self._resting_orders
+    def resting_orders(
+        self,
+        ticker: MarketTicker | None = None,
+    ) -> Dict[OrderId, RestingOrder]:
+        """Gets resting orders for a market ticker. If no market ticker passed in,
+        returns all resting orders"""
+        if ticker is not None:
+            if ticker in self.positions:
+                return self.positions[ticker].resting_orders
+            return {}
+        return dict(
+            chain.from_iterable(
+                d.resting_orders.items() for d in self.positions.values()
+            )
+        )
+
+    def add_resting_order(self, ro: RestingOrder):
+        if ro.ticker not in self.positions:
+            self.positions[ro.ticker] = Position(ro.ticker, ro.side)
+        self.positions[ro.ticker].resting_orders[ro.order_id] = ro
+
+    def remove_resting_order(self, ticker: MarketTicker, order_id: OrderId):
+        del self.positions[ticker].resting_orders[order_id]
 
     def reserve(self, amount: Cents):
         """This function can be used to reserve or free up reserved cash
@@ -398,24 +418,29 @@ class PortfolioHistory:
             assert order.trade == TradeType.SELL
             # For sells, we don't need to reserve money
             total_cost = Cents(0)
-        self._resting_orders[order_id] = RestingOrder(
-            qty_left=order.quantity, money_left=total_cost, ticker=order.ticker
+        ro = RestingOrder(
+            order_id=order_id,
+            qty_left=order.quantity,
+            money_left=total_cost,
+            ticker=order.ticker,
+            side=order.side,
         )
+        self.add_resting_order(ro)
 
-    def has_order_id(self, order_id: OrderId) -> bool:
-        return order_id in self._resting_orders
+    def has_order_id(self, ticker: MarketTicker, order_id: OrderId) -> bool:
+        return order_id in self.resting_orders(ticker)
 
     def is_manual_fill(self, fill: OrderFillRM) -> bool:
         """Returns whether this fill was made manually
 
         Assumes that we keep track of all resting orders"""
 
-        return not self.has_order_id(fill.order_id)
+        return not self.has_order_id(fill.market_ticker, fill.order_id)
 
     def receive_fill_message(self, fill: OrderFillRM):
         """Unreserve cash and place order in portfolio"""
         o = fill.to_order()
-        if resting_order := self._resting_orders.get(fill.order_id):
+        if resting_order := self.resting_orders(fill.market_ticker).get(fill.order_id):
             resting_order.qty_left -= o.quantity
             if fill.action == TradeType.BUY:
                 # Need to unreserve cash
@@ -424,26 +449,27 @@ class PortfolioHistory:
                 resting_order.money_left -= total_cost
 
             if resting_order.qty_left == 0:
-                self.unreserve_order(fill.order_id)
+                self.unreserve_order(fill.market_ticker, fill.order_id)
         else:
             print(f"Received manual fill! {fill}")
         self.place_order(o)
 
-    def unreserve_order(self, id_: OrderId):
+    def unreserve_order(self, ticker: MarketTicker, id_: OrderId):
         """Unlocks a resrved order and its funds"""
-        resting_order = self._resting_orders[id_]
+        resting_order = self.resting_orders(ticker)[id_]
         # Unlock remaining funds
         self.reserve(Cents(-1 * resting_order.money_left))
         # Remove reserved order
-        del self._resting_orders[id_]
+        self.remove_resting_order(ticker, id_)
 
     def sync_resting_orders(self, e: "ExchangeInterface"):
         """Syncs local resting orders with those on the exchange.
 
         Should be called periodically to make sure you have up
         to date view of the orders if they expire or get canceled"""
-        for order_id in list(self._resting_orders.keys()):
-            self.unreserve_order(order_id)
+        for ticker, position in self._positions.items():
+            for order_id in position.resting_orders:
+                self.unreserve_order(ticker, order_id)
         resting_orders = e.get_orders(
             request=GetOrdersRequest(status=OrderStatus.RESTING)
         )
