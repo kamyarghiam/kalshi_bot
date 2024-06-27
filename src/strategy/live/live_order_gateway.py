@@ -72,7 +72,7 @@ class OrderGateway:
     def run(self):
         try:
             self._run_strategies_in_separate_processes()
-            self._run_process_order_queue_in_separte_process()
+            self._run_process_order_queue_in_separate_process()
             self._run_gateway_loop()
         finally:
             print("Stopping strategies!")
@@ -167,7 +167,7 @@ class OrderGateway:
             if strategy_name == all_strategies or strategy_name == strategy.name:
                 queue.put_nowait(msg)
 
-    def _run_process_order_queue_in_separte_process(self):
+    def _run_process_order_queue_in_separate_process(self):
         thread = Thread(target=self._process_order_queue)
         thread.start()
         self.order_queue_thread = thread
