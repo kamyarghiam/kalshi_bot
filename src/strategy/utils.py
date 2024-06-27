@@ -400,6 +400,35 @@ class BaseStrategy(ABC):
         return StrategyName(self.__class__.__name__)
 
 
+class Throttler:
+    """Lets you know if you're calling something too frequently
+
+    Slightly different than rate limiter, throttler is non-blocking.
+    """
+
+    def __init__(self, frequency: datetime.timedelta):
+        self.frequency: datetime.timedelta = frequency
+        self.last_called: Dict[str | None, datetime.datetime] = {}
+
+    def should_trottle(
+        self, curr_ts: datetime.datetime, identifer: str | None = None
+    ) -> bool:
+        """Returns true if we should not process the request (it's too frequent)
+
+        Otherwise, assumes that we called it and updates the timestamp you last called.
+        You can pass in identifier if you want to distinguish different throttling
+        criteria for the same frequency. If you dont pass in an identifier, assumes
+        that all the throttling is shared.
+        """
+        if (
+            identifer in self.last_called
+            and curr_ts - self.last_called[identifer] < self.frequency
+        ):
+            return True
+        self.last_called[identifer] = curr_ts
+        return False
+
+
 class SpyStrategy(ABC):
     @abstractmethod
     def consume_next_step(

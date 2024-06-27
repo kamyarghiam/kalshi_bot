@@ -23,7 +23,7 @@ from helpers.types.websockets.response import (
     ResponseMessage,
     TradeRM,
 )
-from strategy.utils import BaseStrategy
+from strategy.utils import BaseStrategy, Throttler
 
 
 class GraveyardStrategy(BaseStrategy):
@@ -48,16 +48,14 @@ class GraveyardStrategy(BaseStrategy):
     max_position_per_trade = Dollars(20)
     # What is the maximum price the market can be at so we trade
     max_price_to_trade = Price(89)
-    # Time between the last time of checking if a market is dead
-    time_between_dead_market_check = timedelta(minutes=1)
 
     def __init__(
         self,
     ):
         self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
-        # The timestamp of the last time we checked if a market was dead
-        self._last_checked_ts: Dict[MarketTicker, datetime] = {}
+        # Throttles how often we check for dead markets
+        self.dead_market_throttler = Throttler(timedelta(minutes=1))
 
     def get_followup_qty(self, buy_price: Price) -> Quantity:
         min_qty = Quantity(math.ceil(self.min_position_per_trade / buy_price))
@@ -79,13 +77,8 @@ class GraveyardStrategy(BaseStrategy):
 
     def get_orders_if_dead_market(self, ob: Orderbook, ts: datetime) -> List[Order]:
         # Dont run this check too frequently for a market
-        if ob.market_ticker in self._last_checked_ts:
-            if (
-                ts - self._last_checked_ts[ob.market_ticker]
-                < self.time_between_dead_market_check
-            ):
-                return []
-        self._last_checked_ts[ob.market_ticker] = ts
+        if self.dead_market_throttler.should_trottle(ts, str(ob.market_ticker)):
+            return []
         for side in Side:
             ob_side = ob.get_side(side)
             if (
