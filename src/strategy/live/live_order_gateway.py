@@ -11,12 +11,11 @@ when we get an order from a strategy.
 import os
 import time
 import traceback
-from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
 from multiprocessing import Process, Queue
 from threading import Thread
-from typing import Callable, List, Tuple
+from typing import Callable, List
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
@@ -24,16 +23,15 @@ from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
+from strategy.live.types import (
+    ParentMessage,
+    ParentMsgOrders,
+    ParentMsgType,
+    TimedCallback,
+)
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 from strategy.utils import BaseStrategy, StrategyName
-
-
-@dataclass
-class TimedCallback:
-    f: Callable
-    frequency_sec: int
-    last_time_called_sec: int
 
 
 class OrderGateway:
@@ -50,10 +48,10 @@ class OrderGateway:
         self.strategies: List[BaseStrategy] = []
         # These are the queues that the strats pull msgs from
         self.strategy_queues: List[Queue[ResponseMessage | None]] = []
-        # This the queue that strategies publish their orders on
-        self.order_queue: Queue[Tuple[StrategyName, List[Order]] | None] = Queue()
+        # This the queue that strategies use to communicate with the parent process
+        self.parent_read_queue: Queue[ParentMessage | None] = Queue()
         # Thread that the order queue is being processed on
-        self.order_queue_thread: None | Thread = None
+        self.parent_read_queue_thread: None | Thread = None
         # These are the processes that the strategies are running on
         self.processes: List[Process] = []
         self.timed_callbacks: List[TimedCallback] = []
@@ -63,14 +61,14 @@ class OrderGateway:
     def run(self):
         try:
             self._run_strategies_in_separate_processes()
-            self._run_process_order_queue_in_separate_process()
+            self._run_parent_read_queue_in_separate_process()
             self._run_gateway_loop()
         finally:
             print("Stopping strategies!")
             print(self.portfolio)
             self.cancel_all_open_buy_resting_orders()
             self._stop_strategies()
-            self._stop_order_queue()
+            self._stop_parent_read_queue()
 
     def _stop_strategies(self):
         for queue in self.strategy_queues:
@@ -79,15 +77,17 @@ class OrderGateway:
         for p in self.processes:
             p.join()
 
-    def _stop_order_queue(self):
-        self.order_queue.put_nowait(None)
-        if self.order_queue_thread is not None:
-            self.order_queue_thread.join()
+    def _stop_parent_read_queue(self):
+        self.parent_read_queue.put_nowait(None)
+        if self.parent_read_queue_thread is not None:
+            self.parent_read_queue_thread.join()
 
     def _run_strategies_in_separate_processes(self):
         print("Putting strategies in a separate process...")
         for strategy, queue in zip(self.strategies, self.strategy_queues):
-            p = Process(target=run_strategy, args=(strategy, queue, self.order_queue))
+            p = Process(
+                target=run_strategy, args=(strategy, queue, self.parent_read_queue)
+            )
             p.start()
             self.processes.append(p)
 
@@ -144,19 +144,22 @@ class OrderGateway:
             if strategy_name == all_strategies or strategy_name == strategy.name:
                 queue.put_nowait(msg)
 
-    def _run_process_order_queue_in_separate_process(self):
-        thread = Thread(target=self._process_order_queue)
+    def _run_parent_read_queue_in_separate_process(self):
+        thread = Thread(target=self._process_parent_read_queue)
         thread.start()
-        self.order_queue_thread = thread
+        self.parent_read_queue_thread = thread
 
-    def _process_order_queue(self):
+    def _process_parent_read_queue(self):
         """Sees if strats want to place any orders"""
-        for strat_name, orders in iter(self.order_queue.get, None):
-            print(f"Received orders from strategy {strat_name}")
-            for order in orders:
-                print(f"Attempting to place order: {order}")
-                if self._is_order_valid(order):
-                    self._place_order(order, strat_name)
+        for msg in iter(self.parent_read_queue.get, None):
+            strat_name = msg.strategy_name
+            print(f"Received {msg.msg_type.value} from strategy {strat_name}")
+            if msg.msg_type == ParentMsgType.ORDER:
+                assert isinstance(msg.data, ParentMsgOrders)
+                for order in msg.data.orders:
+                    print(f"Attempting to place order: {order}")
+                    if self._is_order_valid(order):
+                        self._place_order(order, strat_name)
 
     def register_strategy(self, strategy: BaseStrategy):
         """Allows you to register a new strategy to run"""
@@ -227,14 +230,19 @@ class OrderGateway:
 def run_strategy(
     strategy: BaseStrategy,
     read_queue: "Queue[ResponseMessage | None]",
-    write_queue: "Queue[Tuple[StrategyName, List[Order]] | None]",
+    write_queue: "Queue[ParentMessage | None]",
 ):
     """The code running in a separate process for the strategy"""
     print(f"Starting {strategy.name} in process {os.getpid()}")
     for msg in iter(read_queue.get, None):
         orders = strategy.consume_next_step(msg)
         if len(orders) > 0:
-            write_queue.put_nowait((strategy.name, orders))
+            parent_msg = ParentMessage(
+                strategy_name=strategy.name,
+                msg_type=ParentMsgType.ORDER,
+                data=ParentMsgOrders(orders=orders),
+            )
+            write_queue.put_nowait(parent_msg)
     print(f"Ending {strategy.name}")
 
 
