@@ -13,19 +13,21 @@ import time
 import traceback
 from datetime import timedelta
 from functools import partial
-from multiprocessing import Process, Queue
+from multiprocessing import Pipe, Process, Queue
+from multiprocessing.connection import Connection
 from threading import Thread
-from typing import Callable, List
+from typing import Callable, Dict, List
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
-from helpers.types.portfolio import PortfolioHistory
+from helpers.types.portfolio import PortfolioHistory, Position
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.live.types import (
     ParentMessage,
     ParentMsgOrders,
+    ParentMsgPositionRequest,
     ParentMsgType,
     TimedCallback,
 )
@@ -54,6 +56,8 @@ class OrderGateway:
         self.parent_read_queue_thread: None | Thread = None
         # These are the processes that the strategies are running on
         self.processes: List[Process] = []
+        # These are how we communicate directly to the strats
+        self.pipes: Dict[StrategyName, Connection] = {}
         self.timed_callbacks: List[TimedCallback] = []
         self.portfolio = portfolio
         self.exchange = exchange
@@ -85,11 +89,14 @@ class OrderGateway:
     def _run_strategies_in_separate_processes(self):
         print("Putting strategies in a separate process...")
         for strategy, queue in zip(self.strategies, self.strategy_queues):
+            parent_conn, child_conn = Pipe()
             p = Process(
-                target=run_strategy, args=(strategy, queue, self.parent_read_queue)
+                target=run_strategy,
+                args=(strategy, queue, self.parent_read_queue, child_conn),
             )
             p.start()
             self.processes.append(p)
+            self.pipes[strategy.name] = parent_conn
 
     def _run_gateway_loop(self):
         """Main event loop, private function so we can wrap it"""
@@ -160,6 +167,13 @@ class OrderGateway:
                     print(f"Attempting to place order: {order}")
                     if self._is_order_valid(order):
                         self._place_order(order, strat_name)
+            elif msg.msg_type == ParentMsgType.POSITION_REQUEST:
+                assert isinstance(msg.data, ParentMsgPositionRequest)
+                ticker = msg.data.ticker
+                position = self.portfolio.positions.get(ticker)
+                self.pipes[msg.strategy_name].send(position)
+            else:
+                raise ValueError(f"Received unknown msg {msg}")
 
     def register_strategy(self, strategy: BaseStrategy):
         """Allows you to register a new strategy to run"""
@@ -231,8 +245,27 @@ def run_strategy(
     strategy: BaseStrategy,
     read_queue: "Queue[ResponseMessage | None]",
     write_queue: "Queue[ParentMessage | None]",
+    pipe_to_parent: Connection,
 ):
     """The code running in a separate process for the strategy"""
+
+    # Register portfolio callback
+    def get_portfolio_position(ticker: MarketTicker) -> Position | None:
+        write_queue.put_nowait(
+            ParentMessage(
+                strategy_name=strategy.name,
+                msg_type=ParentMsgType.POSITION_REQUEST,
+                data=ParentMsgPositionRequest(ticker=ticker),
+            )
+        )
+        # Timeout after 10 seconds
+        assert pipe_to_parent.poll(10)
+        position = pipe_to_parent.recv()
+        assert position is None or isinstance(position, Position)
+        return position
+
+    strategy.register_get_portfolio_positions(get_portfolio_position)
+
     print(f"Starting {strategy.name} in process {os.getpid()}")
     for msg in iter(read_queue.get, None):
         orders = strategy.consume_next_step(msg)

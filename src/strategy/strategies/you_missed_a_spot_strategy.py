@@ -81,6 +81,7 @@ class YouMissedASpotStrategy(BaseStrategy):
         self,
         levels_to_sweep: int = 2,
     ):
+        super().__init__()
         # How many levels must be swept before we place an order?
         self.levels_to_sweep = levels_to_sweep
         self._level_clears: Dict[Tuple[MarketTicker, Side], LevelClear] = {}

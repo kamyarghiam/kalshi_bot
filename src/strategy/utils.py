@@ -11,6 +11,7 @@ from threading import Thread
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Dict,
     Generator,
     Iterable,
@@ -31,7 +32,7 @@ from helpers.types.markets import EventTicker
 from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
-from helpers.types.portfolio import PortfolioHistory
+from helpers.types.portfolio import PortfolioHistory, Position
 from helpers.types.websockets.response import ResponseMessage
 
 if TYPE_CHECKING:
@@ -391,6 +392,11 @@ class BaseStrategy(ABC):
     A non-fancy strategy
     """
 
+    def __init__(self):
+        self._get_portfolio_position_callback: (
+            Callable[[MarketTicker], Position | None] | None
+        ) = None
+
     @abstractmethod
     def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
         pass
@@ -398,6 +404,17 @@ class BaseStrategy(ABC):
     @property
     def name(self) -> StrategyName:
         return StrategyName(self.__class__.__name__)
+
+    def get_portfolio_position(self, ticker: MarketTicker) -> Position | None:
+        """Make sure to set this function before using it"""
+        if self._get_portfolio_position_callback is None:
+            raise NotImplementedError()
+        return self._get_portfolio_position_callback(ticker)
+
+    def register_get_portfolio_positions(
+        self, f: Callable[[MarketTicker], Position | None]
+    ):
+        self._get_portfolio_position_callback = f
 
 
 class Throttler:

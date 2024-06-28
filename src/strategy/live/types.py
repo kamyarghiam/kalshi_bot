@@ -18,7 +18,7 @@ class ParentMsgType(Enum):
     # Sending an order to be sent ot the exchange
     ORDER = "order"
     # Requesting parent to send portfolio position
-    PORTFOLIO_REQUEST = "portfolio_request"
+    POSITION_REQUEST = "position_request"
 
 
 class ParentMsgData:
@@ -33,7 +33,7 @@ class ParentMsgOrders(ParentMsgData):
 
 
 @dataclass
-class ParentMsgPortfolioRequest(ParentMsgData):
+class ParentMsgPositionRequest(ParentMsgData):
     """Requesting parent process to send portfolio"""
 
     ticker: MarketTicker

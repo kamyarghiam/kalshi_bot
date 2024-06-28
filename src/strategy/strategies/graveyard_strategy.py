@@ -52,6 +52,7 @@ class GraveyardStrategy(BaseStrategy):
     def __init__(
         self,
     ):
+        super().__init__()
         self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
         # Throttles how often we check for dead markets
