@@ -163,6 +163,11 @@ class Position:
         s = f"{self.ticker}: {self.side.name}"
         for price, quantity in zip(self.prices, self.quantities):
             s += f" | {quantity} @ {price}"
+        for ro in self.resting_orders.values():
+            s += (
+                f"\n    Resting order: {ro.trade_type.value} {ro.side.value} "
+                + f"| {ro.qty_left} @ {ro.price}"
+            )
         return s
 
     def __repr__(self):
@@ -219,7 +224,6 @@ class PortfolioHistory:
         # TODO: this will accumulate too much memory for high freq strats
         self.orders: List[Order] = []
         self.realized_pnl: Cents = Cents(0)
-        self.max_exposure: Cents = Cents(0)
         self.allow_side_cross = allow_side_cross
         self.consider_reserved_cash = consider_reserved_cash
 
@@ -361,8 +365,7 @@ class PortfolioHistory:
             + f"Realized PnL (with fees): {self.realized_pnl_after_fees}\n"
             + f"Cash left: {BalanceCents(int(self._cash_balance))}\n"
             + f"Reserved cash: {BalanceCents(int(self._reserved_cash))}\n"
-            + f"Max exposure: {self.max_exposure}\n"
-            + f"Current positions ({self.get_positions_value()}):\n{positions_str}\n"
+            + f"Current positions:\n{positions_str}\n"
         )
         if print_orders:
             str_ += f"Orders:\n{self.orders_as_str()}"
@@ -530,8 +533,6 @@ class PortfolioHistory:
         else:
             self._positions[order.ticker] = Position.from_order(order)
         self.orders.append(order)
-        # TODO: optimize a little?
-        self.max_exposure = max(self.get_positions_value(), self.max_exposure)
 
     def potential_pnl(
         self,

@@ -9,6 +9,7 @@ from helpers.types.markets import Market, MarketResult, MarketStatus, MarketTick
 from helpers.types.money import BalanceCents, Cents, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, OrderbookSide
 from helpers.types.orders import (
+    ClientOrderId,
     Order,
     OrderAPIResponse,
     OrderId,
@@ -651,6 +652,28 @@ def test_portfolio_print():
         )
     )
     portfolio.reserve(Cents(250))
+    portfolio.reserve_order(
+        Order(
+            ticker=MarketTicker("Ticker2"),
+            price=Price(7),
+            quantity=Quantity(10),
+            side=Side.NO,
+            trade=TradeType.SELL,
+            time_placed=ts,
+        ),
+        order_id=OrderId("some_id1"),
+    )
+    portfolio.reserve_order(
+        Order(
+            ticker=MarketTicker("Ticker2"),
+            price=Price(8),
+            quantity=Quantity(20),
+            side=Side.NO,
+            trade=TradeType.SELL,
+            time_placed=ts,
+        ),
+        order_id=OrderId("some_id2"),
+    )
     assert (
         str(portfolio)
         == """Realized PnL (no fees): $-1.50
@@ -658,10 +681,11 @@ Fees paid: $1.63
 Realized PnL (with fees): $-3.13
 Cash left: $38.87
 Reserved cash: $2.50
-Max exposure: $17.00
-Current positions ($8.00):
+Current positions:
   Ticker1: NO | 100 @ 5¢
   Ticker2: NO | 50 @ 6¢
+    Resting order: sell no | 10 @ 7¢
+    Resting order: sell no | 20 @ 8¢
 Orders:
   Ticker1: BUY NO | 100 @ 5¢ (07:23:00)
   Ticker2: BUY NO | 200 @ 6¢ (07:23:00)
@@ -958,7 +982,7 @@ def test_load_from_exchange():
         balance=original_balance
     )
     resting_order1 = OrderAPIResponse(
-        client_order_id=OrderId("some_order_id"),
+        client_order_id=ClientOrderId("some_order_id"),
         order_id=order_id_1,
         action=TradeType.BUY,
         no_price=Price(49),
@@ -970,7 +994,7 @@ def test_load_from_exchange():
         remaining_count=Quantity(10),
     )
     sell_order = OrderAPIResponse(
-        client_order_id=OrderId("some_order_id2"),
+        client_order_id=ClientOrderId("some_order_id2"),
         order_id=order_id_2,
         action=TradeType.SELL,
         no_price=Price(48),

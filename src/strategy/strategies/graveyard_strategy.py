@@ -38,8 +38,8 @@ class GraveyardStrategy(BaseStrategy):
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
     # How long should a buy order stay alive for?
-    buy_order_lifetime_min = timedelta(minutes=10)
-    buy_order_lifetime_max = timedelta(minutes=15)
+    buy_order_lifetime_min = timedelta(minutes=120)
+    buy_order_lifetime_max = timedelta(minutes=180)
     # When we sell, how much higher should the price be
     min_profit_gap = Price(2)
     max_profit_gap = Price(4)
