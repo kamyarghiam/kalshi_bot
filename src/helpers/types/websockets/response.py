@@ -28,7 +28,7 @@ WR = TypeVar("WR", bound="WebsocketResponse")
 
 class WebsocketResponse(BaseModel):
     type: Type
-    model_config = ConfigDict(use_enum_values=True, extra="allow")
+    model_config = ConfigDict(extra="allow")
 
     def convert(self, sub_class: typing.Type[WR]) -> WR:
         """Converts a websocket response to the specific type it should be

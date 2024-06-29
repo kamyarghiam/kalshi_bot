@@ -190,6 +190,7 @@ class OrderGateway:
                 for o in resting_orders:
                     print(f"Canceled {o.to_order()} with id: {o.order_id}")
                     self.exchange.cancel_order(o.order_id)
+                    self.portfolio.unreserve_order(o.ticker, o.order_id)
                 self.pipes[msg.strategy_name].send(True)
             else:
                 raise ValueError(f"Received unknown msg {msg}")
@@ -232,6 +233,7 @@ class OrderGateway:
             if order.action == TradeType.BUY:
                 try:
                     self.exchange.cancel_order(order.order_id)
+                    self.portfolio.unreserve_order(order.ticker, order.order_id)
                     print(f"Canceled {order.to_order()} with id: {order.order_id}")
                 except Exception:
                     print(f"Could not find order for {order.order_id}. Error: ")

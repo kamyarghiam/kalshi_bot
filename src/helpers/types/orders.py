@@ -231,7 +231,7 @@ class OrderStatus(str, Enum):
 
 
 class InnerCreateOrderResponse(BaseModel):
-    model_config = ConfigDict(extra="allow", use_enum_values=True)
+    model_config = ConfigDict(extra="allow")
 
     status: OrderStatus
     order_id: OrderId
@@ -248,7 +248,7 @@ class GetOrdersRequest(ExternalApiWithCursor):
 
 
 class OrderAPIResponse(ExternalApi):
-    model_config = ConfigDict(extra="allow", use_enum_values=True)
+    model_config = ConfigDict(extra="allow")
 
     client_order_id: ClientOrderId
     order_id: OrderId

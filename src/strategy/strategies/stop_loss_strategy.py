@@ -46,10 +46,6 @@ class StopLossStrategy(BaseStrategy):
     def check_stop_loss(self, ticker: MarketTicker, ts: datetime) -> List[Order]:
         """Main function to check stop loss"""
 
-        # Throttle so we dont call this too often per ticker
-        if not self._ticker_position_throttle.should_trottle(ts):
-            self._tickers_holding = self.get_portfolio_tickers()
-
         # Throttle stop loss check
         if self._check_stop_loss_throttle.should_trottle(ts, str(ticker)):
             return []
@@ -128,6 +124,11 @@ class StopLossStrategy(BaseStrategy):
         return self.check_stop_loss(msg.market_ticker, msg.ts)
 
     def handle_trade_msg(self, msg: TradeRM):
+        # Throttle so we dont call this too often per ticker
+        if not self._ticker_position_throttle.should_trottle(
+            datetime.fromtimestamp(msg.ts)
+        ):
+            self._tickers_holding = self.get_portfolio_tickers()
         return
 
     def handle_order_fill_msg(self, msg: OrderFillRM):
