@@ -26,6 +26,8 @@ from tests.utils import random_data
 
 YouMissedASpotStrategy.min_levels_on_both_sides = Quantity(0)
 YouMissedASpotStrategy.min_quantity_on_both_sides = Quantity(0)
+YouMissedASpotStrategy.min_price_to_trade = Price(1)
+YouMissedASpotStrategy.max_price_to_trade = Price(98)
 
 
 def test_take_yes_side_real_msgs():

@@ -40,8 +40,11 @@ class LevelClear:
     # Whether we already sent an order for this group of clears (sweep)
     sent_order: bool = False
 
-    def register_level_clear(self, trade: TradeRM, maker_price: Price):
-        """Call this function when a level was cleared"""
+    def register_level_trade(self, trade: TradeRM, maker_price: Price):
+        """Call this function whenever we get a trade
+
+        Keeps track of trades with the same ts. If they cross a price boundary,
+        then they are considered a sweep"""
         if trade.ts != self.ts:
             self.count = 1
             self.ts = trade.ts
@@ -126,11 +129,9 @@ class YouMissedASpotStrategy(BaseStrategy):
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         maker_price, maker_side = get_maker_price_and_side(msg)
-        if self.level_cleared(msg, maker_price, maker_side, msg.count):
-            print(f"Level cleared {msg}")
-            self._level_clears[(msg.market_ticker, maker_side)].register_level_clear(
-                msg, maker_price
-            )
+        self._level_clears[(msg.market_ticker, maker_side)].register_level_trade(
+            msg, maker_price
+        )
         if self.is_sweep(msg.market_ticker, maker_side):
             print(f"Sweep! {msg}")
             order = self.get_order(msg, maker_side)
@@ -180,7 +181,7 @@ class YouMissedASpotStrategy(BaseStrategy):
         return []
 
     def is_sweep(self, ticker: MarketTicker, maker_side: Side) -> bool:
-        """Checks whether this trade sweeps at least two levels on the orderbook"""
+        """Checks whether this trade sweeps levels on the orderbook"""
         level_clear_info = self._level_clears[(ticker, maker_side)]
         if level_clear_info.sent_order:
             print("   not sweep because we already sent an order")
@@ -234,32 +235,6 @@ class YouMissedASpotStrategy(BaseStrategy):
             print("   not sending order bc level empty")
 
         return []
-
-    def level_cleared(
-        self, trade: TradeRM, maker_price: Price, maker_side: Side, qty_traded: Quantity
-    ) -> bool:
-        print(
-            f"Checking level clear for: {trade.market_ticker} on maker side "
-            + f"{Side.get_other_side(trade.taker_side)}"
-        )
-        # Already in BID view due to how we apply deltas in consume_next_step
-        ob = self._obs[trade.market_ticker]
-        ob_side = ob.get_side(maker_side)
-        level = ob_side.get_largest_price_level()
-        if level:
-            price, level_qty = level
-            if maker_price > price:
-                return True
-            print(f"    maker_price: {maker_price} and price {price}")
-            # New condition: if we take half the qty on a level,
-            # we consider it a sweep!
-            if maker_price == price and qty_traded > level_qty:
-                return True
-            print("    did not meet half condition")
-        else:
-            # If there are no more levels, we swept it
-            return True
-        return False
 
 
 def get_maker_price_and_side(t: TradeRM) -> Tuple[Price, Side]:
