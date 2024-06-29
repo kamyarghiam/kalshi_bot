@@ -238,6 +238,10 @@ class YouMissedASpotStrategy(BaseStrategy):
     def level_cleared(
         self, trade: TradeRM, maker_price: Price, maker_side: Side, qty_traded: Quantity
     ) -> bool:
+        print(
+            f"Checking level clear for: {trade.market_ticker} on maker side "
+            + f"{Side.get_other_side(trade.taker_side)}"
+        )
         # Already in BID view due to how we apply deltas in consume_next_step
         ob = self._obs[trade.market_ticker]
         ob_side = ob.get_side(maker_side)
@@ -246,10 +250,12 @@ class YouMissedASpotStrategy(BaseStrategy):
             price, level_qty = level
             if maker_price > price:
                 return True
+            print(f"    maker_price: {maker_price} and price {price}")
             # New condition: if we take half the qty on a level,
             # we consider it a sweep!
             if maker_price == price and qty_traded > level_qty:
                 return True
+            print("    did not meet half condition")
         else:
             # If there are no more levels, we swept it
             return True
