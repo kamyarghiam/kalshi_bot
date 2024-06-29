@@ -69,11 +69,11 @@ class YouMissedASpotStrategy(BaseStrategy):
     # We wont trade prices below this threshold
     min_price_to_trade = Price(10)
     # What is the maximum price the market can be at so we trade
-    max_price_to_trade = Price(96)
+    max_price_to_trade = Price(95)
     # How many cents above best bid should we place order
     price_above_best_bid = Cents(1)
     # At least how many levels should be on both sides so we trade?
-    min_levels_on_both_sides: int = 2
+    min_levels_on_both_sides: int = 1
     # At least how much quantity should be on both sides so we trade?
     min_quantity_on_both_sides: Quantity = Quantity(100)
 
