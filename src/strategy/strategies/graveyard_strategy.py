@@ -3,7 +3,7 @@ The purpose of this strategy is to find markets
 that have no volume on one side (dead side), but some volume
 on the other side (active side). Then we place orders on the side
 with the volume, and if it's picked, we sell it off on
-the other side
+the other side.
 """
 
 import math

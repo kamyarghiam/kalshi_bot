@@ -187,6 +187,7 @@ class RestingOrder:
     ticker: MarketTicker
     side: Side
     trade_type: TradeType
+    price: Price
     # Name of the strategy that added this resting order
     strategy_name: Union["StrategyName", None] = None
 
@@ -434,6 +435,7 @@ class PortfolioHistory:
             ticker=order.ticker,
             side=order.side,
             trade_type=order.trade,
+            price=order.price,
             strategy_name=strategy_name,
         )
         self.add_resting_order(ro)

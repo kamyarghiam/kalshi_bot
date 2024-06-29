@@ -2,9 +2,10 @@
 
 The order gateway runs the strategies in their own separate processes, listens
 to the exchange, sends orders to the strategies, and relays orders from the
-strategies to the exchange
+strategies to the exchange. We also set up a pipe between each parent and child
+so that the child can request things like portfolio positions.
 
-Note that orders are listend to on another thread so that we can act immediately
+Note that we listen to orders on another thread so that we can act immediately
 when we get an order from a strategy.
 """
 
@@ -16,7 +17,7 @@ from functools import partial
 from multiprocessing import Pipe, Process, Queue
 from multiprocessing.connection import Connection
 from threading import Thread
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Set
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
@@ -26,7 +27,9 @@ from helpers.types.portfolio import PortfolioHistory, Position
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.live.types import (
     ParentMessage,
+    ParentMsgCancelOrders,
     ParentMsgOrders,
+    ParentMsgPortfolioTickers,
     ParentMsgPositionRequest,
     ParentMsgType,
     TimedCallback,
@@ -172,6 +175,20 @@ class OrderGateway:
                 ticker = msg.data.ticker
                 position = self.portfolio.positions.get(ticker)
                 self.pipes[msg.strategy_name].send(position)
+            elif msg.msg_type == ParentMsgType.PORTFOLIO_TICKERS:
+                assert isinstance(msg.data, ParentMsgPortfolioTickers)
+                tickers: Set[MarketTicker] = set(self.portfolio.positions.keys())
+                self.pipes[msg.strategy_name].send(tickers)
+            elif msg.msg_type == ParentMsgType.CANCEL_ORDERS:
+                assert isinstance(msg.data, ParentMsgCancelOrders)
+                ticker = msg.data.ticker
+                resting_orders = self.exchange.get_orders(
+                    request=GetOrdersRequest(status=OrderStatus.RESTING, ticker=ticker)
+                )
+                print(f"Canceling {len(resting_orders)} orders")
+                for o in resting_orders:
+                    self.exchange.cancel_order(o.order_id)
+                self.pipes[msg.strategy_name].send(True)
             else:
                 raise ValueError(f"Received unknown msg {msg}")
 
@@ -241,15 +258,11 @@ class OrderGateway:
         return "COULD_NOT_FIGURE_OUT_NAME"
 
 
-def run_strategy(
+def register_helper_functions(
     strategy: BaseStrategy,
-    read_queue: "Queue[ResponseMessage | None]",
     write_queue: "Queue[ParentMessage | None]",
     pipe_to_parent: Connection,
 ):
-    """The code running in a separate process for the strategy"""
-
-    # Register portfolio callback
     def get_portfolio_position(ticker: MarketTicker) -> Position | None:
         write_queue.put_nowait(
             ParentMessage(
@@ -264,7 +277,49 @@ def run_strategy(
         assert position is None or isinstance(position, Position)
         return position
 
+    def get_portfolio_tickers() -> Set[MarketTicker]:
+        write_queue.put_nowait(
+            ParentMessage(
+                strategy_name=strategy.name,
+                msg_type=ParentMsgType.PORTFOLIO_TICKERS,
+                data=ParentMsgPortfolioTickers(),
+            )
+        )
+        # Timeout after 10 seconds
+        assert pipe_to_parent.poll(10)
+        tickers = pipe_to_parent.recv()
+        for ticker in tickers:
+            assert isinstance(ticker, MarketTicker)
+        return tickers
+
+    def cancel_orders(ticker: MarketTicker) -> bool:
+        write_queue.put_nowait(
+            ParentMessage(
+                strategy_name=strategy.name,
+                msg_type=ParentMsgType.CANCEL_ORDERS,
+                data=ParentMsgCancelOrders(ticker=ticker),
+            )
+        )
+        # Timeout after 10 seconds
+        assert pipe_to_parent.poll(10)
+        ok = pipe_to_parent.recv()
+        assert isinstance(ok, bool)
+        return ok
+
     strategy.register_get_portfolio_positions(get_portfolio_position)
+    strategy.register_get_portfolio_tickers(get_portfolio_tickers)
+    strategy.register_cancel_orders(cancel_orders)
+
+
+def run_strategy(
+    strategy: BaseStrategy,
+    read_queue: "Queue[ResponseMessage | None]",
+    write_queue: "Queue[ParentMessage | None]",
+    pipe_to_parent: Connection,
+):
+    """The code running in a separate process for the strategy"""
+
+    register_helper_functions(strategy, write_queue, pipe_to_parent)
 
     print(f"Starting {strategy.name} in process {os.getpid()}")
     for msg in iter(read_queue.get, None):

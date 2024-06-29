@@ -86,6 +86,16 @@ class OrderId(str):
         return core_schema.no_info_after_validator_function(cls, handler(str))
 
 
+class ClientOrderId(str):
+    """Order id that we created"""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, handler(str))
+
+
 class TradeId(str):
     """Id for trades placed. A trade is a confirmed order"""
 
@@ -240,7 +250,7 @@ class GetOrdersRequest(ExternalApiWithCursor):
 class OrderAPIResponse(ExternalApi):
     model_config = ConfigDict(extra="allow", use_enum_values=True)
 
-    client_order_id: OrderId
+    client_order_id: ClientOrderId
     order_id: OrderId
     action: TradeType
     no_price: Price

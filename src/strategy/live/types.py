@@ -19,6 +19,10 @@ class ParentMsgType(Enum):
     ORDER = "order"
     # Requesting parent to send portfolio position
     POSITION_REQUEST = "position_request"
+    # Requesting tickers in portfolio
+    PORTFOLIO_TICKERS = "portfolio_tickers"
+    # Cancel all orders on a market
+    CANCEL_ORDERS = "cancel_orders"
 
 
 class ParentMsgData:
@@ -35,6 +39,18 @@ class ParentMsgOrders(ParentMsgData):
 @dataclass
 class ParentMsgPositionRequest(ParentMsgData):
     """Requesting parent process to send portfolio"""
+
+    ticker: MarketTicker
+
+
+@dataclass
+class ParentMsgPortfolioTickers(ParentMsgData):
+    """Requesting parent process to send what tickers we hold"""
+
+
+@dataclass
+class ParentMsgCancelOrders(ParentMsgData):
+    """Cancel all orders on a specific market"""
 
     ticker: MarketTicker
 

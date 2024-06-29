@@ -18,6 +18,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     Sized,
     Tuple,
     TypeVar,
@@ -396,6 +397,8 @@ class BaseStrategy(ABC):
         self._get_portfolio_position_callback: (
             Callable[[MarketTicker], Position | None] | None
         ) = None
+        self._get_portfolio_tickers: Callable[[], Set[MarketTicker]] | None = None
+        self._cancel_orders: Callable[[MarketTicker], bool] | None = None
 
     @abstractmethod
     def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
@@ -411,10 +414,28 @@ class BaseStrategy(ABC):
             raise NotImplementedError()
         return self._get_portfolio_position_callback(ticker)
 
+    def get_portfolio_tickers(self) -> Set[MarketTicker]:
+        """Returns tickers we're holding in portfolio"""
+        if self._get_portfolio_tickers is None:
+            raise NotImplementedError()
+        return self._get_portfolio_tickers()
+
+    def cancel_orders(self, ticker: MarketTicker) -> bool:
+        """Cancels orders on a market"""
+        if self._cancel_orders is None:
+            raise NotImplementedError()
+        return self._cancel_orders(ticker)
+
     def register_get_portfolio_positions(
         self, f: Callable[[MarketTicker], Position | None]
     ):
         self._get_portfolio_position_callback = f
+
+    def register_get_portfolio_tickers(self, f: Callable[[], Set[MarketTicker]]):
+        self._get_portfolio_tickers = f
+
+    def register_cancel_orders(self, f: Callable[[MarketTicker], bool]):
+        self._cancel_orders = f
 
 
 class Throttler:
