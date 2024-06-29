@@ -35,6 +35,7 @@ from strategy.live.types import (
     TimedCallback,
 )
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
+from strategy.strategies.stop_loss_strategy import StopLossStrategy
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
 from strategy.utils import BaseStrategy, StrategyName
 
@@ -187,6 +188,7 @@ class OrderGateway:
                 )
                 print(f"Canceling {len(resting_orders)} orders")
                 for o in resting_orders:
+                    print(f"Canceled {o.to_order()} with id: {o.order_id}")
                     self.exchange.cancel_order(o.order_id)
                 self.pipes[msg.strategy_name].send(True)
             else:
@@ -230,7 +232,7 @@ class OrderGateway:
             if order.action == TradeType.BUY:
                 try:
                     self.exchange.cancel_order(order.order_id)
-                    print(f"Canceled {order.order_id}")
+                    print(f"Canceled {order.to_order()} with id: {order.order_id}")
                 except Exception:
                     print(f"Could not find order for {order.order_id}. Error: ")
                     traceback.print_exc()
@@ -341,6 +343,7 @@ def main():
         o = OrderGateway(e, p)
         o.register_strategy(YouMissedASpotStrategy())
         o.register_strategy(GraveyardStrategy())
+        o.register_strategy(StopLossStrategy())
 
         # Sync resting orders every X minutes
         o.register_timed_callback(
