@@ -75,7 +75,7 @@ class YouMissedASpotStrategy(BaseStrategy):
     # At least how many levels should be on both sides so we trade?
     min_levels_on_both_sides: int = 2
     # At least how much quantity should be on both sides so we trade?
-    min_quantity_on_both_sides: Quantity = Quantity(700)
+    min_quantity_on_both_sides: Quantity = Quantity(100)
 
     def __init__(
         self,
