@@ -150,7 +150,10 @@ class Position:
 
     def is_empty(self):
         return (
-            len(self.prices) == 0 and len(self.quantities) == 0 and len(self.fees) == 0
+            len(self.prices) == 0
+            and len(self.quantities) == 0
+            and len(self.fees) == 0
+            and len(self.resting_orders) == 0
         )
 
     def get_value(self) -> Cents:
@@ -303,6 +306,8 @@ class PortfolioHistory:
 
     def remove_resting_order(self, ticker: MarketTicker, order_id: OrderId):
         del self.positions[ticker].resting_orders[order_id]
+        if self.positions[ticker].is_empty():
+            del self.positions[ticker]
 
     def reserve(self, amount: Cents):
         """This function can be used to reserve or free up reserved cash
