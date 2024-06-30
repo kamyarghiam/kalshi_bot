@@ -16,7 +16,6 @@ from typing import Dict, List, Set, Tuple
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Dollars, Price
-from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side, TradeType
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
@@ -88,7 +87,6 @@ class YouMissedASpotStrategy(BaseStrategy):
         self.levels_to_sweep = levels_to_sweep
         self._level_clears: Dict[Tuple[MarketTicker, Side], LevelClear] = {}
         self._tickers: Set[MarketTicker] = set()
-        self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.min_position_per_trade < self.max_position_per_trade
         assert self.min_position_per_trade > 0
         assert self.buy_order_lifetime_min < self.buy_order_lifetime_max
@@ -121,12 +119,9 @@ class YouMissedASpotStrategy(BaseStrategy):
             self._tickers.add(msg.market_ticker)
             for side in Side:
                 self._level_clears[(msg.market_ticker, side)] = LevelClear()
-        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
-
         return []
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
-        self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         return []
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
@@ -185,7 +180,7 @@ class YouMissedASpotStrategy(BaseStrategy):
 
     def get_order(self, trade: TradeRM, maker_side: Side) -> List[Order]:
         """Returns order we need to place"""
-        ob = self._obs[trade.market_ticker]
+        ob = self.get_ob(trade.market_ticker)
         for side in Side:
             ob_side = ob.get_side(side)
             if len(ob_side) < self.min_levels_on_both_sides:

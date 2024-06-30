@@ -396,7 +396,7 @@ class StrategyName(str):
 
 class BaseStrategy(ABC):
     """
-    A non-fancy strategy
+    Manages orderbooks, and can be used to register callbacks
     """
 
     def __init__(self):
@@ -405,6 +405,7 @@ class BaseStrategy(ABC):
         ) = None
         self._get_portfolio_tickers: Callable[[], Set[MarketTicker]] | None = None
         self._cancel_orders: Callable[[MarketTicker], bool] | None = None
+        self._obs: Dict[MarketTicker, Orderbook] = {}
 
     @abstractmethod
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
@@ -422,10 +423,15 @@ class BaseStrategy(ABC):
     def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
         pass
 
+    def get_ob(self, ticker: MarketTicker) -> Orderbook:
+        return self._obs[ticker]
+
     def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
         if isinstance(msg, OrderbookSnapshotRM):
+            self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
             return self.handle_snapshot_msg(msg)
         elif isinstance(msg, OrderbookDeltaRM):
+            self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
             return self.handle_delta_msg(msg)
         elif isinstance(msg, TradeRM):
             return self.handle_trade_msg(msg)
@@ -437,6 +443,7 @@ class BaseStrategy(ABC):
     def name(self) -> StrategyName:
         return StrategyName(self.__class__.__name__)
 
+    ################## Callbacks. Useful for live order gateway ###############
     def get_portfolio_position(self, ticker: MarketTicker) -> Position | None:
         """Make sure to set this function before using it"""
         if self._get_portfolio_position_callback is None:
@@ -455,6 +462,7 @@ class BaseStrategy(ABC):
             raise NotImplementedError()
         return self._cancel_orders(ticker)
 
+    ################ Register callback functions #########################
     def register_get_portfolio_positions(
         self, f: Callable[[MarketTicker], Position | None]
     ):

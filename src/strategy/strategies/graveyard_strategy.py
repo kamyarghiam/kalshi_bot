@@ -10,9 +10,8 @@ import math
 import random
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import List
 
-from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Dollars, Price
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order, Quantity, Side, TradeType
@@ -52,7 +51,6 @@ class GraveyardStrategy(BaseStrategy):
         self,
     ):
         super().__init__()
-        self._obs: Dict[MarketTicker, Orderbook] = {}
         assert self.max_price_to_trade + self.price_above_best_bid <= Price(99)
         # Throttles how often we check for dead markets
         self.dead_market_throttler = Throttler(timedelta(minutes=1))
@@ -120,13 +118,11 @@ class GraveyardStrategy(BaseStrategy):
         return []
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
-        self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
-        ob = self._obs[msg.market_ticker]
+        ob = self.get_ob(msg.market_ticker)
         return self.get_orders_if_dead_market(ob, msg.ts)
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
-        self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
-        return self.get_orders_if_dead_market(self._obs[msg.market_ticker], msg.ts)
+        return self.get_orders_if_dead_market(self.get_ob(msg.market_ticker), msg.ts)
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         return []
