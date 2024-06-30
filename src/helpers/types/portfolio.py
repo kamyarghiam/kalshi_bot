@@ -495,7 +495,7 @@ class PortfolioHistory:
         Should be called periodically to make sure you have up
         to date view of the orders if they expire or get canceled"""
         order_id_to_strategy: Dict[OrderId, "StrategyName" | None] = {}
-        for ticker, position in self._positions.items():
+        for ticker, position in list(self._positions.items()):
             for order_id, resting_order in list(position.resting_orders.items()):
                 order_id_to_strategy[order_id] = resting_order.strategy_name
                 self.unreserve_order(ticker, order_id)
