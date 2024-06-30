@@ -3,7 +3,7 @@ import os
 import random
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Dict, List
 
 import starlette
@@ -247,24 +247,28 @@ def kalshi_test_exchange_factory():
                 status=MarketStatus.OPEN,
                 ticker=ticker,
                 result=MarketResult.YES,
+                close_time=datetime.now(UTC),
             )
         elif ticker == MarketTicker("DETERMINED-NO"):
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,
                 result=MarketResult.NO,
+                close_time=datetime.now(UTC),
             )
         elif ticker == MarketTicker("NOT-DETERMINED"):
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,
                 result=MarketResult.NOT_DETERMINED,
+                close_time=datetime.now(UTC),
             )
         else:
             market = Market(
                 status=MarketStatus.OPEN,
                 ticker=ticker,
                 result=MarketResult.NOT_DETERMINED,
+                close_time=datetime.now(UTC),
             )
         return GetMarketResponse(
             market=market,
@@ -354,6 +358,7 @@ def kalshi_test_exchange_factory():
                 ticker=MarketTicker("some_ticker"),
                 result=MarketResult.NOT_DETERMINED,
                 liquidity=1,
+                close_time=datetime.now(UTC),
             )
             for _ in range(100)
         ]

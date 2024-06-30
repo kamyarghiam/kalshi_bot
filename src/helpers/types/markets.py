@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Any, List, Union
 
@@ -84,6 +85,7 @@ class Market(BaseModel):
     ticker: MarketTicker
     result: MarketResult
     liquidity: int = 0
+    close_time: datetime
     # Last Yes price traded on this market. Can be 0
     last_price: Price | int = 0
     # These values can be used to determine market boundaries

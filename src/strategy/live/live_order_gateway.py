@@ -9,6 +9,7 @@ Note that we listen to orders on another thread so that we can act immediately
 when we get an order from a strategy.
 """
 
+import datetime
 import os
 import time
 import traceback
@@ -47,10 +48,14 @@ class OrderGateway:
         self,
         exchange: ExchangeInterface,
         portfolio: PortfolioHistory,
-        tickers: List[MarketTicker] | None = None,
+        tickers: Set[MarketTicker] | None = None,
     ):
-        # If tickers are none, we get all tickers
-        self.tickers = tickers or [m.ticker for m in exchange.get_active_markets()]
+        # If tickers are none, we get all tickers. Union with portfolio tickers
+        self.tickers = tickers or {m.ticker for m in exchange.get_active_markets()}
+        self.tickers = self.tickers.union(
+            {ticker for ticker in portfolio.positions.keys()}
+        )
+
         self.strategies: List[BaseStrategy] = []
         # These are the queues that the strats pull msgs from
         self.strategy_queues: List[Queue[ResponseMessage | None]] = []
@@ -107,7 +112,7 @@ class OrderGateway:
 
         with self.exchange.get_websocket() as ws:
             sub = OrderbookSubscription(
-                ws, self.tickers, send_trade_updates=True, send_order_fills=True
+                ws, list(self.tickers), send_trade_updates=True, send_order_fills=True
             )
             assert (
                 sub.send_trade_updates
@@ -338,11 +343,23 @@ def run_strategy(
     print(f"Ending {strategy.name}")
 
 
+def get_markets_set_to_expire_soon(e: ExchangeInterface) -> Set[MarketTicker]:
+    closes_in = timedelta(days=3)
+    active_markets = e.get_active_markets()
+    tickers = set()
+    now = datetime.datetime.now(datetime.UTC)
+    for am in active_markets:
+        if (am.close_time - now) < closes_in:
+            tickers.add(am.ticker)
+    return tickers
+
+
 def main():
     is_test_run = False
     with ExchangeInterface(is_test_run=is_test_run) as e:
+        tickers = get_markets_set_to_expire_soon(e)
         p = PortfolioHistory.load_from_exchange(e, consider_reserved_cash=False)
-        o = OrderGateway(e, p)
+        o = OrderGateway(e, p, tickers)
         o.register_strategy(YouMissedASpotStrategy())
         o.register_strategy(GraveyardStrategy())
         o.register_strategy(StopLossStrategy())

@@ -727,17 +727,20 @@ def test_get_unrealized_pnl():
         status=MarketStatus.SETTLED,
         ticker=MarketTicker("determined_profit"),
         result=MarketResult.NO,
+        close_time=datetime.datetime.now(datetime.UTC),
     )
 
     market2 = Market(
         status=MarketStatus.SETTLED,
         ticker=MarketTicker("determined_loss"),
         result=MarketResult.YES,
+        close_time=datetime.datetime.now(datetime.UTC),
     )
     market3 = Market(
         status=MarketStatus.OPEN,
         ticker=MarketTicker("not_determined"),
         result=MarketResult.NOT_DETERMINED,
+        close_time=datetime.datetime.now(datetime.UTC),
     )
 
     mock_exchange = MagicMock(spec=ExchangeInterface)
