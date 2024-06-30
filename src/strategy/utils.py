@@ -34,7 +34,13 @@ from helpers.types.money import Cents
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import Order
 from helpers.types.portfolio import PortfolioHistory, Position
-from helpers.types.websockets.response import ResponseMessage
+from helpers.types.websockets.response import (
+    OrderbookDeltaRM,
+    OrderbookSnapshotRM,
+    OrderFillRM,
+    ResponseMessage,
+    TradeRM,
+)
 
 if TYPE_CHECKING:
     from strategy.features.derived.derived_feature import DerivedFeature
@@ -401,8 +407,31 @@ class BaseStrategy(ABC):
         self._cancel_orders: Callable[[MarketTicker], bool] | None = None
 
     @abstractmethod
-    def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
+    def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
         pass
+
+    @abstractmethod
+    def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
+        pass
+
+    @abstractmethod
+    def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
+        pass
+
+    @abstractmethod
+    def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
+        pass
+
+    def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
+        if isinstance(msg, OrderbookSnapshotRM):
+            return self.handle_snapshot_msg(msg)
+        elif isinstance(msg, OrderbookDeltaRM):
+            return self.handle_delta_msg(msg)
+        elif isinstance(msg, TradeRM):
+            return self.handle_trade_msg(msg)
+        elif isinstance(msg, OrderFillRM):
+            return self.handle_order_fill_msg(msg)
+        raise ValueError(f"Received unknown msg type: {msg}")
 
     @property
     def name(self) -> StrategyName:

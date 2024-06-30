@@ -22,7 +22,6 @@ from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
     OrderFillRM,
-    ResponseMessage,
     TradeRM,
 )
 from strategy.utils import BaseStrategy
@@ -117,15 +116,18 @@ class YouMissedASpotStrategy(BaseStrategy):
     def profit_gap(self) -> Price:
         return Price(random.randint(self.min_profit_gap, self.max_profit_gap))
 
-    def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
+    def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
         if msg.market_ticker not in self._tickers:
             self._tickers.add(msg.market_ticker)
             for side in Side:
                 self._level_clears[(msg.market_ticker, side)] = LevelClear()
         self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
 
-    def handle_delta_msg(self, msg: OrderbookDeltaRM):
+        return []
+
+    def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
+        return []
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         maker_price, maker_side = get_maker_price_and_side(msg)
@@ -163,21 +165,6 @@ class YouMissedASpotStrategy(BaseStrategy):
                         expiration_ts=None,
                     )
                 ]
-        return []
-
-    def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
-        if isinstance(msg, OrderbookSnapshotRM):
-            self.handle_snapshot_msg(msg)
-        elif isinstance(msg, OrderbookDeltaRM):
-            self.handle_delta_msg(msg)
-        elif isinstance(msg, TradeRM):
-            if orders := self.handle_trade_msg(msg):
-                return orders
-        elif isinstance(msg, OrderFillRM):
-            if orders := self.handle_order_fill_msg(msg):
-                return orders
-        else:
-            raise ValueError(f"Received unknown msg type: {msg}")
         return []
 
     def is_sweep(self, ticker: MarketTicker, maker_side: Side) -> bool:

@@ -20,7 +20,6 @@ from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
     OrderFillRM,
-    ResponseMessage,
     TradeRM,
 )
 from strategy.utils import BaseStrategy, Throttler
@@ -125,14 +124,14 @@ class GraveyardStrategy(BaseStrategy):
         ob = self._obs[msg.market_ticker]
         return self.get_orders_if_dead_market(ob, msg.ts)
 
-    def handle_delta_msg(self, msg: OrderbookDeltaRM):
+    def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         return self.get_orders_if_dead_market(self._obs[msg.market_ticker], msg.ts)
 
-    def handle_trade_msg(self, msg: TradeRM):
-        return
+    def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
+        return []
 
-    def handle_order_fill_msg(self, msg: OrderFillRM):
+    def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
         print("Graveyard strat got fill msg")
         # If it's a buy message, let's place a sell order immediately
         if msg.action == TradeType.BUY:
@@ -156,18 +155,4 @@ class GraveyardStrategy(BaseStrategy):
                         expiration_ts=None,
                     )
                 ]
-
-    def consume_next_step(self, msg: ResponseMessage) -> List[Order]:
-        if isinstance(msg, OrderbookSnapshotRM):
-            return self.handle_snapshot_msg(msg)
-        elif isinstance(msg, OrderbookDeltaRM):
-            self.handle_delta_msg(msg)
-        elif isinstance(msg, TradeRM):
-            if orders := self.handle_trade_msg(msg):
-                return orders
-        elif isinstance(msg, OrderFillRM):
-            if orders := self.handle_order_fill_msg(msg):
-                return orders
-        else:
-            raise ValueError(f"Received unknown msg type: {msg}")
         return []
