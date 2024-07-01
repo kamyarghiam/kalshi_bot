@@ -6,7 +6,7 @@ Place orders one level within this spread.
 Continuously check on deltas if this spread is moved and move with it"""
 
 import random
-from typing import List
+from typing import Dict, List
 
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Dollars, Price, get_opposite_side_price
@@ -40,13 +40,17 @@ class FollowTheLeaderStrategy(BaseStrategy):
         self,
     ):
         super().__init__()
-        assert False, "make sure to allow self crossing"
+        # Maps what the leader quantitiy behind us to be
+        # Also keeps track of tickers we're holding
+        # Note: this wont be cleared, but that's ok because we overwrite
+        self._ticker_to_qty_behind: Dict[MarketTicker, Quantity] = {}
+        # Represents the qty we're still hold on for this ticker
+        self._tickers_to_open_qty: Dict[MarketTicker, Quantity] = {}
         assert False, "check that prices are set right in demo (see way below)"
 
     def check_top_three_levels(self, ticker: MarketTicker) -> List[Order]:
         # TODO: MAKE THIS WAY MORE EFFICENT
         # TODO: TEST AND BENCHMARK PROFILE THIS IN TESTING
-        # TODO: must allow self crossing
         ob_bid = self._obs[ticker].get_view(OrderbookView.ASK)
         yes_side_bid = ob_bid.get_side(Side.YES)
         no_side_bid = ob_bid.get_side(Side.NO)
@@ -78,13 +82,20 @@ class FollowTheLeaderStrategy(BaseStrategy):
                     abs(ask_qty - bid_qty) / min(ask_qty, bid_qty)
                     < self.max_percent_different
                 ):
-                    max_qty = max(ask_qty, bid_qty)
+                    # We use the min because they're roughly the same anyways
+                    max_qty = min(ask_qty, bid_qty)
                     if max_qty_same is None or max_qty > max_qty_same:
                         max_qty_same = max_qty
                         max_bid_level = bid_price
                         max_ask_level = ask_price
-        if max_bid_level is not None and max_ask_level is not None:
+        if max_qty_same is not None:
+            assert max_bid_level is not None and max_ask_level is not None
+            # Make sure the spread is wide enough for two more levels
+            if (max_ask_level - max_bid_level) < 3:
+                print("    spread not wide enough")
+                return []
             # Place an order between them
+            self._ticker_to_qty_behind[ticker] = max_qty_same
             return self.place_orders_between_levels(
                 max_bid_level, max_ask_level, ticker
             )
@@ -96,10 +107,6 @@ class FollowTheLeaderStrategy(BaseStrategy):
         yes_ask_level: Price,
         ticker: MarketTicker,
     ) -> List[Order]:
-        # Make sure the spread is wide enough for two more levels
-        if (yes_ask_level - yes_bid_level) < 3:
-            print("    spread not wide enough")
-            return []
         # TODO: add some jitter to both sides?
         qty = self.get_quantity_to_place(yes_ask_level)
         # TODO: CHECK THAT THESE PRICES ARE RIGHT IN DEMO?
@@ -139,5 +146,8 @@ class FollowTheLeaderStrategy(BaseStrategy):
 
     def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
         """Once we fill, we cancel all orders and place a sell order on
-        the other side"""
+        the other side."""
+        # TODO: fill this out
+        # TODO: keep track of which tickers were holding + qty. Only check
+        # tickers we're holding in delta. Use self._tickers_to_open_qty
         return []

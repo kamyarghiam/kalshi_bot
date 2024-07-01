@@ -126,11 +126,15 @@ class OrderGateway:
         # Only check for buy orders
         if order.trade == TradeType.BUY:
             if order.ticker in self.portfolio.positions:
-                print("    not buying, already holding position in market")
-                return False
-            if self.portfolio.has_resting_orders(order.ticker):
-                print("    not buying bc we have resting orders")
-                return False
+                # Dont place order if it's on the same side
+                if self.portfolio.positions[order.ticker].side == order.side:
+                    print(f"    nvm, holding position in market on side {order.side}")
+                    return False
+            resting_orders = self.portfolio.resting_orders(order.ticker)
+            for ro in resting_orders.values():
+                if ro.side == order.side:
+                    print(f"    nvm, we have resting orders on side {order.side}")
+                    return False
             if not self.portfolio.can_afford(order):
                 print("    not buying because we cant afford it")
                 return False
@@ -358,7 +362,11 @@ def main():
     is_test_run = False
     with ExchangeInterface(is_test_run=is_test_run) as e:
         tickers = get_markets_set_to_expire_soon(e)
-        p = PortfolioHistory.load_from_exchange(e, consider_reserved_cash=False)
+        p = PortfolioHistory.load_from_exchange(
+            e,
+            allow_side_cross=True,
+            consider_reserved_cash=False,
+        )
         o = OrderGateway(e, p, tickers)
         o.register_strategy(YouMissedASpotStrategy())
         o.register_strategy(GraveyardStrategy())
