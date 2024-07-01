@@ -26,7 +26,7 @@ from strategy.utils import BaseStrategy, Throttler
 class StopLossStrategy(BaseStrategy):
     # The min / max percentage loss we must encounter to sell
     min_percentage_loss = 10
-    max_percentage_loss = 20
+    max_percentage_loss = 15
 
     def __init__(
         self,

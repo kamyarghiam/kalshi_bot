@@ -59,14 +59,14 @@ class LevelClear:
 
 class YouMissedASpotStrategy(BaseStrategy):
     # How long should a buy order stay alive for?
-    buy_order_lifetime_min = timedelta(minutes=10)
-    buy_order_lifetime_max = timedelta(minutes=15)
+    buy_order_lifetime_min = timedelta(minutes=3)
+    buy_order_lifetime_max = timedelta(minutes=7)
     # When we sell, how much higher should the price be
     min_profit_gap = Price(1)
-    max_profit_gap = Price(3)
+    max_profit_gap = Price(2)
     # Max/min we're willing to bet on per trade
-    min_position_per_trade = Dollars(5)
-    max_position_per_trade = Dollars(15)
+    min_position_per_trade = Dollars(7)
+    max_position_per_trade = Dollars(12)
     # We wont trade prices below this threshold
     min_price_to_trade = Price(10)
     # What is the maximum price the market can be at so we trade
