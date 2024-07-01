@@ -126,10 +126,8 @@ class OrderGateway:
         # Only check for buy orders
         if order.trade == TradeType.BUY:
             if order.ticker in self.portfolio.positions:
-                # Dont place order if it's on the same side
-                if self.portfolio.positions[order.ticker].side == order.side:
-                    print(f"    nvm, holding position or resting order on {order.side}")
-                    return False
+                print(f"    nvm, holding position or resting order on {order.side}")
+                return False
             if not self.portfolio.can_afford(order):
                 print("    not buying because we cant afford it")
                 return False

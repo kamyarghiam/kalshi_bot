@@ -48,6 +48,12 @@ class FollowTheLeaderStrategy(BaseStrategy):
         self._tickers_to_open_qty: Dict[MarketTicker, Quantity] = {}
         assert False, "check that prices are set right in demo (see way below)"
         assert False, "TODO: update Position to allow resting orders on multiple sides"
+        assert (
+            False
+        ), "fix bug with positions where you try to buy / sell on opposite sides"
+        assert (
+            False
+        ), "in _is_order_valid, make sure you can buy on both sides at the same time"
 
     def check_top_three_levels(self, ticker: MarketTicker) -> List[Order]:
         # TODO: MAKE THIS WAY MORE EFFICENT
