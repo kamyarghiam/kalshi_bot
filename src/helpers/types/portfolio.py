@@ -37,9 +37,10 @@ if TYPE_CHECKING:
 
 
 class Position:
-    def __init__(self, ticker: MarketTicker, side: Side):
+    def __init__(self, ticker: MarketTicker, side: Side | None = None):
         self.ticker = ticker
-        self.side: Side = side
+        # A position can have a null side if it's just a resting order
+        self.side: Side | None = side
         # We can be holding a position at several different price points
         self.prices: List[Price] = []
         self.quantities: List[Quantity] = []
@@ -63,6 +64,12 @@ class Position:
             and self.side == other.side
         )
 
+    @classmethod
+    def from_resting_order(cls, ro: "RestingOrder") -> "Position":
+        c = cls(ro.ticker, side=None)
+        c.resting_orders[ro.order_id] = ro
+        return c
+
     @property
     def total_quantity(self) -> Quantity:
         return Quantity(sum(self.quantities))
@@ -72,7 +79,9 @@ class Position:
         assert len(self.prices) == len(self.quantities)
         if order.trade != TradeType.BUY:
             raise ValueError(f"Not a buy order: {order}")
-        if self.side != order.side:
+        if self.side is None:
+            self.side = order.side
+        elif self.side != order.side:
             raise ValueError(
                 f"Position has side {self.side} but order has side {order.side}"
             )
@@ -101,6 +110,8 @@ class Position:
         """
         if order.trade != TradeType.SELL:
             raise ValueError(f"Not a sell order: {order}")
+        if order.side is None:
+            raise ValueError("Not holding any positions")
         if self.side != order.side:
             raise ValueError(
                 f"Position has side {self.side} but order has side {order.side}"
@@ -163,7 +174,13 @@ class Position:
         return Cents(cents)
 
     def __str__(self):
-        s = f"{self.ticker}: {self.side.name}"
+        s = f"{self.ticker}: "
+
+        if self.side is not None:
+            side_str = f"{self.side.name}"
+        else:
+            side_str = "(only resting orders)"
+        s += side_str
         for price, quantity in zip(self.prices, self.quantities):
             s += f" | {quantity} @ {price}"
         for ro in self.resting_orders.values():
@@ -301,8 +318,9 @@ class PortfolioHistory:
 
     def add_resting_order(self, ro: RestingOrder):
         if ro.ticker not in self.positions:
-            self.positions[ro.ticker] = Position(ro.ticker, ro.side)
-        self.positions[ro.ticker].resting_orders[ro.order_id] = ro
+            self.positions[ro.ticker] = Position.from_resting_order(ro)
+        else:
+            self.positions[ro.ticker].resting_orders[ro.order_id] = ro
 
     def remove_resting_order(self, ticker: MarketTicker, order_id: OrderId):
         del self.positions[ticker].resting_orders[order_id]
@@ -324,6 +342,9 @@ class PortfolioHistory:
         Does not include realized portion of pnl"""
         unrealized_pnl: Cents = Cents(0)
         for position in self._positions.values():
+            if position.side is None:
+                # Not holding any positions here
+                continue
             market = e.get_market(position.ticker)
             if market.result == MarketResult.NOT_DETERMINED:
                 # We only need the top of the book
@@ -405,10 +426,11 @@ class PortfolioHistory:
     def holding_other_side(self, order: Order):
         if order.ticker in self._positions:
             holding = self._positions[order.ticker]
-            return order.side != holding.side
+            return holding.side is not None and order.side != holding.side
+        return False
 
     def can_sell(self, order: Order) -> bool:
-        if order.ticker not in self._positions:
+        if order.ticker not in self._positions or order.side is None:
             return False
         position = self._positions[order.ticker]
         if position.side != order.side:
@@ -577,6 +599,8 @@ class PortfolioHistory:
         ticker = orderbook.market_ticker
         if ticker in self._positions:
             position = self._positions[ticker]
+            if position.side is None:
+                return None
             sell_order = orderbook.sell_order(position.side)
 
             if sell_order is None:
