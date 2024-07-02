@@ -133,6 +133,18 @@ class OrderGateway:
                 if order.side != side:
                     print(f"    nvm, holding position or resting order on {order.side}")
                     return False
+                if (
+                    len(
+                        ros := self.portfolio.positions[
+                            order.ticker
+                        ].resting_orders.values()
+                    )
+                    > 0
+                ):
+                    for ro in ros:
+                        if ro.side == order.side:
+                            print("    nvm, resting order on the same side")
+                            return False
             if not self.portfolio.can_afford(order):
                 print("    not buying because we cant afford it")
                 return False
