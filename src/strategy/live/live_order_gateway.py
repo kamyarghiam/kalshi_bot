@@ -17,6 +17,7 @@ from datetime import timedelta
 from functools import partial
 from multiprocessing import Pipe, Process, Queue
 from multiprocessing.connection import Connection
+from queue import Full
 from threading import Thread
 from typing import Callable, Dict, List, Set
 
@@ -155,7 +156,11 @@ class OrderGateway:
         # Feed message to the strats
         for strategy, queue in zip(self.strategies, self.strategy_queues):
             if strategy_name == all_strategies or strategy_name == strategy.name:
-                queue.put_nowait(msg)
+                try:
+                    queue.put_nowait(msg)
+                except Full:
+                    print("Strategy with full queue: ", strategy.name)
+                    raise
 
     def _run_parent_read_queue_in_separate_process(self):
         thread = Thread(target=self._process_parent_read_queue)
