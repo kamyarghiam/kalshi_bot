@@ -36,6 +36,7 @@ from strategy.live.types import (
     ParentMsgType,
     TimedCallback,
 )
+from strategy.strategies.follow_the_leader_strategy import FollowTheLeaderStrategy
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
 from strategy.strategies.stop_loss_strategy import StopLossStrategy
 from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrategy
@@ -155,6 +156,8 @@ class OrderGateway:
         if order_id is not None:
             print("Order placed!")
             self.portfolio.reserve_order(order, order_id, strategy_name)
+        else:
+            print("ORDER REJECTED")
 
     def _process_response_msg(self, msg: ResponseMessage):
         """Processes websocket messages from the exchange"""
@@ -282,7 +285,7 @@ class OrderGateway:
             return f.func.__name__
         elif isinstance(f, Callable):  # type:ignore[arg-type]
             return f.__name__
-        return "COULD_NOT_FIGURE_OUT_NAME"
+        return "CANT FIGURE OUT NAME"
 
 
 def register_helper_functions(
@@ -385,6 +388,7 @@ def main():
         o.register_strategy(YouMissedASpotStrategy())
         o.register_strategy(GraveyardStrategy())
         o.register_strategy(StopLossStrategy())
+        o.register_strategy(FollowTheLeaderStrategy())
 
         # Sync resting orders every X minutes
         o.register_timed_callback(

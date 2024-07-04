@@ -32,6 +32,7 @@ class LeaderStats:
     # Prices of the leaders
     ask_price: Price
     bid_price: Price
+    sent_order: bool
 
 
 class FollowTheLeaderStrategy(BaseStrategy):
@@ -40,14 +41,14 @@ class FollowTheLeaderStrategy(BaseStrategy):
     num_levels_to_check = 3
 
     # How different can the quantities be (percentage wise) to consider them similar
-    max_percent_different = 0.1
+    max_percent_different = 0.2
 
     # The minimum quantity the that the top book needs to be to be considered
     top_book_min_qty = Quantity(900)
 
     # Max and min per trade
-    max_per_trade = Dollars(5)
-    min_per_trade = Dollars(10)
+    min_per_trade = Dollars(5)
+    max_per_trade = Dollars(10)
 
     def roughly_equal(self, x: int, y: int) -> bool:
         if x == 0 or y == 0:
@@ -62,17 +63,15 @@ class FollowTheLeaderStrategy(BaseStrategy):
     ):
         super().__init__()
         self._ticker_to_leader_stats: Dict[MarketTicker, LeaderStats] = {}
-        self._delta_msg_throttle = Throttler(timedelta(minutes=1))
-
-        assert False, "check that prices are set right in demo (see way below)"
-        assert (
-            False
-        ), "in _is_order_valid, make sure you can buy on both sides at the same time"
+        self._check_top_levels_throttle = Throttler(timedelta(minutes=1))
 
     def check_top_levels(self, ticker: MarketTicker) -> List[Order]:
         # TODO: MAKE THIS WAY MORE EFFICENT
         # TODO: TEST AND BENCHMARK PROFILE THIS IN TESTING
-        ob_bid = self._obs[ticker].get_view(OrderbookView.ASK)
+        if ticker in self._ticker_to_leader_stats:
+            if self._ticker_to_leader_stats[ticker].sent_order:
+                return []
+        ob_bid = self.get_ob(ticker).get_view(OrderbookView.BID)
         yes_side_bid = ob_bid.get_side(Side.YES)
         no_side_bid = ob_bid.get_side(Side.NO)
 
@@ -81,6 +80,7 @@ class FollowTheLeaderStrategy(BaseStrategy):
             len(yes_side_bid) < self.num_levels_to_check
             or len(no_side_bid) < self.num_levels_to_check
         ):
+            print(f"   not enough levels on {ticker}")
             return []
 
         ask_view = ob_bid.get_view(OrderbookView.ASK)
@@ -99,7 +99,7 @@ class FollowTheLeaderStrategy(BaseStrategy):
                 bid_price = bid_prices_in_order[j]
                 bid_qty = yes_side_bid.levels[bid_price]
                 # Check they are about the same
-                if self.roughly_equal(ask_qty, bid_qty):
+                if self.roughly_equal(int(ask_qty), int(bid_qty)):
                     # We use the min because they're roughly the same anyways
                     max_qty = min(ask_qty, bid_qty)
                     if max_qty_same is None or max_qty > max_qty_same:
@@ -110,12 +110,16 @@ class FollowTheLeaderStrategy(BaseStrategy):
             assert max_bid_level is not None and max_ask_level is not None
             # Make sure the spread is wide enough for two more levels
             if (max_ask_level - max_bid_level) < 3:
-                print("    spread not wide enough")
+                print(f"    spread not wide enough on {ticker}")
                 return []
             # Place an order between them
-            self._ticker_to_leader_stats[ticker].leader_qty = max_qty_same
-            self._ticker_to_leader_stats[ticker].bid_price = max_bid_level
-            self._ticker_to_leader_stats[ticker].ask_price = max_ask_level
+            self._ticker_to_leader_stats[ticker] = LeaderStats(
+                leader_qty=max_qty_same,
+                our_qty=Quantity(0),
+                ask_price=max_ask_level,
+                bid_price=max_bid_level,
+                sent_order=False,
+            )
             return self.place_orders_between_levels(
                 max_bid_level, max_ask_level, ticker
             )
@@ -136,6 +140,7 @@ class FollowTheLeaderStrategy(BaseStrategy):
             trade=TradeType.BUY,
             ticker=ticker,
             side=Side.YES,
+            expiration_ts=None,
         )
         # TODO: check?
         no_bid = get_opposite_side_price(yes_ask_level)
@@ -145,7 +150,9 @@ class FollowTheLeaderStrategy(BaseStrategy):
             trade=TradeType.BUY,
             ticker=ticker,
             side=Side.NO,
+            expiration_ts=None,
         )
+        self._ticker_to_leader_stats[ticker].sent_order = True
         return [yes_order, no_order]
 
     def get_quantity_to_place(self, p: Price) -> Quantity:
@@ -154,6 +161,10 @@ class FollowTheLeaderStrategy(BaseStrategy):
         return Quantity(int(dollar_amount / p))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
+        if self._check_top_levels_throttle.should_trottle(
+            msg.ts, str(msg.market_ticker)
+        ):
+            return []
         return self.check_top_levels(msg.market_ticker)
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
@@ -164,16 +175,19 @@ class FollowTheLeaderStrategy(BaseStrategy):
                 or leader_stats.bid_price == msg.price
             ):
                 # There was a change in top book prices. Check if our leader moved
-                new_qty = (
-                    self._obs[msg.market_ticker].get_side(msg.side).levels[msg.price]
-                )
-                if not self.roughly_equal(
-                    new_qty, self._ticker_to_leader_stats[msg.market_ticker].leader_qty
+                ob_levels = self.get_ob(msg.market_ticker).get_side(msg.side).levels
+                # Either the level was removed or the qty changed enough
+                # to warrent us to move
+                if msg.price not in ob_levels or not self.roughly_equal(
+                    int(ob_levels[msg.price]),
+                    int(self._ticker_to_leader_stats[msg.market_ticker].leader_qty),
                 ):
                     self.cancel_orders(msg.market_ticker)
                     del self._ticker_to_leader_stats[msg.market_ticker]
 
-        if self._delta_msg_throttle.should_trottle(msg.ts, str(msg.market_ticker)):
+        if self._check_top_levels_throttle.should_trottle(
+            msg.ts, str(msg.market_ticker)
+        ):
             return []
 
         return self.check_top_levels(msg.market_ticker)
