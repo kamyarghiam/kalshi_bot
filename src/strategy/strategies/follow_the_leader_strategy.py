@@ -6,6 +6,8 @@ Place orders one level within this spread.
 Continuously check on deltas if this spread is moved and move with it"""
 
 import random
+from dataclasses import dataclass
+from datetime import timedelta
 from typing import Dict, List
 
 from helpers.types.markets import MarketTicker
@@ -18,7 +20,18 @@ from helpers.types.websockets.response import (
     OrderFillRM,
     TradeRM,
 )
-from strategy.utils import BaseStrategy
+from strategy.utils import BaseStrategy, Throttler
+
+
+@dataclass
+class LeaderStats:
+    # Roughly the quantity that the leader is holding
+    leader_qty: Quantity
+    # Our open quantity
+    our_qty: Quantity
+    # Prices of the leaders
+    ask_price: Price
+    bid_price: Price
 
 
 class FollowTheLeaderStrategy(BaseStrategy):
@@ -30,32 +43,33 @@ class FollowTheLeaderStrategy(BaseStrategy):
     max_percent_different = 0.1
 
     # The minimum quantity the that the top book needs to be to be considered
-    top_book_min_qty = 50
+    top_book_min_qty = Quantity(900)
 
     # Max and min per trade
     max_per_trade = Dollars(5)
     min_per_trade = Dollars(10)
 
+    def roughly_equal(self, x: int, y: int) -> bool:
+        if x == 0 or y == 0:
+            return x == y
+        percentage_difference = abs(x - y) / min(abs(x), abs(y))
+
+        # Check if the percentage difference is within 10%
+        return percentage_difference <= self.max_percent_different
+
     def __init__(
         self,
     ):
         super().__init__()
-        # Maps what the leader quantitiy behind us to be
-        # Also keeps track of tickers we're holding
-        # Note: this wont be cleared, but that's ok because we overwrite
-        self._ticker_to_qty_behind: Dict[MarketTicker, Quantity] = {}
-        # Represents the qty we're still hold on for this ticker
-        self._tickers_to_open_qty: Dict[MarketTicker, Quantity] = {}
+        self._ticker_to_leader_stats: Dict[MarketTicker, LeaderStats] = {}
+        self._delta_msg_throttle = Throttler(timedelta(minutes=1))
+
         assert False, "check that prices are set right in demo (see way below)"
-        assert False, "TODO: update Position to allow resting orders on multiple sides"
-        assert (
-            False
-        ), "fix bug with positions where you try to buy / sell on opposite sides"
         assert (
             False
         ), "in _is_order_valid, make sure you can buy on both sides at the same time"
 
-    def check_top_three_levels(self, ticker: MarketTicker) -> List[Order]:
+    def check_top_levels(self, ticker: MarketTicker) -> List[Order]:
         # TODO: MAKE THIS WAY MORE EFFICENT
         # TODO: TEST AND BENCHMARK PROFILE THIS IN TESTING
         ob_bid = self._obs[ticker].get_view(OrderbookView.ASK)
@@ -85,24 +99,23 @@ class FollowTheLeaderStrategy(BaseStrategy):
                 bid_price = bid_prices_in_order[j]
                 bid_qty = yes_side_bid.levels[bid_price]
                 # Check they are about the same
-                if (
-                    abs(ask_qty - bid_qty) / min(ask_qty, bid_qty)
-                    < self.max_percent_different
-                ):
+                if self.roughly_equal(ask_qty, bid_qty):
                     # We use the min because they're roughly the same anyways
                     max_qty = min(ask_qty, bid_qty)
                     if max_qty_same is None or max_qty > max_qty_same:
                         max_qty_same = max_qty
                         max_bid_level = bid_price
                         max_ask_level = ask_price
-        if max_qty_same is not None:
+        if max_qty_same is not None and max_qty_same >= self.top_book_min_qty:
             assert max_bid_level is not None and max_ask_level is not None
             # Make sure the spread is wide enough for two more levels
             if (max_ask_level - max_bid_level) < 3:
                 print("    spread not wide enough")
                 return []
             # Place an order between them
-            self._ticker_to_qty_behind[ticker] = max_qty_same
+            self._ticker_to_leader_stats[ticker].leader_qty = max_qty_same
+            self._ticker_to_leader_stats[ticker].bid_price = max_bid_level
+            self._ticker_to_leader_stats[ticker].ask_price = max_ask_level
             return self.place_orders_between_levels(
                 max_bid_level, max_ask_level, ticker
             )
@@ -141,12 +154,29 @@ class FollowTheLeaderStrategy(BaseStrategy):
         return Quantity(int(dollar_amount / p))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM) -> List[Order]:
-        return self.check_top_three_levels(msg.market_ticker)
+        return self.check_top_levels(msg.market_ticker)
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
-        # TODO: check if there was a change in the top level before proceeding
-        # TODO: store top quantities and cancel orders / replace orders if moved
-        return self.check_top_three_levels(msg.market_ticker)
+        # check if there was a change in the top level before proceeding
+        if leader_stats := self._ticker_to_leader_stats.get(msg.market_ticker):
+            if (
+                leader_stats.ask_price == msg.price
+                or leader_stats.bid_price == msg.price
+            ):
+                # There was a change in top book prices. Check if our leader moved
+                new_qty = (
+                    self._obs[msg.market_ticker].get_side(msg.side).levels[msg.price]
+                )
+                if not self.roughly_equal(
+                    new_qty, self._ticker_to_leader_stats[msg.market_ticker].leader_qty
+                ):
+                    self.cancel_orders(msg.market_ticker)
+                    del self._ticker_to_leader_stats[msg.market_ticker]
+
+        if self._delta_msg_throttle.should_trottle(msg.ts, str(msg.market_ticker)):
+            return []
+
+        return self.check_top_levels(msg.market_ticker)
 
     def handle_trade_msg(self, msg: TradeRM) -> List[Order]:
         return []
@@ -154,7 +184,23 @@ class FollowTheLeaderStrategy(BaseStrategy):
     def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order]:
         """Once we fill, we cancel all orders and place a sell order on
         the other side."""
-        # TODO: fill this out
-        # TODO: keep track of which tickers were holding + qty. Only check
-        # tickers we're holding in delta. Use self._tickers_to_open_qty
+        if msg.action == TradeType.BUY:
+            self._ticker_to_leader_stats[msg.market_ticker].our_qty += msg.count
+            if self.cancel_orders(msg.market_ticker) and msg.price < Price(99):
+                # Only takes 1 tick of profit rn
+                return [
+                    Order(
+                        price=msg.price + 1,
+                        quantity=msg.count,
+                        trade=TradeType.SELL,
+                        ticker=msg.market_ticker,
+                        side=msg.side,
+                        expiration_ts=None,
+                    )
+                ]
+        else:
+            assert msg.action == TradeType.SELL
+            self._ticker_to_leader_stats[msg.market_ticker].our_qty -= msg.count
+            if self._ticker_to_leader_stats[msg.market_ticker].our_qty == 0:
+                del self._ticker_to_leader_stats[msg.market_ticker]
         return []

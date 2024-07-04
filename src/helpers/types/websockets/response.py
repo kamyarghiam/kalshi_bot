@@ -195,6 +195,10 @@ class OrderFillRM(ResponseMessage):
             is_taker=self.is_taker,
         )
 
+    @property
+    def price(self):
+        return self.yes_price if self.side == Side.YES else self.no_price
+
 
 class OrderFillWR(WebsocketResponse):
     sid: SubscriptionId
