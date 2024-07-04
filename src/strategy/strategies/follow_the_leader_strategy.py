@@ -80,7 +80,6 @@ class FollowTheLeaderStrategy(BaseStrategy):
             len(yes_side_bid) < self.num_levels_to_check
             or len(no_side_bid) < self.num_levels_to_check
         ):
-            print(f"   not enough levels on {ticker}")
             return []
 
         ask_view = ob_bid.get_view(OrderbookView.ASK)
