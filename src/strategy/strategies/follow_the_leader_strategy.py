@@ -64,6 +64,7 @@ class FollowTheLeaderStrategy(BaseStrategy):
         super().__init__()
         self._ticker_to_leader_stats: Dict[MarketTicker, LeaderStats] = {}
         self._check_top_levels_throttle = Throttler(timedelta(minutes=1))
+        self._check_cancel_throttle = Throttler(timedelta(seconds=2))
 
     def check_top_levels(self, ticker: MarketTicker) -> List[Order]:
         # TODO: MAKE THIS WAY MORE EFFICENT
@@ -169,6 +170,10 @@ class FollowTheLeaderStrategy(BaseStrategy):
     def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order]:
         # check if there was a change in the top level before proceeding
         if leader_stats := self._ticker_to_leader_stats.get(msg.market_ticker):
+            if self._check_cancel_throttle.should_trottle(
+                msg.ts, str(msg.market_ticker)
+            ):
+                return []
             if (
                 leader_stats.ask_price == msg.price
                 or leader_stats.bid_price == msg.price

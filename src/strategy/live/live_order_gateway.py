@@ -375,8 +375,31 @@ def get_markets_set_to_expire_soon(e: ExchangeInterface) -> Set[MarketTicker]:
     return tickers
 
 
+# TODO: set this up
+# def setup_logger():
+#     logger = logging.getLogger(__name__)
+#     logger.setLevel(logging.DEBUG)
+#     today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+
+#     file_handler = logging.FileHandler(f"{today_str}.log")
+#     file_handler.setLevel(logging.DEBUG)
+
+#     console_handler = logging.StreamHandler()
+#     console_handler.setLevel(logging.INFO)
+
+#     formatter = logging.Formatter("%(asctime)s - %(name)s - %(message)s")
+#     file_handler.setFormatter(formatter)
+
+#     logger.addHandler(file_handler)
+#     logger.addHandler(console_handler)
+
+#     # TODO: use queue handler for multi processing logs
+#     # https://docs.python.org/3/library/logging.handlers.html#logging.handlers.QueueHandler
+
+
 def main():
     is_test_run = False
+    # setup_logger()
     with ExchangeInterface(is_test_run=is_test_run) as e:
         tickers = get_markets_set_to_expire_soon(e)
         p = PortfolioHistory.load_from_exchange(
