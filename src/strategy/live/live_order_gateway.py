@@ -10,7 +10,6 @@ when we get an order from a strategy.
 """
 
 import datetime
-import os
 import time
 import traceback
 from datetime import timedelta
@@ -25,8 +24,9 @@ from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
-from helpers.types.portfolio import PortfolioHistory, Position
+from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
+from strategy.live.strategy_worker import run_strategy
 from strategy.live.types import (
     ParentMessage,
     ParentMsgCancelOrders,
@@ -286,82 +286,6 @@ class OrderGateway:
         elif isinstance(f, Callable):  # type:ignore[arg-type]
             return f.__name__
         return "CANT FIGURE OUT NAME"
-
-
-def register_helper_functions(
-    strategy: BaseStrategy,
-    write_queue: "Queue[ParentMessage | None]",
-    pipe_to_parent: Connection,
-):
-    def get_portfolio_position(ticker: MarketTicker) -> Position | None:
-        write_queue.put_nowait(
-            ParentMessage(
-                strategy_name=strategy.name,
-                msg_type=ParentMsgType.POSITION_REQUEST,
-                data=ParentMsgPositionRequest(ticker=ticker),
-            )
-        )
-        # Timeout after 10 seconds
-        assert pipe_to_parent.poll(10)
-        position = pipe_to_parent.recv()
-        assert position is None or isinstance(position, Position)
-        return position
-
-    def get_portfolio_tickers() -> Set[MarketTicker]:
-        write_queue.put_nowait(
-            ParentMessage(
-                strategy_name=strategy.name,
-                msg_type=ParentMsgType.PORTFOLIO_TICKERS,
-                data=ParentMsgPortfolioTickers(),
-            )
-        )
-        # Timeout after 10 seconds
-        assert pipe_to_parent.poll(10)
-        tickers = pipe_to_parent.recv()
-        for ticker in tickers:
-            assert isinstance(ticker, MarketTicker)
-        return tickers
-
-    def cancel_orders(ticker: MarketTicker) -> bool:
-        write_queue.put_nowait(
-            ParentMessage(
-                strategy_name=strategy.name,
-                msg_type=ParentMsgType.CANCEL_ORDERS,
-                data=ParentMsgCancelOrders(ticker=ticker),
-            )
-        )
-        # Timeout after 10 seconds
-        assert pipe_to_parent.poll(10)
-        ok = pipe_to_parent.recv()
-        assert isinstance(ok, bool)
-        return ok
-
-    strategy.register_get_portfolio_positions(get_portfolio_position)
-    strategy.register_get_portfolio_tickers(get_portfolio_tickers)
-    strategy.register_cancel_orders(cancel_orders)
-
-
-def run_strategy(
-    strategy: BaseStrategy,
-    read_queue: "Queue[ResponseMessage | None]",
-    write_queue: "Queue[ParentMessage | None]",
-    pipe_to_parent: Connection,
-):
-    """The code running in a separate process for the strategy"""
-
-    register_helper_functions(strategy, write_queue, pipe_to_parent)
-
-    print(f"Starting {strategy.name} in process {os.getpid()}")
-    for msg in iter(read_queue.get, None):
-        orders = strategy.consume_next_step(msg)
-        if len(orders) > 0:
-            parent_msg = ParentMessage(
-                strategy_name=strategy.name,
-                msg_type=ParentMsgType.ORDER,
-                data=ParentMsgOrders(orders=orders),
-            )
-            write_queue.put_nowait(parent_msg)
-    print(f"Ending {strategy.name}")
 
 
 def get_markets_set_to_expire_soon(e: ExchangeInterface) -> Set[MarketTicker]:
