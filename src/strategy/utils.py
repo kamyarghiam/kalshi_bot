@@ -41,6 +41,7 @@ from helpers.types.websockets.response import (
     ResponseMessage,
     TradeRM,
 )
+from strategy.live.types import StrategyName
 
 if TYPE_CHECKING:
     from strategy.features.derived.derived_feature import DerivedFeature
@@ -388,10 +389,6 @@ class Strategy(ABC):
         self, update: ObservationSet, portfolio: PortfolioHistory
     ) -> Iterable[Order]:
         pass
-
-
-class StrategyName(str):
-    """Name of a strategy"""
 
 
 class BaseStrategy(ABC):

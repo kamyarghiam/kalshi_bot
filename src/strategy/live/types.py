@@ -1,10 +1,19 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List
+from typing import Callable, List, TypeAlias
 
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import Order
-from strategy.utils import StrategyName
+from helpers.types.websockets.response import (
+    OrderbookDeltaRM,
+    OrderbookSnapshotRM,
+    OrderFillRM,
+    TradeRM,
+)
+
+
+class StrategyName(str):
+    """Name of a strategy"""
 
 
 @dataclass
@@ -63,3 +72,8 @@ class ParentMessage:
     strategy_name: StrategyName
     msg_type: ParentMsgType
     data: ParentMsgData
+
+
+ResponseMessage: TypeAlias = (
+    OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
+)

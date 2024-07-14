@@ -2,9 +2,12 @@
 to run the strategies."""
 
 import os
+import threading
+from dataclasses import dataclass
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
-from typing import Set
+from threading import Thread
+from typing import Dict, Set
 
 from helpers.types.markets import MarketTicker
 from helpers.types.portfolio import Position
@@ -18,6 +21,16 @@ from strategy.live.types import (
     ParentMsgType,
 )
 from strategy.utils import BaseStrategy
+
+
+class ThreadId(int):
+    """Id of a thread processing market data"""
+
+
+@dataclass
+class StrategyThread:
+    queue: Queue[ResponseMessage | None]
+    thread: Thread
 
 
 def register_helper_functions(
@@ -76,22 +89,55 @@ def register_helper_functions(
 def run_strategy(
     strategy: BaseStrategy,
     read_queue: Queue[ResponseMessage | None],
-    write_queue: "Queue[ParentMessage | None]",
+    write_queue: Queue[ParentMessage | None],
     pipe_to_parent: Connection,
 ):
     """The code running in a separate process for the strategy"""
 
     register_helper_functions(strategy, write_queue, pipe_to_parent)
-
     print(f"Starting {strategy.name} in process {os.getpid()}")
-    # TODO: spin up threads here
-    # For load balancing, have mapping of ticker
-    # to thread ID (plus count) and num msgs in that thread
-    # Reduce ticker count after processed,
-    # and remove ticker to thread ID once 0
-    # Need to somehow re-order threads after adding messages to it.
-    # Want to have least num messages at top
+
+    # Launch threads
+    num_threads = 10
+    thread_id_to_info: Dict[ThreadId, StrategyThread] = {}
+    for i in range(num_threads):
+        thread_queue: Queue[ResponseMessage | None] = Queue()
+        thread = threading.Thread(
+            target=run_thread, args=(strategy, thread_queue, write_queue)
+        )
+        thread_id_to_info[ThreadId(i)] = StrategyThread(
+            queue=thread_queue, thread=thread
+        )
+        thread.start()
+
+    # We store what threads are keeping track of what market tickers
+    ticker_to_thread_id: Dict[MarketTicker, ThreadId] = {}
+    # This is the thread to receive the next new market ticker
+    round_robin_idx = ThreadId(0)
+
     for msg in iter(read_queue.get, None):
+        if hasattr(msg, "market_ticker"):
+            ticker = msg.market_ticker
+        if ticker not in ticker_to_thread_id:
+            ticker_to_thread_id[ticker] = round_robin_idx
+            round_robin_idx = ThreadId(round_robin_idx + 1)
+        thread_id = ticker_to_thread_id[ticker]
+        thread_queue = thread_id_to_info[thread_id].queue
+        thread_queue.put(msg)
+
+    print(f"Ending {strategy.name}...")
+    for t in thread_id_to_info.values():
+        t.queue.put(None)
+        t.thread.join()
+    print(f"Closed {strategy.name}")
+
+
+def run_thread(
+    strategy: BaseStrategy,
+    thread_queue: Queue[ResponseMessage | None],
+    write_queue: Queue[ParentMessage | None],
+):
+    for msg in iter(thread_queue.get, None):
         orders = strategy.consume_next_step(msg)
         if len(orders) > 0:
             parent_msg = ParentMessage(
@@ -100,5 +146,3 @@ def run_strategy(
                 data=ParentMsgOrders(orders=orders),
             )
             write_queue.put_nowait(parent_msg)
-    # TODO: shut down threads here
-    print(f"Ending {strategy.name}")
