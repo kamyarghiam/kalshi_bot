@@ -60,9 +60,9 @@ class OrderGateway:
 
         self.strategies: List[BaseStrategy] = []
         # These are the queues that the strats pull msgs from
-        self.strategy_queues: List[Queue[ResponseMessage | None]] = []
+        self.strategy_queues: List["Queue[ResponseMessage | None]"] = []
         # This the queue that strategies use to communicate with the parent process
-        self.parent_read_queue: Queue[ParentMessage | None] = Queue()
+        self.parent_read_queue: "Queue[ParentMessage | None]" = Queue()
         # Thread that the order queue is being processed on
         self.parent_read_queue_thread: None | Thread = None
         # These are the processes that the strategies are running on

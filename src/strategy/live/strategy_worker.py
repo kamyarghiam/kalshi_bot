@@ -29,7 +29,7 @@ class ThreadId(int):
 
 @dataclass
 class StrategyThread:
-    queue: Queue[ResponseMessage | None]
+    queue: "Queue[ResponseMessage | None]"
     thread: Thread
 
 
@@ -88,8 +88,8 @@ def register_helper_functions(
 
 def run_strategy(
     strategy: BaseStrategy,
-    read_queue: Queue[ResponseMessage | None],
-    write_queue: Queue[ParentMessage | None],
+    read_queue: "Queue[ResponseMessage | None]",
+    write_queue: "Queue[ParentMessage | None]",
     pipe_to_parent: Connection,
 ):
     """The code running in a separate process for the strategy"""
@@ -101,7 +101,7 @@ def run_strategy(
     num_threads = 10
     thread_id_to_info: Dict[ThreadId, StrategyThread] = {}
     for i in range(num_threads):
-        thread_queue: Queue[ResponseMessage | None] = Queue()
+        thread_queue: "Queue[ResponseMessage | None]" = Queue()
         thread = threading.Thread(
             target=run_thread, args=(strategy, thread_queue, write_queue)
         )
@@ -118,9 +118,11 @@ def run_strategy(
     for msg in iter(read_queue.get, None):
         if hasattr(msg, "market_ticker"):
             ticker = msg.market_ticker
+        else:
+            raise ValueError("Type does not have market_ticker attribute")
         if ticker not in ticker_to_thread_id:
             ticker_to_thread_id[ticker] = round_robin_idx
-            round_robin_idx = ThreadId(round_robin_idx + 1)
+            round_robin_idx = ThreadId((round_robin_idx + 1) % num_threads)
         thread_id = ticker_to_thread_id[ticker]
         thread_queue = thread_id_to_info[thread_id].queue
         thread_queue.put(msg)
@@ -134,8 +136,8 @@ def run_strategy(
 
 def run_thread(
     strategy: BaseStrategy,
-    thread_queue: Queue[ResponseMessage | None],
-    write_queue: Queue[ParentMessage | None],
+    thread_queue: "Queue[ResponseMessage | None]",
+    write_queue: "Queue[ParentMessage | None]",
 ):
     for msg in iter(thread_queue.get, None):
         orders = strategy.consume_next_step(msg)
