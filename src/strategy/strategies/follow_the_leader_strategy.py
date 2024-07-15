@@ -47,8 +47,8 @@ class FollowTheLeaderStrategy(BaseStrategy):
     top_book_min_qty = Quantity(900)
 
     # Max and min per trade
-    min_per_trade = Dollars(5)
-    max_per_trade = Dollars(10)
+    min_per_trade = Dollars(2)
+    max_per_trade = Dollars(5)
 
     def roughly_equal(self, x: int, y: int) -> bool:
         if x == 0 or y == 0:
@@ -101,9 +101,9 @@ class FollowTheLeaderStrategy(BaseStrategy):
                 # Check they are about the same
                 if self.roughly_equal(int(ask_qty), int(bid_qty)):
                     # We use the min because they're roughly the same anyways
-                    max_qty = min(ask_qty, bid_qty)
-                    if max_qty_same is None or max_qty > max_qty_same:
-                        max_qty_same = max_qty
+                    top_qty = min(ask_qty, bid_qty)
+                    if max_qty_same is None or top_qty > max_qty_same:
+                        max_qty_same = top_qty
                         max_bid_level = bid_price
                         max_ask_level = ask_price
         if max_qty_same is not None and max_qty_same >= self.top_book_min_qty:
