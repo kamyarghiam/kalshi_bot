@@ -1,19 +1,3 @@
-"""The purpose of the order gateway is to provide a parent to the strategies.
-
-The order gateway runs the strategies in their own separate processes, listens
-to the exchange, sends orders to the strategies, and relays orders from the
-strategies to the exchange. We also set up a pipe between each parent and child
-so that the child can request things like portfolio positions.
-
-Each strategy (that's running on a separate process) is also multi-threaded and
-partitioned by market ticker (each thread takes multiple tickers). This is because
-the the order gateway <-> strategy pipe was overflowing for some strats. So we want
-to immediately pull off this main pipe and feed data to the threads.
-
-Note that we listen to orders on another thread so that we can act immediately
-when we get an order from a strategy.
-"""
-
 import datetime
 import time
 import traceback

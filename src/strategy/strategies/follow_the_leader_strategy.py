@@ -38,13 +38,13 @@ class LeaderStats:
 class FollowTheLeaderStrategy(BaseStrategy):
     # The top X levels to check for some quantity. Each side has to have
     # at least this many levels
-    num_levels_to_check = 3
+    num_levels_to_check = 2
 
     # How different can the quantities be (percentage wise) to consider them similar
     max_percent_different = 0.2
 
     # The minimum quantity the that the top book needs to be to be considered
-    top_book_min_qty = Quantity(900)
+    top_book_min_qty = Quantity(1000)
 
     # Max and min per trade
     min_per_trade = Dollars(2)
@@ -63,7 +63,7 @@ class FollowTheLeaderStrategy(BaseStrategy):
     ):
         super().__init__()
         self._ticker_to_leader_stats: Dict[MarketTicker, LeaderStats] = {}
-        self._check_top_levels_throttle = Throttler(timedelta(minutes=1))
+        self._check_top_levels_throttle = Throttler(timedelta(seconds=5))
         self._check_cancel_throttle = Throttler(timedelta(seconds=2))
 
     def check_top_levels(self, ticker: MarketTicker) -> List[Order]:
@@ -133,7 +133,6 @@ class FollowTheLeaderStrategy(BaseStrategy):
     ) -> List[Order]:
         # TODO: add some jitter to both sides?
         qty = self.get_quantity_to_place(yes_ask_level)
-        # TODO: CHECK THAT THESE PRICES ARE RIGHT IN DEMO?
         yes_order = Order(
             price=Price(yes_bid_level + 1),
             quantity=qty,
@@ -142,7 +141,6 @@ class FollowTheLeaderStrategy(BaseStrategy):
             side=Side.YES,
             expiration_ts=None,
         )
-        # TODO: check?
         no_bid = get_opposite_side_price(yes_ask_level)
         no_order = Order(
             price=Price(no_bid + 1),
@@ -156,7 +154,6 @@ class FollowTheLeaderStrategy(BaseStrategy):
         return [yes_order, no_order]
 
     def get_quantity_to_place(self, p: Price) -> Quantity:
-        # TODO: check that this is proper
         dollar_amount = random.randint(int(self.min_per_trade), int(self.max_per_trade))
         return Quantity(int(dollar_amount / p))
 
