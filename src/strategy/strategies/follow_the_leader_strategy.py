@@ -38,13 +38,13 @@ class LeaderStats:
 class FollowTheLeaderStrategy(BaseStrategy):
     # The top X levels to check for some quantity. Each side has to have
     # at least this many levels
-    num_levels_to_check = 2
+    num_levels_to_check = 3
 
     # How different can the quantities be (percentage wise) to consider them similar
     max_percent_different = 0.2
 
     # The minimum quantity the that the top book needs to be to be considered
-    top_book_min_qty = Quantity(1000)
+    top_book_min_qty = Quantity(10000)
 
     # Max and min per trade
     min_per_trade = Dollars(2)
@@ -215,7 +215,13 @@ class FollowTheLeaderStrategy(BaseStrategy):
                 ]
         else:
             assert msg.action == TradeType.SELL
-            self._ticker_to_leader_stats[msg.market_ticker].our_qty -= msg.count
-            if self._ticker_to_leader_stats[msg.market_ticker].our_qty == 0:
-                del self._ticker_to_leader_stats[msg.market_ticker]
+            # Sometimes we subtract more than we have? Why?
+            # Sometimes not in the leader stats?
+            if msg.market_ticker in self._ticker_to_leader_stats:
+                our_qty = self._ticker_to_leader_stats[msg.market_ticker].our_qty
+                self._ticker_to_leader_stats[msg.market_ticker].our_qty -= min(
+                    our_qty, msg.count
+                )
+                if self._ticker_to_leader_stats[msg.market_ticker].our_qty == 0:
+                    del self._ticker_to_leader_stats[msg.market_ticker]
         return []

@@ -5,6 +5,8 @@ from datetime import timedelta
 from functools import partial
 from typing import Callable, List, Set
 
+import requests
+
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
@@ -185,8 +187,16 @@ class SinlgeStrategyOrderGateway:
             )
             print(f"Canceling {len(resting_orders)} orders")
             for o in resting_orders:
+                if o.action == TradeType.SELL:
+                    # Don't cancel sell orders
+                    continue
                 print(f"Canceled {o.to_order()} with id: {o.order_id}")
-                self.exchange.cancel_order(o.order_id)
+                try:
+                    self.exchange.cancel_order(o.order_id)
+                except requests.exceptions.HTTPError:
+                    # TODO: check if 404
+                    print("order not found, continuing")
+                    continue
                 self.portfolio.unreserve_order(o.ticker, o.order_id)
             return True
 
