@@ -34,7 +34,6 @@ from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.live.strategy_worker import run_strategy
 from strategy.live.types import (
-    BaseOrderGateway,
     ParentMessage,
     ParentMsgCancelOrders,
     ParentMsgOrders,
@@ -50,7 +49,7 @@ from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrateg
 from strategy.utils import BaseStrategy, StrategyName
 
 
-class OrderGateway(BaseOrderGateway):
+class OrderGateway:
     """The middle man between us and the exchange"""
 
     def __init__(

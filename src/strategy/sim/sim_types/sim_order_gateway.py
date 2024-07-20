@@ -1,4 +1,3 @@
-from datetime import date
 from typing import ContextManager, Generator, List
 
 from exchange.connection import Websocket
@@ -6,16 +5,6 @@ from helpers.types.exchange import BaseExchangeInterface
 from helpers.types.markets import Market
 from helpers.types.orders import GetOrdersRequest, Order, OrderAPIResponse, OrderId
 from helpers.types.portfolio import ApiMarketPosition, GetPortfolioBalanceResponse
-from strategy.live.types import BaseOrderGateway
-
-
-class SimOrderGateway:
-    def __init__(self, gateway: BaseOrderGateway):
-        self.gateway = gateway
-        self.fill_rate_percentage = 50
-
-    def sim_one_day(self, day: date):
-        ...
 
 
 class SimExchange(BaseExchangeInterface):

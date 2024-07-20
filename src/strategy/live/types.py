@@ -1,22 +1,15 @@
-import typing
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Set, TypeAlias
+from typing import Callable, List, TypeAlias
 
-from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import Order
-from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
     OrderFillRM,
     TradeRM,
 )
-
-if typing.TYPE_CHECKING:
-    from strategy.utils import BaseStrategy
 
 
 class StrategyName(str):
@@ -84,15 +77,3 @@ class ParentMessage:
 ResponseMessage: TypeAlias = (
     OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
 )
-
-
-class BaseOrderGateway(ABC):
-    @abstractmethod
-    def __init__(
-        self,
-        exchange: ExchangeInterface,
-        portfolio: PortfolioHistory,
-        strategies: List["BaseStrategy"],
-        tickers: Set[MarketTicker] | None = None,
-    ):
-        pass
