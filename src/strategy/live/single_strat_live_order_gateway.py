@@ -24,17 +24,16 @@ class SinlgeStrategyOrderGateway:
         self,
         exchange: BaseExchangeInterface,
         portfolio: PortfolioHistory,
-        strategies: List[BaseStrategy],
+        strategy: BaseStrategy,
         tickers: Set[MarketTicker] | None = None,
     ):
-        assert len(strategies) == 1, "this order gateway only takes one strat"
         # If tickers are none, we get all tickers. Union with portfolio tickers
         self.tickers = tickers or {m.ticker for m in exchange.get_active_markets()}
         self.tickers = self.tickers.union(
             {ticker for ticker in portfolio.positions.keys()}
         )
 
-        self.strategy = strategies[0]
+        self.strategy = strategy
         self.timed_callbacks: List[TimedCallback] = []
         self.portfolio = portfolio
         self.exchange = exchange
@@ -230,7 +229,7 @@ def main():
         o = SinlgeStrategyOrderGateway(
             e,
             p,
-            [FollowTheLeaderStrategy()],
+            FollowTheLeaderStrategy(),
             tickers,
         )
 
