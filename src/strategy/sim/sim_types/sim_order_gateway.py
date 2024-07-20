@@ -1,48 +1,45 @@
-from abc import ABC, abstractmethod
+from datetime import date
 from typing import ContextManager, Generator, List
 
-from pydantic import BaseModel
-
 from exchange.connection import Websocket
+from helpers.types.exchange import BaseExchangeInterface
 from helpers.types.markets import Market
 from helpers.types.orders import GetOrdersRequest, Order, OrderAPIResponse, OrderId
 from helpers.types.portfolio import ApiMarketPosition, GetPortfolioBalanceResponse
+from strategy.live.types import BaseOrderGateway
 
 
-class BaseExchangeInterface(ABC):
-    @abstractmethod
+class SimOrderGateway:
+    def __init__(self, gateway: BaseOrderGateway):
+        self.gateway = gateway
+        self.fill_rate_percentage = 50
+
+    def sim_one_day(self, day: date):
+        ...
+
+
+class SimExchange(BaseExchangeInterface):
     def get_active_markets(
         self, pages: int | None = None
     ) -> Generator[Market, None, None]:
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def get_websocket(self) -> ContextManager[Websocket]:
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def place_order(self, order: Order) -> OrderId | None:
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def get_orders(
         self, request: GetOrdersRequest, pages: int | None = None
     ) -> List[OrderAPIResponse]:
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def cancel_order(self, order_id: OrderId) -> OrderAPIResponse:
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def get_portfolio_balance(self) -> GetPortfolioBalanceResponse:
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def get_positions(self, pages: int | None = None) -> List[ApiMarketPosition]:
-        pass
-
-
-class ExchangeStatusResponse(BaseModel):
-    exchange_active: bool
-    trading_active: bool
+        raise NotImplementedError()

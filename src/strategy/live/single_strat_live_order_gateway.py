@@ -9,30 +9,32 @@ import requests
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
+from helpers.types.exchange import BaseExchangeInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory, Position
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
-from strategy.live.types import TimedCallback
+from strategy.live.types import BaseOrderGateway, TimedCallback
 from strategy.strategies.follow_the_leader_strategy import FollowTheLeaderStrategy
 from strategy.utils import BaseStrategy
 
 
-class SinlgeStrategyOrderGateway:
+class SinlgeStrategyOrderGateway(BaseOrderGateway):
     def __init__(
         self,
-        exchange: ExchangeInterface,
+        exchange: BaseExchangeInterface,
         portfolio: PortfolioHistory,
-        strategy: BaseStrategy,
+        strategies: List[BaseStrategy],
         tickers: Set[MarketTicker] | None = None,
     ):
+        assert len(strategies) == 1, "this order gateway only takes one strat"
         # If tickers are none, we get all tickers. Union with portfolio tickers
         self.tickers = tickers or {m.ticker for m in exchange.get_active_markets()}
         self.tickers = self.tickers.union(
             {ticker for ticker in portfolio.positions.keys()}
         )
 
-        self.strategy = strategy
+        self.strategy = strategies[0]
         self.timed_callbacks: List[TimedCallback] = []
         self.portfolio = portfolio
         self.exchange = exchange
@@ -228,7 +230,7 @@ def main():
         o = SinlgeStrategyOrderGateway(
             e,
             p,
-            FollowTheLeaderStrategy(),
+            [FollowTheLeaderStrategy()],
             tickers,
         )
 

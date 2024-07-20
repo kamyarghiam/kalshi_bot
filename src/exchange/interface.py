@@ -19,7 +19,7 @@ from helpers.constants import (
 )
 from helpers.types.api import ExternalApiWithCursor
 from helpers.types.common import URL
-from helpers.types.exchange import ExchangeStatusResponse
+from helpers.types.exchange import BaseExchangeInterface, ExchangeStatusResponse
 from helpers.types.markets import (
     GetMarketHistoryRequest,
     GetMarketHistoryResponse,
@@ -56,7 +56,7 @@ from helpers.types.portfolio import (
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
 
-class ExchangeInterface:
+class ExchangeInterface(BaseExchangeInterface):
     def __init__(self, test_client: TestClient | None = None, is_test_run: bool = True):
         """This class provides a high level interface with the exchange.
 

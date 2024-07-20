@@ -27,12 +27,14 @@ from typing import Callable, Dict, List, Set
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
+from helpers.types.exchange import BaseExchangeInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
 from strategy.live.strategy_worker import run_strategy
 from strategy.live.types import (
+    BaseOrderGateway,
     ParentMessage,
     ParentMsgCancelOrders,
     ParentMsgOrders,
@@ -48,15 +50,18 @@ from strategy.strategies.you_missed_a_spot_strategy import YouMissedASpotStrateg
 from strategy.utils import BaseStrategy, StrategyName
 
 
-class OrderGateway:
+class OrderGateway(BaseOrderGateway):
     """The middle man between us and the exchange"""
 
     def __init__(
         self,
-        exchange: ExchangeInterface,
+        exchange: BaseExchangeInterface,
         portfolio: PortfolioHistory,
+        strategies: List[BaseStrategy],
         tickers: Set[MarketTicker] | None = None,
     ):
+        for strategy in strategies:
+            self.register_strategy(strategy)
         # If tickers are none, we get all tickers. Union with portfolio tickers
         self.tickers = tickers or {m.ticker for m in exchange.get_active_markets()}
         self.tickers = self.tickers.union(
@@ -336,11 +341,13 @@ def main():
             allow_side_cross=True,
             consider_reserved_cash=False,
         )
-        o = OrderGateway(e, p, tickers)
-        o.register_strategy(YouMissedASpotStrategy())
-        o.register_strategy(GraveyardStrategy())
-        o.register_strategy(StopLossStrategy())
-        o.register_strategy(FollowTheLeaderStrategy())
+        strategies = [
+            YouMissedASpotStrategy(),
+            GraveyardStrategy(),
+            StopLossStrategy(),
+            FollowTheLeaderStrategy(),
+        ]
+        o = OrderGateway(e, p, strategies, tickers)
 
         # Sync resting orders every X minutes
         o.register_timed_callback(
