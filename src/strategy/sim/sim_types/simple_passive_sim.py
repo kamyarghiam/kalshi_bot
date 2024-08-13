@@ -95,14 +95,17 @@ def run_simple_passive_sim(m: MarketTicker, s: BaseStrategy):
 
     trades_rm: Generator[TradeRM, None, None] = (trade_to_trade_rm(t) for t in trades)
 
-    msgs: Generator[
-        TradeRM | OrderbookSnapshotRM | OrderbookDeltaRM, None, None
-    ] = merge_historical_generators(trades_rm, orderbook, "created_time", "ts")
+    msgs: Generator[TradeRM | OrderbookSnapshotRM | OrderbookDeltaRM, None, None] = (
+        merge_historical_generators(trades_rm, orderbook, "created_time", "ts")
+    )
     # TODO: update portfolio on new orders
     # and make sure to store the OrderId for the fills
+    # START HERE: making pending orders return Order Id's
+    # use that to call "reserve_order"
     for msg in msgs:
         if isinstance(msg, TradeRM):
             if fill := pending_orders.does_match(msg):
+                portfolio.receive_fill_message(fill)
                 orders = s.consume_next_step(fill)
                 pending_orders.add_orders(orders)
         orders = s.consume_next_step(msg)
