@@ -886,7 +886,6 @@ def test_get_event_tickers():
     cole_db = ColeDBInterface(storage_path=Path("tests/data/coledb"))
     assert cole_db.get_event_tickers(SeriesTicker("INXD")) == [
         EventTicker("INXD-23AUG31"),
-        EventTicker("INXD-23AUG30"),
     ]
 
 

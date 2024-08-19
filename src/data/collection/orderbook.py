@@ -3,7 +3,7 @@ from time import sleep
 
 from rich.live import Live
 from rich.table import Table
-
+import traceback
 from data.coledb.coledb import ColeDBInterface
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
@@ -93,6 +93,7 @@ def retry_collect_orderbook_data(
             collect_orderbook_data(exchange_interface=exchange_interface, cole=cole)
         except Exception as e:
             error_msg = f"Received error: {str(e)}. Re-running collect orderbook algo"
+            traceback.print_exc()
             print(error_msg)
             if (now := datetime.now()) - time_between_emails > last_email_sent_ts:
                 send_alert_email(error_msg)
