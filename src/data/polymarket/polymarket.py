@@ -1,3 +1,4 @@
+from decimal import Decimal
 import os
 import ssl
 from contextlib import contextmanager
@@ -21,6 +22,9 @@ class PolyMarketToken(BaseModel):
 
 class PolyMarketMarket(BaseModel):
     tokens: List[PolyMarketToken]
+    condition_id: str
+    question: str | None = None
+    market_slug: str | None = None
 
 
 class SubscribeRequest(BaseModel):
@@ -47,11 +51,24 @@ class BookSnapshot(MarketMessage):
     bids: List[OrderSummary]
 
 
-class BookDelta(MarketMessage):
-    price: str
-    size: str
+class BookUpdate(MarketMessage):
+    price: Decimal
+    # This is the new size at that level
+    size: Decimal
     side: str
-    time: str
+    timestamp: int
+
+
+class Trade(MarketMessage):
+    price: Decimal
+    side: str
+    size: Decimal
+    timestamp: int
+
+
+class GetMarketResponse(BaseModel):
+    next_cursor: str
+    data: List[PolyMarketMarket]
 
 
 class SessionsWrapper:
@@ -91,18 +108,36 @@ class LivePolyMarket:
         print("Subscribing!")
         ws.send(request.model_dump_json())
 
-    def receive(self, ws: ClientConnection) -> Union[BookSnapshot, BookDelta]:
+    def receive(self, ws: ClientConnection) -> BookSnapshot | BookUpdate | Trade:
         payload = ws.recv()
         msg = MarketMessage.model_validate_json(payload)
         if msg.event_type == "book":
             return BookSnapshot.model_validate(msg.model_dump())
-        assert msg.event_type == "price_change"
-        return BookDelta.model_validate(msg.model_dump())
+        if msg.event_type == "price_change":
+            return BookUpdate.model_validate(msg.model_dump())
+        elif msg.event_type == "last_trade_price":
+            return Trade.model_validate(msg.model_dump())
+        raise ValueError(f"Unknown msg: {payload}")
 
     def get_market_msgs(
         self, token_ids: List[str]
-    ) -> Generator[Union[BookSnapshot, BookDelta], None, None]:
-        """You can get token_ids from the get_market endpoint"""
+    ) -> Generator[Union[BookSnapshot, BookUpdate], None, None]:
+        """To get token ID, go to the market, click on graph, open inspect element,
+        look up prices-history, then look at the condition id after market= in the URL.
+        There should be two per market (one for yes, one for no).
+
+        Alternatively, you can look for the market using the api and the market slug.
+        The market slug can be obtained by sharing the specific candidate on the market
+        and extracting the slug from there.
+
+        Donalod Trump "Yes" token_id: 21742633143463906290569050155826241533067272736897614950488156847949938836455
+        Donald Trump "No" token_id: 48331043336612883890938759509493159234755048973500640148014422747788308965732
+
+        Kamala Harris "Yes" token_id: 69236923620077691027083946871148646972011131466059644796654161903044970987404
+        Kamala Harris "No" token_id: 87584955359245246404952128082451897287778571240979823316620093987046202296181
+
+        Note: when you subscribe the to each token ID, you get deltas twice!
+        """
         while True:
             with self.connect() as ws:
                 request = SubscribeRequest(assets_ids=token_ids)
@@ -115,7 +150,20 @@ class LivePolyMarket:
                         break
 
     def get_market(self, condition_id: str) -> PolyMarketMarket:
-        """To get condition ID, go to the market, click inspect element,
-        then search for holders in the networks tab"""
         resp = self._http_client.request("GET", f"markets/{condition_id}")
         return PolyMarketMarket.model_validate_json(resp.content)
+
+    def get_markets(self) -> List[PolyMarketMarket]:
+        markets: List[PolyMarketMarket] = []
+        next_cursor = ""
+        while True:
+            print(next_cursor)
+            resp = self._http_client.request(
+                "GET", f"markets/?next_cursor={next_cursor}"
+            )
+            parsed = GetMarketResponse.model_validate_json(resp.content)
+            if parsed.next_cursor in ("LTE=", ""):
+                break
+            next_cursor = parsed.next_cursor
+            markets.extend(parsed.data)
+        return markets
