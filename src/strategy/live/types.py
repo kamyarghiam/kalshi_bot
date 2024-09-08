@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Callable, List, TypeAlias
 
 from helpers.types.markets import MarketTicker
-from helpers.types.orders import Order
+from helpers.types.orders import Order, OrderId
 from helpers.types.websockets.response import (
     OrderbookDeltaRM,
     OrderbookSnapshotRM,
@@ -77,3 +77,8 @@ class ParentMessage:
 ResponseMessage: TypeAlias = (
     OrderbookSnapshotRM | OrderbookDeltaRM | TradeRM | OrderFillRM
 )
+
+
+@dataclass
+class CancelRequest:
+    order_id: OrderId

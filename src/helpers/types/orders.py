@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, List, Union
 from uuid import uuid1
+import uuid
 
 from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
@@ -120,6 +121,7 @@ class Order:
     # Use this field to specify IOC, if time is in the past
     # If it's None, then it's Good 'til Canceled
     expiration_ts: int | None = int(time.time())
+    client_order_id: ClientOrderId = str(uuid1())
 
     @property
     def fee(self) -> Cents:
@@ -185,7 +187,7 @@ class Order:
             ticker=self.ticker,
             action=self.trade,
             type=self.order_type,
-            client_order_id=str(uuid1()),
+            client_order_id=self.client_order_id,
             count=self.quantity,
             side=self.side,
             expiration_ts=self.expiration_ts,
