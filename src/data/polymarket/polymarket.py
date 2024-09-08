@@ -1,16 +1,20 @@
+from dataclasses import dataclass, field
 from decimal import Decimal
+from enum import Enum
 import os
 import ssl
 from contextlib import contextmanager
-from typing import Generator, List, Union
+from typing import Dict, Generator, List
 
 from pydantic import BaseModel, ConfigDict
 from requests import Session
+from sortedcontainers import SortedDict
 from websockets.exceptions import ConnectionClosedError
 from websockets.sync.client import ClientConnection
 from websockets.sync.client import connect as external_websocket_connect
 
 from helpers.constants import POLYMARKET_PROD_BASE_WS_URL, POLYMARKET_REST_BASE_URL
+from helpers.types.markets import MarketTicker
 
 SUB_TYPE = "market"
 
@@ -35,6 +39,7 @@ class SubscribeRequest(BaseModel):
 
 class MarketMessage(BaseModel):
     event_type: str
+    # This is also called the token id?
     asset_id: str
     market: str
 
@@ -42,8 +47,8 @@ class MarketMessage(BaseModel):
 
 
 class OrderSummary(BaseModel):
-    price: str
-    size: str
+    price: Decimal
+    size: Decimal
 
 
 class BookSnapshot(MarketMessage):
@@ -51,17 +56,22 @@ class BookSnapshot(MarketMessage):
     bids: List[OrderSummary]
 
 
+class PolySide(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
 class BookUpdate(MarketMessage):
     price: Decimal
     # This is the new size at that level
     size: Decimal
-    side: str
+    side: PolySide
     timestamp: int
 
 
 class Trade(MarketMessage):
     price: Decimal
-    side: str
+    side: PolySide
     size: Decimal
     timestamp: int
 
@@ -83,6 +93,20 @@ class SessionsWrapper:
         return self._session.request(
             method, os.path.join(self.base_url, url), *args, **kwargs
         )
+
+
+@dataclass
+class BBO:
+    price: Decimal
+    qty: Decimal
+
+
+@dataclass
+class PolyTopBook:
+    # Associated kalshi ticker with this top book
+    ticker: MarketTicker
+    top_bid: BBO | None = None
+    top_ask: BBO | None = None
 
 
 class LivePolyMarket:
@@ -121,7 +145,7 @@ class LivePolyMarket:
 
     def get_market_msgs(
         self, token_ids: List[str]
-    ) -> Generator[Union[BookSnapshot, BookUpdate], None, None]:
+    ) -> Generator[BookSnapshot | BookUpdate | Trade, None, None]:
         """To get token ID, go to the market, click on graph, open inspect element,
         look up prices-history, then look at the condition id after market= in the URL.
         There should be two per market (one for yes, one for no).
@@ -130,7 +154,7 @@ class LivePolyMarket:
         The market slug can be obtained by sharing the specific candidate on the market
         and extracting the slug from there.
 
-        Donalod Trump "Yes" token_id: 21742633143463906290569050155826241533067272736897614950488156847949938836455
+        Donald Trump "Yes" token_id: 21742633143463906290569050155826241533067272736897614950488156847949938836455
         Donald Trump "No" token_id: 48331043336612883890938759509493159234755048973500640148014422747788308965732
 
         Kamala Harris "Yes" token_id: 69236923620077691027083946871148646972011131466059644796654161903044970987404
@@ -167,3 +191,103 @@ class LivePolyMarket:
             next_cursor = parsed.next_cursor
             markets.extend(parsed.data)
         return markets
+
+
+@dataclass
+class PolyOrderbook:
+    bids: SortedDict = field(default_factory=SortedDict)
+    asks: SortedDict = field(default_factory=SortedDict)
+
+    @classmethod
+    def from_book_snapshot(cls, msg: BookSnapshot) -> "PolyOrderbook":
+        p = cls()
+        for ask in msg.asks:
+            p.asks[ask.price] = ask.size
+        for bid in msg.bids:
+            p.bids[bid.price] = bid.size
+        return p
+
+    def get_side(self, side: PolySide) -> SortedDict:
+        if side == PolySide.BUY:
+            return self.bids
+        elif side == PolySide.SELL:
+            return self.asks
+        raise ValueError(f"Bad side {side}")
+
+    def get_top(self, side: PolySide) -> BBO | None:
+        """Returns the top of the book
+        Returns tuple of (price, size)
+        """
+        if side == PolySide.SELL:
+            try:
+                top_ask = self.asks.peekitem(0)
+            except IndexError:
+                return None
+            return BBO(price=top_ask[0], qty=top_ask[1])
+        assert side == PolySide.BUY
+        try:
+            top_bid = self.bids.peekitem()
+        except IndexError:
+            return None
+        return BBO(price=top_bid[0], qty=top_bid[1])
+
+
+class PolyMarketFair:
+    """Gets you the fair values of the markets assocaited with the token ids
+    in poly market. NOTE: generator returns when there's any update to the top
+    book, including updated quantity"""
+
+    def __init__(self, poly_token_id_to_market_ticker: Dict[str, MarketTicker]):
+        """When initializing, just choose the token id of the yes side because otherwise
+        messages are duplicated"""
+        self.tid_to_last_top_book: Dict[str, PolyTopBook] = {
+            tid: PolyTopBook(ticker=ticker)
+            for tid, ticker in poly_token_id_to_market_ticker.items()
+        }
+
+    def get_top_book_updates(self) -> Generator[PolyTopBook, None, None]:
+        """NOTE: generator returns any updates to the topbook, including qty"""
+        token_ids = list(self.tid_to_last_top_book.keys())
+        # Mapping from token id to sorted list of prices
+        books: Dict[str, PolyOrderbook] = dict()
+        l = LivePolyMarket()
+        for msg in l.get_market_msgs(token_ids):
+            print(msg)
+            token_id = msg.asset_id
+            last_top_book = self.tid_to_last_top_book[token_id]
+            if isinstance(msg, BookSnapshot):
+                books[token_id] = PolyOrderbook.from_book_snapshot(msg)
+            elif isinstance(msg, BookUpdate):
+                if msg.size == 0:
+                    try:
+                        del books[token_id].get_side(msg.side)[msg.price]
+                    except KeyError:
+                        # Already deleted
+                        pass
+                else:
+                    books[token_id].get_side(msg.side)[msg.price] = msg.size
+
+            book = books[token_id]
+            top_bid = book.get_top(PolySide.BUY)
+            top_ask = book.get_top(PolySide.SELL)
+            top_book = PolyTopBook(
+                ticker=last_top_book.ticker,
+                top_bid=top_bid,
+                top_ask=top_ask,
+            )
+
+            if top_book != last_top_book:
+                self.tid_to_last_top_book[token_id] = top_book
+                yield top_book
+
+
+def sample_fair_listener():
+    tid_to_ticker = {
+        "21742633143463906290569050155826241533067272736897614950488156847949938836455": "TRUMP_MARKET",
+        "69236923620077691027083946871148646972011131466059644796654161903044970987404": "KAMALA_MARKET",
+    }
+    p = PolyMarketFair(tid_to_ticker)
+    for msg in p.get_top_book_updates():
+        print()
+        print(msg)
+        print()
