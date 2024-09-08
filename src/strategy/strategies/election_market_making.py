@@ -1,5 +1,6 @@
 from typing import Dict, List
 from data.polymarket.polymarket import PolyTopBook
+from helpers.types.markets import MarketTicker
 from helpers.types.orderbook import Orderbook
 from helpers.types.orders import ClientOrderId, Order, OrderId
 from helpers.types.websockets.response import (
@@ -14,7 +15,7 @@ from strategy.live.types import CancelRequest
 
 class ElectionMarketMaker:
     def __init__(self):
-        self._obs = dict()
+        self._obs: Dict[MarketTicker, Orderbook] = dict()
         self._order_id_mapping: Dict[OrderId, ClientOrderId] = dict()
 
     def handle_snapshot_msg(
