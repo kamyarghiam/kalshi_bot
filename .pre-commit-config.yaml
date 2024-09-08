@@ -20,6 +20,7 @@ repos:
             --non-interactive,
             --check-untyped-defs,
             --ignore-missing-imports,
+            --cache-dir=.mypy_cache/.vscode
           ]
         additional_dependencies:
           - pytest

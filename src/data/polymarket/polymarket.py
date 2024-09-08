@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
-from decimal import Decimal
-from enum import Enum
 import os
 import ssl
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from decimal import Decimal
+from enum import Enum
 from typing import Dict, Generator, List
 
 from pydantic import BaseModel, ConfigDict
@@ -15,6 +15,7 @@ from websockets.sync.client import connect as external_websocket_connect
 
 from helpers.constants import POLYMARKET_PROD_BASE_WS_URL, POLYMARKET_REST_BASE_URL
 from helpers.types.markets import MarketTicker
+from helpers.types.orders import Side
 
 SUB_TYPE = "market"
 
@@ -104,9 +105,14 @@ class BBO:
 @dataclass
 class PolyTopBook:
     # Associated kalshi ticker with this top book
-    ticker: MarketTicker
+    market_ticker: MarketTicker
     top_bid: BBO | None = None
     top_ask: BBO | None = None
+
+    def get_bbo(self, side: Side) -> BBO | None:
+        if side == Side.YES:
+            return self.top_bid
+        return self.top_bid
 
 
 class LivePolyMarket:
@@ -154,11 +160,17 @@ class LivePolyMarket:
         The market slug can be obtained by sharing the specific candidate on the market
         and extracting the slug from there.
 
-        Donald Trump "Yes" token_id: 21742633143463906290569050155826241533067272736897614950488156847949938836455
-        Donald Trump "No" token_id: 48331043336612883890938759509493159234755048973500640148014422747788308965732
+        Donald Trump "Yes" token_id:
+        21742633143463906290569050155826241533067272736897614950488156847949938836455
 
-        Kamala Harris "Yes" token_id: 69236923620077691027083946871148646972011131466059644796654161903044970987404
-        Kamala Harris "No" token_id: 87584955359245246404952128082451897287778571240979823316620093987046202296181
+        Donald Trump "No" token_id:
+        48331043336612883890938759509493159234755048973500640148014422747788308965732
+
+        Kamala Harris "Yes" token_id:
+        69236923620077691027083946871148646972011131466059644796654161903044970987404
+
+        Kamala Harris "No" token_id:
+        87584955359245246404952128082451897287778571240979823316620093987046202296181
 
         Note: when you subscribe the to each token ID, you get deltas twice!
         """
@@ -241,7 +253,7 @@ class PolyMarketFair:
         """When initializing, just choose the token id of the yes side because otherwise
         messages are duplicated"""
         self.tid_to_last_top_book: Dict[str, PolyTopBook] = {
-            tid: PolyTopBook(ticker=ticker)
+            tid: PolyTopBook(market_ticker=ticker)
             for tid, ticker in poly_token_id_to_market_ticker.items()
         }
 
@@ -250,8 +262,8 @@ class PolyMarketFair:
         token_ids = list(self.tid_to_last_top_book.keys())
         # Mapping from token id to sorted list of prices
         books: Dict[str, PolyOrderbook] = dict()
-        l = LivePolyMarket()
-        for msg in l.get_market_msgs(token_ids):
+        lpm = LivePolyMarket()
+        for msg in lpm.get_market_msgs(token_ids):
             print(msg)
             token_id = msg.asset_id
             last_top_book = self.tid_to_last_top_book[token_id]
@@ -271,7 +283,7 @@ class PolyMarketFair:
             top_bid = book.get_top(PolySide.BUY)
             top_ask = book.get_top(PolySide.SELL)
             top_book = PolyTopBook(
-                ticker=last_top_book.ticker,
+                market_ticker=last_top_book.market_ticker,
                 top_bid=top_bid,
                 top_ask=top_ask,
             )
@@ -283,8 +295,12 @@ class PolyMarketFair:
 
 def sample_fair_listener():
     tid_to_ticker = {
-        "21742633143463906290569050155826241533067272736897614950488156847949938836455": "TRUMP_MARKET",
-        "69236923620077691027083946871148646972011131466059644796654161903044970987404": "KAMALA_MARKET",
+        "21742633143463906290569050155826241533067272736897614950488156847949938836455": MarketTicker(  # noqa: disable=E501
+            "TRUMP_MARKET"
+        ),
+        "69236923620077691027083946871148646972011131466059644796654161903044970987404": MarketTicker(  # noqa: disable=E501
+            "KAMALA_MARKET"
+        ),
     }
     p = PolyMarketFair(tid_to_ticker)
     for msg in p.get_top_book_updates():

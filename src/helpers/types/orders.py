@@ -7,7 +7,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, List, Union
 from uuid import uuid1
-import uuid
 
 from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
@@ -15,6 +14,15 @@ from pydantic_core import CoreSchema, core_schema
 from helpers.types.api import ExternalApi, ExternalApiWithCursor
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Price, get_opposite_side_price
+
+
+class OrderStatus(str, Enum):
+    RESTING = "resting"
+    CANCELED = "canceled"
+    EXECUTED = "executed"
+    PENDING = "pending"
+    # This one is ours
+    IN_FLIGHT = "in_flight"
 
 
 class QuantityDelta(int):
@@ -121,7 +129,8 @@ class Order:
     # Use this field to specify IOC, if time is in the past
     # If it's None, then it's Good 'til Canceled
     expiration_ts: int | None = int(time.time())
-    client_order_id: ClientOrderId = str(uuid1())
+    client_order_id: ClientOrderId = ClientOrderId(str(uuid1()))
+    status: OrderStatus | None = None
 
     @property
     def fee(self) -> Cents:
@@ -223,13 +232,6 @@ class CreateOrderRequest(ExternalApi):
     # If type = market and action = buy, buy_max_cost
     # represents the maximum cents that can be spent to acquire a position
     buy_max_cost: Cents | None = None
-
-
-class OrderStatus(str, Enum):
-    RESTING = "resting"
-    CANCELED = "canceled"
-    EXECUTED = "executed"
-    PENDING = "pending"
 
 
 class InnerCreateOrderResponse(BaseModel):
