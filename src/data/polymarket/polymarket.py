@@ -97,7 +97,7 @@ class SessionsWrapper:
 
 
 @dataclass
-class BBO:
+class PolyBBO:
     price: Decimal
     qty: Decimal
 
@@ -106,13 +106,13 @@ class BBO:
 class PolyTopBook:
     # Associated kalshi ticker with this top book
     market_ticker: MarketTicker
-    top_bid: BBO | None = None
-    top_ask: BBO | None = None
+    top_bid: PolyBBO | None = None
+    top_ask: PolyBBO | None = None
 
-    def get_bbo(self, side: Side) -> BBO | None:
+    def get_bbo(self, side: Side) -> PolyBBO | None:
         if side == Side.YES:
             return self.top_bid
-        return self.top_bid
+        return self.top_ask
 
 
 class LivePolyMarket:
@@ -226,7 +226,7 @@ class PolyOrderbook:
             return self.asks
         raise ValueError(f"Bad side {side}")
 
-    def get_top(self, side: PolySide) -> BBO | None:
+    def get_top(self, side: PolySide) -> PolyBBO | None:
         """Returns the top of the book
         Returns tuple of (price, size)
         """
@@ -235,13 +235,13 @@ class PolyOrderbook:
                 top_ask = self.asks.peekitem(0)
             except IndexError:
                 return None
-            return BBO(price=top_ask[0], qty=top_ask[1])
+            return PolyBBO(price=top_ask[0], qty=top_ask[1])
         assert side == PolySide.BUY
         try:
             top_bid = self.bids.peekitem()
         except IndexError:
             return None
-        return BBO(price=top_bid[0], qty=top_bid[1])
+        return PolyBBO(price=top_bid[0], qty=top_bid[1])
 
 
 class PolyMarketFair:

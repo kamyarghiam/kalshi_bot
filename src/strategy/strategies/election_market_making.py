@@ -1,6 +1,9 @@
+import sys
+from decimal import Decimal
 from typing import Dict, Generator, List
+from unittest.mock import patch
 
-from data.polymarket.polymarket import PolyTopBook
+from data.polymarket.polymarket import PolyBBO, PolyTopBook
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Cents, Dollars, Price, get_opposite_side_price
 from helpers.types.orderbook import BBO, Orderbook
@@ -9,6 +12,7 @@ from helpers.types.orders import (
     Order,
     OrderId,
     OrderStatus,
+    Quantity,
     Side,
     TradeType,
 )
@@ -55,17 +59,20 @@ class ElectionMarketMaker:
     def handle_snapshot_msg(
         self, msg: OrderbookSnapshotRM
     ) -> Generator[Order | CancelRequest, None, None]:
-        return  # type:ignore[return-value]
+        return
+        yield
 
     def handle_delta_msg(
         self, msg: OrderbookDeltaRM
     ) -> Generator[Order | CancelRequest, None, None]:
-        return  # type:ignore[return-value]
+        return
+        yield
 
     def handle_trade_msg(
         self, msg: TradeRM
     ) -> Generator[Order | CancelRequest, None, None]:
-        return  # type:ignore[return-value]
+        return
+        yield
 
     def handle_order_fill_msg(
         self, msg: OrderFillRM
@@ -120,18 +127,11 @@ class ElectionMarketMaker:
         assert kalshi_bbo.ask and kalshi_bbo.bid
         # Dont cross bid or ask
         if side == Side.YES:
-            price_to_place = Price(
-                max(min(price_to_place, kalshi_bbo.ask.price - 1), 1)
-            )
-            if price_to_place == kalshi_bbo.bid:
-                return None
+            price_to_place = Price(max(price_to_place, kalshi_bbo.bid.price))
         else:
-            price_to_place = Price(
-                min(max(price_to_place, kalshi_bbo.bid.price + 1), 99)
-            )
-            if price_to_place == kalshi_bbo.ask:
-                return None
+            price_to_place = Price(min(price_to_place, kalshi_bbo.ask.price))
             price_to_place = get_opposite_side_price(price_to_place)
+
         return Price(price_to_place)
 
     def cancel_other_orders(
@@ -151,7 +151,7 @@ class ElectionMarketMaker:
         for side in Side:
             if price_to_place := self.get_price_to_place(side, msg, kalshi_bbo):
                 yield from self.cancel_other_orders(side, price_to_place)
-                if size := self.side_size(side) >= Dollars(1):
+                if (size := self.side_size(side)) >= Dollars(1):
                     qty = size // price_to_place
                     if qty > 0:
                         order = Order(
@@ -167,7 +167,7 @@ class ElectionMarketMaker:
 
         # Check that they dont self cross
         # TODO: self cross needs to be checked with resting orders as well
-        if len(orders) == 2 and orders[0].price == orders[1].price:
+        if len(orders) == 2 and ((orders[0].price + orders[1].price) >= 100):
             return
         # Mark orders
         for order in orders:
@@ -238,3 +238,83 @@ class ElectionMarketMaker:
             yield from self.handle_top_book_msg(msg)
         else:
             raise ValueError(f"Received unknown msg type: {msg}")
+
+
+TEST_TICKER = MarketTicker("test_ticker")
+
+
+def make_snapshot_ob(
+    yes_price: Price = Price(60), no_price: Price = Price(30), num_levels: int = 3
+) -> OrderbookSnapshotRM:
+    assert yes_price + no_price < 100
+    assert yes_price - num_levels > 0
+    assert no_price - num_levels > 0
+    return OrderbookSnapshotRM(
+        market_ticker=TEST_TICKER,
+        yes=[(Price(yes_price - i), Quantity(100)) for i in range(num_levels)],
+        no=[(Price(no_price - i), Quantity(100)) for i in range(num_levels)],
+    )
+
+
+def make_poly_topbook(
+    bid_price: Decimal | None, ask_price: Decimal | None
+) -> PolyTopBook:
+    bid = PolyBBO(price=bid_price, qty=Decimal(100)) if bid_price else None
+    ask = PolyBBO(price=ask_price, qty=Decimal(100)) if ask_price else None
+
+    return PolyTopBook(TEST_TICKER, top_bid=bid, top_ask=ask)
+
+
+def test_empty_poly_book():
+    e = ElectionMarketMaker(TEST_TICKER)
+    snapshot_msg = make_snapshot_ob()
+    msgs = list(e.consume_next_step(snapshot_msg))
+    assert len(msgs) == 0
+
+    top_book = make_poly_topbook(Decimal(62), Decimal(68))
+    msgs = list(e.consume_next_step(top_book))
+    assert len(msgs) == 2, msgs
+    assert isinstance(msgs[0], Order) and msgs[0].price == Price(62)
+    assert isinstance(msgs[1], Order) and msgs[1].price == Price(32)
+
+    # Test empty poly top book
+    top_book = make_poly_topbook(None, Decimal(69))
+    with patch.object(e, "cancel_orders") as cancel_orders:
+        list(e.consume_next_step(top_book))
+        cancel_orders.assert_called_once_with()
+
+    # Test empty kalshi top book
+    e._ob = Orderbook(TEST_TICKER)
+    with patch.object(e, "cancel_orders") as cancel_orders:
+        list(e.consume_next_step(make_poly_topbook(Decimal(62), Decimal(68))))
+        cancel_orders.assert_called_once_with()
+
+
+def test_adjust_to_kalshi_bbo():
+    e = ElectionMarketMaker(TEST_TICKER)
+    snapshot_msg = make_snapshot_ob()
+    msgs = list(e.consume_next_step(snapshot_msg))
+    assert len(msgs) == 0
+
+    top_book = make_poly_topbook(Decimal(30), Decimal(75))
+    msgs = list(e.consume_next_step(top_book))
+    assert len(msgs) == 2, msgs
+    assert isinstance(msgs[0], Order) and msgs[0].price == Price(60)
+    assert isinstance(msgs[1], Order) and msgs[1].price == Price(30)
+
+
+def unit_test_election_market_maker():
+    """Runs all the unit tests defined above"""
+    current_module = sys.modules[__name__]
+    test_functions = [f for f in dir(current_module) if f.startswith("test")]
+    print("Starting tests...")
+    for function_name in test_functions:
+        function_to_call = getattr(sys.modules[__name__], function_name)
+        function_to_call()
+        print(f"   Passed {function_name}")
+
+    print("Passed unit tests!")
+
+
+if __name__ == "__main__":
+    unit_test_election_market_maker()
