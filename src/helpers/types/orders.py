@@ -129,7 +129,9 @@ class Order:
     # Use this field to specify IOC, if time is in the past
     # If it's None, then it's Good 'til Canceled
     expiration_ts: int | None = int(time.time())
-    client_order_id: ClientOrderId = ClientOrderId(str(uuid1()))
+    client_order_id: ClientOrderId = field(
+        default_factory=lambda: ClientOrderId(str(uuid1())), compare=False
+    )
     status: OrderStatus | None = None
 
     @property

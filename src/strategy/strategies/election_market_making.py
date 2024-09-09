@@ -14,6 +14,7 @@ from helpers.types.orders import (
     OrderStatus,
     Quantity,
     Side,
+    TradeId,
     TradeType,
 )
 from helpers.types.websockets.response import (
@@ -46,7 +47,7 @@ class ElectionMarketMaker:
         # TODO: deposit more money and raise this?
         self._max_liquidity_per_side = Dollars(50)
 
-    def side_size(self, side: Side):
+    def side_size(self, side: Side) -> Cents:
         """How much money should we place on ask / bid side?"""
         size = self._max_liquidity_per_side
         for order in self._orders[side]:
@@ -77,11 +78,8 @@ class ElectionMarketMaker:
     def handle_order_fill_msg(
         self, msg: OrderFillRM
     ) -> Generator[Order | CancelRequest, None, None]:
-        price = (
-            msg.price if msg.side == Side.YES else get_opposite_side_price(msg.price)
-        )
-        multiplier = -1 if msg.side == Side.YES else 1
-        self._holding_liquidity += multiplier * (price * msg.count)
+        multiplier = 1 if msg.side == Side.YES else -1
+        self._holding_liquidity += multiplier * (msg.price * msg.count)
         for i, order in enumerate(self._orders[msg.side]):
             if self._order_id_mapping[order.client_order_id] == msg.order_id:
                 break
@@ -120,7 +118,7 @@ class ElectionMarketMaker:
 
     def get_price_to_place(
         self, side: Side, msg: PolyTopBook, kalshi_bbo: BBO
-    ) -> Price | None:
+    ) -> Price:
         poly_bbo = msg.get_bbo(side)
         assert poly_bbo is not None
         price_to_place = Price(round(poly_bbo.price))
@@ -149,21 +147,21 @@ class ElectionMarketMaker:
     ) -> Generator[Order | CancelRequest, None, None]:
         orders: List[Order] = []
         for side in Side:
-            if price_to_place := self.get_price_to_place(side, msg, kalshi_bbo):
-                yield from self.cancel_other_orders(side, price_to_place)
-                if (size := self.side_size(side)) >= Dollars(1):
-                    qty = size // price_to_place
-                    if qty > 0:
-                        order = Order(
-                            price=price_to_place,
-                            quantity=qty,
-                            trade=TradeType.BUY,
-                            ticker=self._ticker,
-                            side=side,
-                            expiration_ts=None,
-                            status=OrderStatus.IN_FLIGHT,
-                        )
-                        orders.append(order)
+            price_to_place = self.get_price_to_place(side, msg, kalshi_bbo)
+            yield from self.cancel_other_orders(side, price_to_place)
+            if (size := self.side_size(side)) >= Dollars(1):
+                qty = Quantity(int(size // price_to_place))
+                if qty > 0:
+                    order = Order(
+                        price=price_to_place,
+                        quantity=qty,
+                        trade=TradeType.BUY,
+                        ticker=self._ticker,
+                        side=side,
+                        expiration_ts=None,
+                        status=OrderStatus.IN_FLIGHT,
+                    )
+                    orders.append(order)
 
         # Check that they dont self cross
         # TODO: self cross needs to be checked with resting orders as well
@@ -266,6 +264,7 @@ def make_poly_topbook(
 
 
 def test_empty_poly_book():
+    """Test if kalshi bbo empty or poly bbo empty"""
     e = ElectionMarketMaker(TEST_TICKER)
     snapshot_msg = make_snapshot_ob()
     msgs = list(e.consume_next_step(snapshot_msg))
@@ -291,6 +290,8 @@ def test_empty_poly_book():
 
 
 def test_adjust_to_kalshi_bbo():
+    """Test the case where the poly bbo is outside of the range
+    of the Kalshi bbo. We should default to the kalshi bbo"""
     e = ElectionMarketMaker(TEST_TICKER)
     snapshot_msg = make_snapshot_ob()
     msgs = list(e.consume_next_step(snapshot_msg))
@@ -301,6 +302,102 @@ def test_adjust_to_kalshi_bbo():
     assert len(msgs) == 2, msgs
     assert isinstance(msgs[0], Order) and msgs[0].price == Price(60)
     assert isinstance(msgs[1], Order) and msgs[1].price == Price(30)
+
+
+def test_price_moves_bbo():
+    """Test that if the poly bbo moves, we cancel our orders and move our bbo"""
+    e = ElectionMarketMaker(TEST_TICKER)
+    snapshot_msg = make_snapshot_ob()
+    msgs = list(e.consume_next_step(snapshot_msg))
+    assert len(msgs) == 0
+
+    top_book = make_poly_topbook(Decimal(62), Decimal(68))
+    msgs = list(e.consume_next_step(top_book))
+    assert len(msgs) == 2, msgs
+    assert isinstance(msgs[0], Order) and msgs[0].price == Price(62)
+    assert isinstance(msgs[1], Order) and msgs[1].price == Price(32)
+
+    e.register_order_id_to_our_id(OrderId("0"), msgs[0].client_order_id)
+    e.register_order_id_to_our_id(OrderId("1"), msgs[1].client_order_id)
+
+    # Poly moves top book
+    top_book = make_poly_topbook(Decimal(63), Decimal(67))
+    # We cancel the last two orders and move up our BBO
+    msgs = list(e.consume_next_step(top_book))
+    assert len(msgs) == 4
+    assert isinstance(msgs[0], CancelRequest) and msgs[0].order_id == OrderId("0")
+    assert isinstance(msgs[1], CancelRequest) and msgs[1].order_id == OrderId("1")
+    assert isinstance(msgs[2], Order) and msgs[2].price == Price(63)
+    assert isinstance(msgs[3], Order) and msgs[3].price == Price(33)
+
+
+def test_fill_liquidity():
+    """Test that when we get filled on one side, we place orders on the other"""
+    e = ElectionMarketMaker(TEST_TICKER)
+    snapshot_msg = make_snapshot_ob()
+    msgs = list(e.consume_next_step(snapshot_msg))
+    assert len(msgs) == 0
+
+    top_book = make_poly_topbook(Decimal(62), Decimal(68))
+    msgs = list(e.consume_next_step(top_book))
+    assert len(msgs) == 2, msgs
+    assert isinstance(msgs[0], Order) and msgs[0].price == Price(62)
+    assert isinstance(msgs[1], Order) and msgs[1].price == Price(32)
+
+    e.register_order_id_to_our_id(OrderId("0"), msgs[0].client_order_id)
+    e.register_order_id_to_our_id(OrderId("1"), msgs[1].client_order_id)
+
+    # Fill half of liquidity
+    fill_qty = Quantity(msgs[0].quantity // 2)
+    msgs[0].price
+    order_side = msgs[0].side
+
+    msgs = list(
+        e.consume_next_step(
+            OrderFillRM(
+                trade_id=TradeId("1"),
+                order_id=OrderId("0"),
+                market_ticker=TEST_TICKER,
+                is_taker=False,
+                side=order_side,
+                yes_price=msgs[0].price,
+                no_price=get_opposite_side_price(msgs[0].price),
+                count=fill_qty,
+                action=TradeType.BUY,
+                ts=0,
+            )
+        )
+    )
+    assert len(msgs) == 1
+    # Place order on other side
+    o = msgs[0]
+    assert isinstance(o, Order)
+    assert o.price == Price(32)
+    assert o.side == order_side.get_other_side()
+
+    # Fill the rest of it
+    msgs = list(
+        e.consume_next_step(
+            OrderFillRM(
+                trade_id=TradeId("1"),
+                order_id=OrderId("0"),
+                market_ticker=TEST_TICKER,
+                is_taker=False,
+                side=order_side,
+                yes_price=o.price,
+                no_price=get_opposite_side_price(o.price),
+                count=fill_qty,
+                action=TradeType.BUY,
+                ts=0,
+            )
+        )
+    )
+    assert len(msgs) == 1, msgs
+    # Place order on other side
+    o = msgs[0]
+    assert isinstance(o, Order)
+    assert o.price == Price(32)
+    assert o.side == order_side.get_other_side()
 
 
 def unit_test_election_market_maker():
