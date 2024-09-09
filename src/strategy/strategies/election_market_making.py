@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, Generator, List
 
 from data.polymarket.polymarket import PolyTopBook
 from helpers.types.markets import MarketTicker
@@ -54,16 +54,22 @@ class ElectionMarketMaker:
 
     def handle_snapshot_msg(
         self, msg: OrderbookSnapshotRM
-    ) -> List[Order | CancelRequest]:
-        return []
+    ) -> Generator[Order | CancelRequest, None, None]:
+        return  # type:ignore[return-value]
 
-    def handle_delta_msg(self, msg: OrderbookDeltaRM) -> List[Order | CancelRequest]:
-        return []
+    def handle_delta_msg(
+        self, msg: OrderbookDeltaRM
+    ) -> Generator[Order | CancelRequest, None, None]:
+        return  # type:ignore[return-value]
 
-    def handle_trade_msg(self, msg: TradeRM) -> List[Order | CancelRequest]:
-        return []
+    def handle_trade_msg(
+        self, msg: TradeRM
+    ) -> Generator[Order | CancelRequest, None, None]:
+        return  # type:ignore[return-value]
 
-    def handle_order_fill_msg(self, msg: OrderFillRM) -> List[Order | CancelRequest]:
+    def handle_order_fill_msg(
+        self, msg: OrderFillRM
+    ) -> Generator[Order | CancelRequest, None, None]:
         price = (
             msg.price if msg.side == Side.YES else get_opposite_side_price(msg.price)
         )
@@ -77,17 +83,17 @@ class ElectionMarketMaker:
                 f"Could not find order id for {msg}. "
                 + "This could happen if you get filled while you're cancelling"
             )
-            return []
+            return
 
         self._orders[msg.side][i].quantity -= msg.count
         if self._orders[msg.side][i].quantity == 0:
             self._orders[msg.side].pop(i)
             del self._order_id_mapping[order.client_order_id]
         if self._last_poly_top_book:
-            return self.handle_top_book_msg(self._last_poly_top_book)
-        return []
+            yield from self.handle_top_book_msg(self._last_poly_top_book)
+        return
 
-    def cancel_side_orders(self, side: Side) -> List[CancelRequest]:
+    def cancel_side_orders(self, side: Side) -> Generator[CancelRequest, None, None]:
         orders_to_remove = [
             order for order in self._orders[side] if order.status == OrderStatus.RESTING
         ]
@@ -99,13 +105,11 @@ class ElectionMarketMaker:
         self._orders[side] = [
             order for order in self._orders[side] if order.status != OrderStatus.RESTING
         ]
-        return cancel_requests
+        yield from cancel_requests
 
-    def cancel_orders(self) -> List[Order | CancelRequest]:
-        cancellations: List[Order | CancelRequest] = []
+    def cancel_orders(self) -> Generator[Order | CancelRequest, None, None]:
         for side in Side:
-            cancellations.extend(self.cancel_side_orders(side))
-        return cancellations
+            yield from self.cancel_side_orders(side)
 
     def get_price_to_place(
         self, side: Side, msg: PolyTopBook, kalshi_bbo: BBO
@@ -130,22 +134,23 @@ class ElectionMarketMaker:
             price_to_place = get_opposite_side_price(price_to_place)
         return Price(price_to_place)
 
-    def cancel_other_orders(self, side: Side, price: Price) -> List[CancelRequest]:
+    def cancel_other_orders(
+        self, side: Side, price: Price
+    ) -> Generator[CancelRequest, None, None]:
         """Cancel all order if we're not at the top of the book"""
         # TODO: not super efficient because we cancel all orders. Might lose PIQ
         orders = self._orders[side]
         for order in orders:
             if order.price != price:
-                return self.cancel_side_orders(side)
-        return []
+                yield from self.cancel_side_orders(side)
 
     def place_orders(
         self, msg: PolyTopBook, kalshi_bbo: BBO
-    ) -> List[Order | CancelRequest]:
-        actions: List[Order | CancelRequest] = []
+    ) -> Generator[Order | CancelRequest, None, None]:
+        orders: List[Order] = []
         for side in Side:
             if price_to_place := self.get_price_to_place(side, msg, kalshi_bbo):
-                actions.extend(self.cancel_other_orders(side, price_to_place))
+                yield from self.cancel_other_orders(side, price_to_place)
                 if size := self.side_size(side) >= Dollars(1):
                     qty = size // price_to_place
                     if qty > 0:
@@ -158,24 +163,24 @@ class ElectionMarketMaker:
                             expiration_ts=None,
                             status=OrderStatus.IN_FLIGHT,
                         )
-                        actions.append(order)
+                        orders.append(order)
 
         # Check that they dont self cross
         # TODO: self cross needs to be checked with resting orders as well
-        orders = [action for action in actions if isinstance(action, Order)]
         if len(orders) == 2 and orders[0].price == orders[1].price:
-            return []
+            return
         # Mark orders
         for order in orders:
             self._orders[order.side].append(order)
-        return actions
+        yield from orders
 
-    def handle_top_book_msg(self, msg: PolyTopBook) -> List[Order | CancelRequest]:
+    def handle_top_book_msg(
+        self, msg: PolyTopBook
+    ) -> Generator[Order | CancelRequest, None, None]:
         self._last_poly_top_book = msg
         # Don't place orders if we dont see the orderbook yet
         if self._ob is None:
-            return []
-        actions: List[Order | CancelRequest] = []
+            return
         kalshi_bbo = self._ob.get_bbo()
 
         # If missing info, cancel and continue
@@ -185,7 +190,8 @@ class ElectionMarketMaker:
             or kalshi_bbo.ask is None
             or kalshi_bbo.bid is None
         ):
-            return self.cancel_orders()
+            yield from self.cancel_orders()
+            return
 
         # Dont trade on edge
         if (
@@ -194,11 +200,10 @@ class ElectionMarketMaker:
             or kalshi_bbo.bid.price < 10
             or kalshi_bbo.ask.price > 90
         ):
-            return self.cancel_orders()
+            yield from self.cancel_orders()
+            return
 
-        actions.extend(self.place_orders(msg, kalshi_bbo))
-
-        return actions
+        yield from self.place_orders(msg, kalshi_bbo)
 
     def register_order_id_to_our_id(self, order_id: OrderId, our_id: ClientOrderId):
         # TODO: call this when getting a response from place order because this lets
@@ -211,24 +216,25 @@ class ElectionMarketMaker:
 
     def consume_next_step(
         self, msg: ResponseMessage | PolyTopBook
-    ) -> List[Order | CancelRequest]:
+    ) -> Generator[Order | CancelRequest, None, None]:
         if (ticker := msg.market_ticker) != self._ticker:  # type:ignore[union-attr]
             print(
                 f"Error: passed in market ticker {ticker} "
                 + f"to strategy for ticker {self._ticker}. {msg}"
             )
-            return []
+            return
         if isinstance(msg, OrderbookSnapshotRM):
             self._ob = Orderbook.from_snapshot(msg)
-            return self.handle_snapshot_msg(msg)
+            yield from self.handle_snapshot_msg(msg)
         elif isinstance(msg, OrderbookDeltaRM):
             assert self._ob
             self._ob.apply_delta(msg, in_place=True)
-            return self.handle_delta_msg(msg)
+            yield from self.handle_delta_msg(msg)
         elif isinstance(msg, TradeRM):
-            return self.handle_trade_msg(msg)
+            yield from self.handle_trade_msg(msg)
         elif isinstance(msg, OrderFillRM):
-            return self.handle_order_fill_msg(msg)
+            yield from self.handle_order_fill_msg(msg)
         elif isinstance(msg, PolyTopBook):
-            return self.handle_top_book_msg(msg)
-        raise ValueError(f"Received unknown msg type: {msg}")
+            yield from self.handle_top_book_msg(msg)
+        else:
+            raise ValueError(f"Received unknown msg type: {msg}")
