@@ -235,13 +235,13 @@ class PolyOrderbook:
                 top_ask = self.asks.peekitem(0)
             except IndexError:
                 return None
-            return PolyBBO(price=top_ask[0], qty=top_ask[1])
+            return PolyBBO(price=top_ask[0] * 100, qty=top_ask[1])
         assert side == PolySide.BUY
         try:
             top_bid = self.bids.peekitem()
         except IndexError:
             return None
-        return PolyBBO(price=top_bid[0], qty=top_bid[1])
+        return PolyBBO(price=top_bid[0] * 100, qty=top_bid[1])
 
 
 class PolyMarketFair:
@@ -264,7 +264,6 @@ class PolyMarketFair:
         books: Dict[str, PolyOrderbook] = dict()
         lpm = LivePolyMarket()
         for msg in lpm.get_market_msgs(token_ids):
-            print(msg)
             token_id = msg.asset_id
             last_top_book = self.tid_to_last_top_book[token_id]
             if isinstance(msg, BookSnapshot):

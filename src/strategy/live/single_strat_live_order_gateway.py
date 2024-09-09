@@ -14,7 +14,7 @@ from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory, Position
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
-from strategy.live.types import TimedCallback
+from strategy.live.live_types import TimedCallback
 from strategy.strategies.follow_the_leader_strategy import FollowTheLeaderStrategy
 from strategy.utils import BaseStrategy
 

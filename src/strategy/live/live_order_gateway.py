@@ -32,8 +32,7 @@ from helpers.types.markets import MarketTicker
 from helpers.types.orders import GetOrdersRequest, Order, OrderStatus, TradeType
 from helpers.types.portfolio import PortfolioHistory
 from helpers.types.websockets.response import OrderFillRM, ResponseMessage, TradeRM
-from strategy.live.strategy_worker import run_strategy
-from strategy.live.types import (
+from strategy.live.live_types import (
     ParentMessage,
     ParentMsgCancelOrders,
     ParentMsgOrders,
@@ -42,6 +41,7 @@ from strategy.live.types import (
     ParentMsgType,
     TimedCallback,
 )
+from strategy.live.strategy_worker import run_strategy
 from strategy.strategies.follow_the_leader_strategy import FollowTheLeaderStrategy
 from strategy.strategies.graveyard_strategy import GraveyardStrategy
 from strategy.strategies.stop_loss_strategy import StopLossStrategy

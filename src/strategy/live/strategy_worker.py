@@ -12,7 +12,7 @@ from typing import Dict, Set
 from helpers.types.markets import MarketTicker
 from helpers.types.portfolio import Position
 from helpers.types.websockets.response import ResponseMessage
-from strategy.live.types import (
+from strategy.live.live_types import (
     ParentMessage,
     ParentMsgCancelOrders,
     ParentMsgOrders,

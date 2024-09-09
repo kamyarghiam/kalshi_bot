@@ -87,6 +87,7 @@ class ExchangeInterface(BaseExchangeInterface):
         # So for now, we print to see what happened
         print(request.__repr__())
         raw_resp = self._connection.post(ORDERS_URL, request)
+        print(raw_resp)
 
         resp: CreateOrderResponse = CreateOrderResponse.model_validate(raw_resp)
         if (

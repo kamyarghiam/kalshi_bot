@@ -41,7 +41,7 @@ from helpers.types.websockets.response import (
     ResponseMessage,
     TradeRM,
 )
-from strategy.live.types import StrategyName
+from strategy.live.live_types import StrategyName
 
 if TYPE_CHECKING:
     from strategy.features.derived.derived_feature import DerivedFeature
