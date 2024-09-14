@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta, timezone
 from typing import List
 
 from exchange.interface import ExchangeInterface
@@ -19,14 +18,13 @@ def run(tickers: List[MarketTicker], e: ExchangeInterface, strat: GeneralMarketM
 
 
 def main():
-    now = datetime.now(timezone.utc)
-    diff = timedelta(hours=15)
     with ExchangeInterface(is_test_run=False) as e:
-        tickers = [
-            m.ticker for m in e.get_active_markets() if m.close_time - now < diff
-        ]
-        # Dont trade miami markets for now because there's another penny bot there
-        tickers = tickers[:18]
+        # now = datetime.now(timezone.utc)
+        # diff = timedelta(hours=15)
+        # tickers = [
+        #     m.ticker for m in e.get_active_markets() if m.close_time - now < diff
+        # ]
+        tickers = [m.ticker for m in e.get_active_markets()]
         strat = GeneralMarketMaker(e)
         try:
             run(tickers, e, strat)

@@ -1,7 +1,9 @@
 import copy
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import DefaultDict, Dict, List
+from datetime import datetime, timedelta
+from time import sleep
+from typing import DefaultDict, Dict, List, Set, Tuple
 
 import requests
 
@@ -104,6 +106,61 @@ class GeneralMarketMaker:
             MarketTicker, QuantityDelta
         ] = defaultdict(lambda: QuantityDelta(0))
 
+        # Markets we ban becasue there's a competing penny bot or someone
+        # whose trades make us change our mind quickly
+        self._banned_markets: Set[MarketTicker] = set()
+
+        # Store the timestamps of the last several actions. Helps us know if we're
+        # doing too much on this market at the same time
+        self._actions_ts: DefaultDict[MarketTicker, deque] = defaultdict(
+            lambda: deque(maxlen=10)
+        )
+
+        # How many seconds can the earliest action be from now
+        self._banning_threshold = timedelta(seconds=10)
+
+        # Mapping of ticker to time banned and exponent used to unban ticker
+        self._ban_expo_backoff: Dict[MarketTicker, Tuple[datetime, int]] = dict()
+
+    def should_ban(self, ticker: MarketTicker) -> bool:
+        actions = self._actions_ts[ticker]
+        if len(actions) == actions.maxlen:
+            earliest_action = actions[0]
+            assert isinstance(earliest_action, datetime)
+            if datetime.now() - earliest_action <= self._banning_threshold:
+                return True
+        return False
+
+    def ban_ticker(self, ticker: MarketTicker):
+        print(f"Banning ticker: {ticker}")
+        del self._actions_ts[ticker]
+        self.cancel_resting_orders(ticker, [side for side in Side])
+        self._banned_markets.add(ticker)
+        if ticker not in self._ban_expo_backoff:
+            self._ban_expo_backoff[ticker] = (datetime.now(), 0)
+        else:
+            self._ban_expo_backoff[ticker] = (
+                datetime.now(),
+                self._ban_expo_backoff[ticker][1] + 1,
+            )
+
+    def is_banned(self, ticker: MarketTicker) -> bool:
+        if ticker in self._banned_markets:
+            # Check if it's time to unban
+            last_banned, expo = self._ban_expo_backoff[ticker]
+            if (datetime.now() - last_banned) > timedelta(seconds=(60 * (2**expo))):
+                # Unban ticker
+                self._banned_markets.remove(ticker)
+                return False
+            return True
+        return False
+
+    def mark_action(self, ticker: MarketTicker):
+        """Marks an action that can be used to see if
+        we're doing too much activity on this ticker. Used
+        later to ban the ticker if need be"""
+        self._actions_ts[ticker].append(datetime.now())
+
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
         self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
         self.handle_ob_update(self._obs[msg.market_ticker])
@@ -135,6 +192,8 @@ class GeneralMarketMaker:
         return False
 
     def handle_ob_update(self, ob: Orderbook):
+        if self.is_banned(ob.market_ticker):
+            return
         if self.ignore_if_state_not_matching(ob):
             return
         top_book_without_us = self.get_top_book_without_us(ob)
@@ -175,6 +234,11 @@ class GeneralMarketMaker:
         if orders_to_place:
             print("Placing orders: ", orders_to_place)
             order_ids_final: List[OrderId] = []
+            # If we're doing too much with this ticker, ban it
+            if self.should_ban(ticker):
+                self.ban_ticker(ticker)
+                return
+            self.mark_action(ticker)
             order_ids = self.e.place_batch_order(orders_to_place)
             for order_id in order_ids:
                 assert order_id
@@ -326,7 +390,9 @@ class GeneralMarketMaker:
                     # TODO: small bug, this can go over 20
                     order_ids_to_cancel.extend(side_resting_orders.order_ids)
                     # Can only cancel 20 at a time
-                    if len(order_ids_to_cancel) >= 20:
+                    if len(order_ids_to_cancel) >= 15:
+                        # Take a breath
+                        sleep(0.2)
                         self.e.batch_cancel_orders(order_ids_to_cancel)
                         order_ids_to_cancel = []
         if order_ids_to_cancel:
