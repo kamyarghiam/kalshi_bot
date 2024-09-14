@@ -18,10 +18,14 @@ def run(tickers: List[MarketTicker], e: ExchangeInterface, strat: GeneralMarketM
 
 
 def main():
-    tickers: List[MarketTicker] = []
+    tickers: List[MarketTicker] = [MarketTicker("SPACEXSTARSHIP-5-24SEP14")]
     with ExchangeInterface(is_test_run=True) as e:
         strat = GeneralMarketMaker(e)
         try:
             run(tickers, e, strat)
         finally:
             strat.cancel_all_orders()
+
+
+if __name__ == "__main__":
+    main()

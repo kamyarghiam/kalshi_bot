@@ -102,6 +102,10 @@ class ExchangeInterface(BaseExchangeInterface):
         """Places batch orders on exchange. Available for advanced API access only. Max
         20 orders per batch. Returns OrderID if order was placed or None if it wasn't"""
 
+        # If there's only or we're in the demo env, we use the regular place order
+        if len(orders) == 1 or self.is_test_run:
+            return [self.place_order(order) for order in orders]
+
         request = BatchCreateOrderRequest(orders=[o.to_api_request() for o in orders])
         raw_resp = self._connection.post(ORDERS_URL.add(BATCHED), request)
         resp = BatchCreateOrderResponse.model_validate(raw_resp)
@@ -114,6 +118,11 @@ class ExchangeInterface(BaseExchangeInterface):
         return result
 
     def batch_cancel_orders(self, order_ids: List[OrderId]):
+        # If there's only one, or we're in the demo env, we use the regular cancel order
+        if len(order_ids) == 1 or self.is_test_run:
+            for order_id in order_ids:
+                self.cancel_order(order_id)
+            return
         request = BatchCancelOrders(ids=order_ids)
         self._connection.delete(ORDERS_URL.add(BATCHED), request)
 
