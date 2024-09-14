@@ -256,13 +256,17 @@ class GeneralMarketMaker:
     def get_quantity_to_place(
         self, ticker: MarketTicker, side: Side
     ) -> Quantity | None:
-        multiplier = -1 if side == Side.YES else 1
-        positions_holding = self._holding_position_delta[ticker]
-        if abs(positions_holding) >= self.base_num_contracts:
-            num_contracts = abs(positions_holding)
+        multiplier = 1 if side == Side.YES else -1
+        positions_holding = multiplier * self._holding_position_delta[ticker]
+        if positions_holding >= self.base_num_contracts:
+            # We are holding more contracts on this side than we should, so dont buy
+            return None
+        if abs(positions_holding) > self.base_num_contracts:
+            # We dont want to add more contracts on top of this
+            num_contracts = positions_holding
         else:
-            # Add holding positions from other side
-            num_contracts = self.base_num_contracts + multiplier * positions_holding
+            # Remove holding positions (or add from other side)
+            num_contracts = self.base_num_contracts - positions_holding
         # Remove resting orders
         resting_orders = self._resting_top_book_orders[ticker].get_side(side)
         if resting_orders:
