@@ -36,6 +36,7 @@ from helpers.types.markets import (
 )
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.orders import (
+    BatchCancelOrders,
     BatchCreateOrderRequest,
     BatchCreateOrderResponse,
     CancelOrderResponse,
@@ -111,6 +112,10 @@ class ExchangeInterface(BaseExchangeInterface):
             else:
                 result.append(None)
         return result
+
+    def batch_cancel_orders(self, order_ids: List[OrderId]):
+        request = BatchCancelOrders(ids=order_ids)
+        self._connection.delete(ORDERS_URL.add(BATCHED), request)
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.model_validate(

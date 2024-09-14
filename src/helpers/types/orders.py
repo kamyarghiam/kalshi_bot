@@ -133,6 +133,7 @@ class Order:
         default_factory=lambda: ClientOrderId(str(uuid1())), compare=False
     )
     status: OrderStatus | None = None
+    order_id: OrderId | None = None
 
     @property
     def fee(self) -> Cents:
@@ -293,6 +294,10 @@ class CancelOrderResponse(ExternalApi):
 
 class BatchCreateOrderRequest(ExternalApi):
     orders: List[CreateOrderRequest]
+
+
+class BatchCancelOrders(ExternalApi):
+    ids: List[OrderId]
 
 
 class BatchCreateOrderResponse(ExternalApi):

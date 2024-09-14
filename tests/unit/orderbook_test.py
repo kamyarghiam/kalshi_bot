@@ -6,7 +6,7 @@ import pytest
 from data.collection.orderbook import generate_table
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import Orderbook, OrderbookSide, OrderbookView, SideBBO
+from helpers.types.orderbook import LevelInfo, Orderbook, OrderbookSide, OrderbookView
 from helpers.types.orders import Order, Quantity, QuantityDelta, Side, TradeType
 from helpers.types.websockets.response import OrderbookDeltaRM, OrderbookSnapshotRM
 
@@ -536,8 +536,8 @@ def test_get_bbo():
     )
     bbo = o.get_bbo()
 
-    assert bbo.bid == SideBBO(price=Price(90), quantity=Quantity(10))
-    assert bbo.ask == SideBBO(price=Price(94), quantity=Quantity(50))
+    assert bbo.bid == LevelInfo(price=Price(90), quantity=Quantity(10))
+    assert bbo.ask == LevelInfo(price=Price(94), quantity=Quantity(50))
 
 
 def test_sell_max_quantity():
@@ -635,3 +635,43 @@ def test_sell_max_quantity():
             trade=TradeType.SELL,
         ),
     ]
+
+
+def test_get_top_book():
+    o = Orderbook(
+        market_ticker=MarketTicker("hi"),
+        yes=OrderbookSide(levels={Price(2): Quantity(100), Price(1): Quantity(200)}),
+        no=OrderbookSide(
+            levels={
+                Price(93): Quantity(300),
+                Price(94): Quantity(400),
+                Price(95): Quantity(500),
+            }
+        ),
+    )
+
+    top_book = o.get_top_book()
+    assert top_book.yes
+    assert top_book.no
+    assert top_book.yes.price == Price(2)
+    assert top_book.yes.quantity == Quantity(100)
+    assert top_book.no.price == Price(95)
+    assert top_book.no.quantity == Quantity(500)
+    assert top_book.view == OrderbookView.BID
+
+    o = o.get_view(OrderbookView.ASK)
+    top_book = o.get_top_book()
+    assert top_book.yes
+    assert top_book.no
+    assert top_book.yes.price == Price(5)
+    assert top_book.yes.quantity == Quantity(500)
+    assert top_book.no.price == Price(98)
+    assert top_book.no.quantity == Quantity(100)
+    assert top_book.view == OrderbookView.ASK
+
+    o.yes = OrderbookSide()
+    top_book = o.get_top_book()
+    assert top_book.yes is None
+    assert top_book.no
+    assert top_book.no.price == Price(98)
+    assert top_book.no.quantity == Quantity(100)

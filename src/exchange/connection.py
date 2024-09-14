@@ -338,8 +338,8 @@ class Connection:
     def post(self, url: URL, body: ExternalApi | None = None, check_auth: bool = True):
         return self._request(Method.POST, url, body=body, check_auth=check_auth)
 
-    def delete(self, url: URL):
-        return self._request(Method.DELETE, url)
+    def delete(self, url: URL, body: ExternalApi | None = None):
+        return self._request(Method.DELETE, url, body=body)
 
     def sign_in(self):
         response = LogInResponse.model_validate(

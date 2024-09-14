@@ -114,7 +114,7 @@ class OrderbookView(str, Enum):
 
 
 @dataclass
-class SideBBO:
+class LevelInfo:
     """Top level information about a side"""
 
     price: Price
@@ -123,10 +123,22 @@ class SideBBO:
 
 @dataclass
 class BBO:
-    """Information about top of book"""
+    """Information about the BBO"""
 
-    bid: SideBBO | None
-    ask: SideBBO | None
+    bid: LevelInfo | None
+    ask: LevelInfo | None
+
+
+@dataclass
+class TopBook:
+    """Information about the top of the book"""
+
+    yes: LevelInfo | None
+    no: LevelInfo | None
+    view: OrderbookView = field(default_factory=lambda: OrderbookView.BID)
+
+    def get_side(self, side: Side) -> LevelInfo | None:
+        return self.yes if side == Side.YES else self.no
 
 
 @dataclass
@@ -202,6 +214,20 @@ class Orderbook:
         assert side == Side.YES
         return self.yes
 
+    def get_top_book(self) -> TopBook:
+        if self.view == OrderbookView.BID:
+            yes = self.get_side(Side.YES).get_largest_price_level()
+            no = self.get_side(Side.NO).get_largest_price_level()
+        else:
+            yes = self.get_side(Side.YES).get_smallest_price_level()
+            no = self.get_side(Side.NO).get_smallest_price_level()
+
+        yes_level_info = (
+            None if yes is None else LevelInfo(price=yes[0], quantity=yes[1])
+        )
+        no_level_info = None if no is None else LevelInfo(price=no[0], quantity=no[1])
+        return TopBook(yes=yes_level_info, no=no_level_info, view=self.view)
+
     def get_bbo(
         self,
         side: Side = Side.YES,
@@ -209,18 +235,18 @@ class Orderbook:
         """Returns tuple of bid and ask at bbo yes side, if it exists"""
         ob = self.get_view(OrderbookView.BID)
         bid = ob.get_side(side).get_largest_price_level()
-        bid_side_bbo: SideBBO | None = None
+        bid_side_bbo: LevelInfo | None = None
         if bid is not None:
             bid_price, bid_qty = bid
-            bid_side_bbo = SideBBO(price=bid_price, quantity=bid_qty)
+            bid_side_bbo = LevelInfo(price=bid_price, quantity=bid_qty)
 
         ask = ob.get_side(Side.get_other_side(side)).get_largest_price_level()
-        ask_side_bbo: SideBBO | None = None
+        ask_side_bbo: LevelInfo | None = None
         if ask is not None:
             # Need to take opposite price
             ask_price, ask_qty = ask
             ask_price = get_opposite_side_price(ask_price)
-            ask_side_bbo = SideBBO(price=ask_price, quantity=ask_qty)
+            ask_side_bbo = LevelInfo(price=ask_price, quantity=ask_qty)
 
         return BBO(bid=bid_side_bbo, ask=ask_side_bbo)
 
