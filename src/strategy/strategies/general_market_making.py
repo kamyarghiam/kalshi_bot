@@ -1,3 +1,4 @@
+import copy
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict, Dict, List
@@ -34,7 +35,7 @@ class OrdersOnSide:
 
 
 @dataclass
-class TopBookOrders:
+class RestingTopBookOrders:
     yes: OrdersOnSide | None
     no: OrdersOnSide | None
 
@@ -88,20 +89,22 @@ class GeneralMarketMaker:
         self.e = e
         self._obs: Dict[MarketTicker, Orderbook] = dict()
         # Maps to the yes BBO
-        self._last_top_books: Dict[MarketTicker, TopBook] = dict()
-        self._resting_top_book_orders: Dict[MarketTicker, TopBookOrders] = dict()
+        self._last_top_books: DefaultDict[MarketTicker, TopBook] = defaultdict(
+            lambda: TopBook(yes=None, no=None)
+        )
+        self._resting_top_book_orders: DefaultDict[
+            MarketTicker, RestingTopBookOrders
+        ] = defaultdict(lambda: RestingTopBookOrders(yes=None, no=None))
         # How much net contracts are we holding? Positive means more Yes positions
         self._holding_position_delta: DefaultDict[
             MarketTicker, QuantityDelta
         ] = defaultdict(lambda: QuantityDelta(0))
 
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
-        self.update_last_top_book(msg.market_ticker)
         self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
         self.handle_ob_update(self._obs[msg.market_ticker])
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
-        self.update_last_top_book(msg.market_ticker)
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         self.handle_ob_update(self._obs[msg.market_ticker])
 
@@ -110,36 +113,50 @@ class GeneralMarketMaker:
 
     def handle_order_fill_msg(self, msg: OrderFillRM):
         self.adjust_fill_quantities(msg)
+        top_book_without_us = self.get_top_book_without_us(self._obs[msg.market_ticker])
         self.place_top_book_orders(
-            self._obs[msg.market_ticker], sides=[msg.side.get_other_side()]
+            top_book_without_us, msg.market_ticker, sides=[msg.side.get_other_side()]
         )
 
+    def ignore_if_state_not_matching(self, ob: Orderbook) -> bool:
+        """Ignores an update if the state of the OB does not match waht we see"""
+        resting_orders = self._resting_top_book_orders[ob.market_ticker]
+        for side in Side:
+            side_resting_orders = resting_orders.get_side(side)
+            if side_resting_orders:
+                # If we don't have the price level or the quantity is not up to date
+                level_qty = ob.get_side(side).levels.get(
+                    side_resting_orders.price, None
+                )
+                if not level_qty or level_qty < side_resting_orders.quantity:
+                    return True
+
+        return False
+
     def handle_ob_update(self, ob: Orderbook):
-        # We have top book orders
-        if sides := self.top_book_moved(ob):
-            self.move_orders_with_top_book(ob, sides)
+        if self.ignore_if_state_not_matching(ob):
+            return
+        top_book_without_us = self.get_top_book_without_us(ob)
+        if sides := self.top_book_moved(top_book_without_us, ob.market_ticker):
+            self.move_orders_with_top_book(top_book_without_us, ob.market_ticker, sides)
             return
 
-    def place_top_book_orders(self, ob: Orderbook, sides: List[Side]):
+    def place_top_book_orders(
+        self, top_book_without_us: TopBook, ticker: MarketTicker, sides: List[Side]
+    ):
         """Places orders at the top of the book for the sides requested"""
 
-        if ob.market_ticker not in self._resting_top_book_orders:
-            self._resting_top_book_orders[ob.market_ticker] = TopBookOrders(
-                yes=None, no=None
-            )
-        # Assuming we have no orders yet on these sides
-        top_book = ob.get_top_book()
         # Penny order or join bbo
         orders_to_place: List[Order] = []
         # Price we're going to place on other side
         other_side_price: Price | None = None
         for side in sides:
             price_to_place = self.get_price_to_place(
-                ob.market_ticker, side, top_book, other_side_price
+                ticker, side, top_book_without_us, other_side_price
             )
             if price_to_place is None:
                 continue
-            quantity_to_place = self.get_quantity_to_place(ob.market_ticker, side)
+            quantity_to_place = self.get_quantity_to_place(ticker, side)
             if quantity_to_place is None:
                 continue
             other_side_price = price_to_place
@@ -147,7 +164,7 @@ class GeneralMarketMaker:
                 price=price_to_place,
                 quantity=quantity_to_place,
                 trade=TradeType.BUY,
-                ticker=ob.market_ticker,
+                ticker=ticker,
                 side=side,
                 is_taker=False,
                 expiration_ts=None,
@@ -164,7 +181,7 @@ class GeneralMarketMaker:
             for i, order in enumerate(orders_to_place):
                 order.status = OrderStatus.RESTING
                 order.order_id = order_ids_final[i]
-                self._resting_top_book_orders[ob.market_ticker].add_to_side(order)
+                self._resting_top_book_orders[ticker].add_to_side(order)
 
     def get_quantity_to_place(
         self, ticker: MarketTicker, side: Side
@@ -175,10 +192,9 @@ class GeneralMarketMaker:
             self.base_num_contracts + multiplier * self._holding_position_delta[ticker]
         )
         # Remove resting orders
-        if ticker in self._resting_top_book_orders:
-            resting_orders = self._resting_top_book_orders[ticker].get_side(side)
-            if resting_orders:
-                num_contracts -= resting_orders.quantity
+        resting_orders = self._resting_top_book_orders[ticker].get_side(side)
+        if resting_orders:
+            num_contracts -= resting_orders.quantity
         if num_contracts == 0:
             return None
         return Quantity(num_contracts)
@@ -187,16 +203,15 @@ class GeneralMarketMaker:
         self,
         ticker: MarketTicker,
         side: Side,
-        top_book: TopBook,
+        top_book_without_us: TopBook,
         our_price_on_other_side: Price | None,
     ) -> Price | None:
         """Returns if we should penny or join BBO"""
         # If we already have top book orders, join on the same level
-        if ticker in self._resting_top_book_orders:
-            resting_orders = self._resting_top_book_orders[ticker].get_side(side)
-            if resting_orders:
-                return resting_orders.price
-        side_top_book = top_book.get_side(side)
+        resting_orders = self._resting_top_book_orders[ticker].get_side(side)
+        if resting_orders:
+            return resting_orders.price
+        side_top_book = top_book_without_us.get_side(side)
         if side_top_book is None:
             return None
         # Dont place orders on the edges
@@ -204,7 +219,11 @@ class GeneralMarketMaker:
             return None
         price_to_place = Price(side_top_book.price + Price(1))
         # Dont cross the spread
-        other_side_top_book = top_book.get_side(side.get_other_side())
+        # We have to use the top book with us so we dont self cross
+        top_book_with_us = (
+            self._obs[ticker].get_top_book().get_side(side.get_other_side())
+        )
+        other_side_top_book = top_book_with_us
         other_side_topbook_price = (
             None if other_side_top_book is None else int(other_side_top_book.price)
         )
@@ -226,53 +245,65 @@ class GeneralMarketMaker:
             return x
         return y
 
-    def top_book_moved(self, ob: Orderbook) -> List[Side]:
-        """Checks if the top of the orderbook moved from the
-        last time we saw it. Returns the sides that moved"""
-        sides_changed: List[Side] = []
+    def get_top_book_without_us(self, ob: Orderbook) -> TopBook:
+        # TODO: make more efficient
+        ob_copy = copy.deepcopy(ob)
+        resting_orders = self._resting_top_book_orders[ob.market_ticker]
+        if resting_orders.yes:
+            ob_copy.yes.apply_delta(
+                resting_orders.yes.price,
+                QuantityDelta(-1 * resting_orders.yes.quantity),
+            )
+        if resting_orders.no:
+            ob_copy.no.apply_delta(
+                resting_orders.no.price,
+                QuantityDelta(-1 * resting_orders.no.quantity),
+            )
+        return ob_copy.get_top_book()
 
-        top_book = ob.get_top_book()
+    def top_book_moved(
+        self, top_book_without_us: TopBook, ticker: MarketTicker
+    ) -> List[Side]:
+        """Checks if the top of the orderbook moved from the
+        last time we saw it. Does not consider our orders.
+        Returns the sides that moved"""
+        sides_changed: List[Side] = []
+        last_top_book = self._last_top_books[ticker]
+        resting_orders = self._resting_top_book_orders[ticker]
         for side in Side:
-            level = top_book.get_side(side)
+            side_resting_orders = resting_orders.get_side(side)
+            level = top_book_without_us.get_side(side)
             # If prices changed
-            last_level = self._last_top_books[ob.market_ticker].get_side(side)
+            last_level = last_top_book.get_side(side)
             # If they're both not None and a price has changed, the book as moved
             if level and last_level:
+                # If the price moved
                 if level.price != last_level.price:
-                    sides_changed.append(side)
+                    # If the price moved in front of us or several levels behind
+                    if (not side_resting_orders) or (
+                        level.price > side_resting_orders.price
+                        or level.price < side_resting_orders.price - Price(1)
+                    ):
+                        sides_changed.append(side)
             else:
                 # If only one of the is None, then a side has changed
                 if not (level is None and last_level is None):
                     sides_changed.append(side)
 
-        # Check if we're on the top of the book for the sides changed
-        sides_changed_without_us: List[Side] = []
-        if ob.market_ticker in self._resting_top_book_orders:
-            for side in sides_changed:
-                resting_orders = self._resting_top_book_orders[ob.market_ticker]
-                side_resting_orders = resting_orders.get_side(side)
-                side_top_book = top_book.get_side(side)
-                if side_resting_orders:
-                    if side_top_book:
-                        if side_top_book.price != side_resting_orders.price:
-                            # Top book has moved away from us
-                            sides_changed_without_us.append(side)
-                    else:
-                        # The side was removed, we should delete the order
-                        sides_changed_without_us.append(side)
-        else:
-            sides_changed_without_us = sides_changed
+        self._last_top_books[ticker] = top_book_without_us
 
-        if sides_changed_without_us:
-            print(f"Top book changed for {ob.market_ticker}: {top_book}")
-        return sides_changed_without_us
+        if sides_changed:
+            print(f"Top book changed for {ticker}: {top_book_without_us}")
+        return sides_changed
 
-    def move_orders_with_top_book(self, ob: Orderbook, sides: List[Side]):
+    def move_orders_with_top_book(
+        self, top_book_without_us: TopBook, ticker: MarketTicker, sides: List[Side]
+    ):
         """Moves the orders to match the new top book"""
         # First cancel the orders
-        self.cancel_resting_orders(ob.market_ticker, sides)
+        self.cancel_resting_orders(ticker, sides)
         # Then place resting orders
-        self.place_top_book_orders(ob, sides)
+        self.place_top_book_orders(top_book_without_us, ticker, sides)
         return
 
     def cancel_all_orders(self) -> None:
@@ -297,12 +328,11 @@ class GeneralMarketMaker:
     def cancel_resting_orders(self, ticker: MarketTicker, sides: List[Side]):
         print(f"Cancelling resting orders on {ticker} for sides {str(sides)}")
         order_ids_to_canel: List[OrderId] = []
-        if ticker in self._resting_top_book_orders:
-            resting_orders = self._resting_top_book_orders[ticker]
-            for side in sides:
-                side_resting_orders = resting_orders.get_side(side)
-                if side_resting_orders:
-                    order_ids_to_canel.extend(side_resting_orders.order_ids)
+        resting_orders = self._resting_top_book_orders[ticker]
+        for side in sides:
+            side_resting_orders = resting_orders.get_side(side)
+            if side_resting_orders:
+                order_ids_to_canel.extend(side_resting_orders.order_ids)
 
         if order_ids_to_canel:
             self.e.batch_cancel_orders(order_ids_to_canel)
@@ -320,14 +350,6 @@ class GeneralMarketMaker:
         self._resting_top_book_orders[msg.market_ticker].remove_quantity(
             msg.side, msg.count
         )
-
-    def update_last_top_book(self, ticker: MarketTicker):
-        """Stores the states of the previous top book"""
-        if ticker in self._obs:
-            last_top_book = self._obs[ticker].get_top_book()
-        else:
-            last_top_book = TopBook(yes=None, no=None)
-        self._last_top_books[ticker] = last_top_book
 
     def consume_next_step(self, msg: ResponseMessage):
         if isinstance(msg, OrderbookSnapshotRM):
