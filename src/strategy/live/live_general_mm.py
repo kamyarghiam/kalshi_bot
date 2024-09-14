@@ -24,8 +24,9 @@ def main():
     with ExchangeInterface(is_test_run=False) as e:
         tickers = [
             m.ticker for m in e.get_active_markets() if m.close_time - now < diff
-        ][:12]
-        print(tickers)
+        ]
+        # Dont trade miami markets for now because there's another penny bot there
+        tickers = tickers[:18]
         strat = GeneralMarketMaker(e)
         try:
             run(tickers, e, strat)

@@ -71,10 +71,12 @@ class RestingTopBookOrders:
 
     def remove_quantity(self, side: Side, quantity: Quantity):
         side_orders = self.get_side(side)
-        assert side_orders
-        side_orders.quantity -= quantity
-        if side_orders.quantity == 0:
-            self.clear_side(side)
+        # Although side orders should never be none, it's possible
+        # we get filled while we're cancelling
+        if side_orders:
+            side_orders.quantity -= quantity
+            if side_orders.quantity == 0:
+                self.clear_side(side)
 
 
 class GeneralMarketMaker:

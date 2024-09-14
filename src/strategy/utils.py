@@ -2,6 +2,7 @@ import datetime
 import itertools
 import json
 import pathlib
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -483,7 +484,10 @@ class Throttler:
         self.last_called: Dict[str | None, datetime.datetime] = {}
 
     def should_trottle(
-        self, curr_ts: datetime.datetime, identifer: str | None = None
+        self,
+        curr_ts: datetime.datetime,
+        identifer: str | None = None,
+        sleep: bool = False,
     ) -> bool:
         """Returns true if we should not process the request (it's too frequent)
 
@@ -492,10 +496,12 @@ class Throttler:
         criteria for the same frequency. If you dont pass in an identifier, assumes
         that all the throttling is shared.
         """
-        if (
-            identifer in self.last_called
-            and curr_ts - self.last_called[identifer] < self.frequency
+        if identifer in self.last_called and (
+            (diff := curr_ts - self.last_called[identifer]) < self.frequency
         ):
+            if sleep:
+                time_left = self.frequency - diff
+                time.sleep(time_left.total_seconds())
             return True
         self.last_called[identifer] = curr_ts
         return False
