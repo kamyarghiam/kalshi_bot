@@ -263,7 +263,7 @@ class GeneralMarketMaker:
             return None
         if abs(positions_holding) > self.base_num_contracts:
             # We dont want to add more contracts on top of this
-            num_contracts = positions_holding
+            num_contracts = abs(positions_holding)
         else:
             # Remove holding positions (or add from other side)
             num_contracts = self.base_num_contracts - positions_holding
@@ -404,9 +404,9 @@ class GeneralMarketMaker:
                     # TODO: small bug, this can go over 20
                     order_ids_to_cancel.extend(side_resting_orders.order_ids)
                     # Can only cancel 20 at a time
-                    if len(order_ids_to_cancel) >= 15:
+                    if len(order_ids_to_cancel) >= 17:
                         # Take a breath
-                        sleep(0.5)
+                        sleep(0.3)
                         self.e.batch_cancel_orders(order_ids_to_cancel)
                         order_ids_to_cancel = []
         if order_ids_to_cancel:

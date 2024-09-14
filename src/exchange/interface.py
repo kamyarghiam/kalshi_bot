@@ -265,7 +265,7 @@ class ExchangeInterface(BaseExchangeInterface):
         batch_size = 20
         for i in range(0, len(order_ids), batch_size):
             batch = order_ids[i : i + batch_size]
-            sleep(0.5)
+            sleep(0.3)
             self.batch_cancel_orders(batch)
 
     ######## Helpers ############

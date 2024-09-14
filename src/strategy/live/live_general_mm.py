@@ -25,15 +25,17 @@ def main():
         # tickers = [
         #     m.ticker for m in e.get_active_markets() if m.close_time - now < diff
         # ]
+
+        strat = GeneralMarketMaker(e)
         tickers = {m.ticker for m in e.get_active_markets()}
         positions = e.get_positions()
-        strat = GeneralMarketMaker(e)
         # Keep track of markets where we have a position
         for position in positions:
             tickers.add(position.ticker)
             strat.load_pre_existing_position(
                 position.ticker, QuantityDelta(position.position)
             )
+
         try:
             run(list(tickers), e, strat)
         finally:
