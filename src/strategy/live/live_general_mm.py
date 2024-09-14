@@ -3,6 +3,7 @@ from typing import List
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
 from helpers.types.markets import MarketTicker
+from helpers.types.orders import QuantityDelta
 from strategy.strategies.general_market_making import GeneralMarketMaker
 
 
@@ -24,10 +25,17 @@ def main():
         # tickers = [
         #     m.ticker for m in e.get_active_markets() if m.close_time - now < diff
         # ]
-        tickers = [m.ticker for m in e.get_active_markets()]
+        tickers = {m.ticker for m in e.get_active_markets()}
+        positions = e.get_positions()
         strat = GeneralMarketMaker(e)
+        # Keep track of markets where we have a position
+        for position in positions:
+            tickers.add(position.ticker)
+            strat.load_pre_existing_position(
+                position.ticker, QuantityDelta(position.position)
+            )
         try:
-            run(tickers, e, strat)
+            run(list(tickers), e, strat)
         finally:
             strat.cancel_all_orders()
 

@@ -122,6 +122,11 @@ class GeneralMarketMaker:
         # Mapping of ticker to time banned and exponent used to unban ticker
         self._ban_expo_backoff: Dict[MarketTicker, Tuple[datetime, int]] = dict()
 
+    def load_pre_existing_position(self, ticker: MarketTicker, position: QuantityDelta):
+        """If you have an existing position, give the position as a quantity delta
+        where positive means you're holding more Yes"""
+        self._holding_position_delta[ticker] = position
+
     def should_ban(self, ticker: MarketTicker) -> bool:
         actions = self._actions_ts[ticker]
         if len(actions) == actions.maxlen:
@@ -252,15 +257,20 @@ class GeneralMarketMaker:
         self, ticker: MarketTicker, side: Side
     ) -> Quantity | None:
         multiplier = -1 if side == Side.YES else 1
-        # Add holding positions from other side
-        num_contracts = (
-            self.base_num_contracts + multiplier * self._holding_position_delta[ticker]
-        )
+        positions_holding = self._holding_position_delta[ticker]
+        if abs(positions_holding) >= self.base_num_contracts:
+            num_contracts = abs(positions_holding)
+        else:
+            # Add holding positions from other side
+            num_contracts = self.base_num_contracts + multiplier * positions_holding
         # Remove resting orders
         resting_orders = self._resting_top_book_orders[ticker].get_side(side)
         if resting_orders:
+            # This can happen if we were trying to sell a large position
+            if resting_orders.quantity >= num_contracts:
+                return None
             num_contracts -= resting_orders.quantity
-        if num_contracts == 0:
+        if num_contracts <= 0:
             return None
         return Quantity(num_contracts)
 
@@ -392,7 +402,7 @@ class GeneralMarketMaker:
                     # Can only cancel 20 at a time
                     if len(order_ids_to_cancel) >= 15:
                         # Take a breath
-                        sleep(0.2)
+                        sleep(0.5)
                         self.e.batch_cancel_orders(order_ids_to_cancel)
                         order_ids_to_cancel = []
         if order_ids_to_cancel:

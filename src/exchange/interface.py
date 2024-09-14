@@ -1,5 +1,6 @@
 from datetime import datetime
 from functools import partial
+from time import sleep
 from types import TracebackType
 from typing import Callable, ContextManager, Generator, List, TypeVar
 
@@ -257,6 +258,15 @@ class ExchangeInterface(BaseExchangeInterface):
                 url=SERIES_URL.add(s),
             )
         ).series
+
+    def cancel_all_resting_orders(self):
+        resting_orders = self.get_orders(GetOrdersRequest(status=OrderStatus.RESTING))
+        order_ids = [order.order_id for order in resting_orders]
+        batch_size = 20
+        for i in range(0, len(order_ids), batch_size):
+            batch = order_ids[i : i + batch_size]
+            sleep(0.5)
+            self.batch_cancel_orders(batch)
 
     ######## Helpers ############
 
