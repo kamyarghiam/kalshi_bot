@@ -3,6 +3,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict, Dict, List
 
+import requests
+
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
@@ -328,7 +330,10 @@ class GeneralMarketMaker:
                         self.e.batch_cancel_orders(order_ids_to_cancel)
                         order_ids_to_cancel = []
         if order_ids_to_cancel:
-            self.e.batch_cancel_orders(order_ids_to_cancel)
+            try:
+                self.e.batch_cancel_orders(order_ids_to_cancel)
+            except requests.exceptions.HTTPError as e:
+                print(f"Error canceling orders, but continuing: {str(e)}")
 
     def cancel_resting_orders(self, ticker: MarketTicker, sides: List[Side]):
         print(f"Cancelling resting orders on {ticker} for sides {str(sides)}")
@@ -340,7 +345,10 @@ class GeneralMarketMaker:
                 order_ids_to_canel.extend(side_resting_orders.order_ids)
 
         if order_ids_to_canel:
-            self.e.batch_cancel_orders(order_ids_to_canel)
+            try:
+                self.e.batch_cancel_orders(order_ids_to_canel)
+            except requests.exceptions.HTTPError as e:
+                print(f"Error canceling orders, but continuing: {str(e)}")
 
             for side in sides:
                 self._resting_top_book_orders[ticker].clear_side(side)
