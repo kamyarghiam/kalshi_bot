@@ -113,10 +113,7 @@ class GeneralMarketMaker:
 
     def handle_order_fill_msg(self, msg: OrderFillRM):
         self.adjust_fill_quantities(msg)
-        top_book_without_us = self.get_top_book_without_us(self._obs[msg.market_ticker])
-        self.place_top_book_orders(
-            top_book_without_us, msg.market_ticker, sides=[msg.side.get_other_side()]
-        )
+        # Wait until next delta to fill side
 
     def ignore_if_state_not_matching(self, ob: Orderbook) -> bool:
         """Ignores an update if the state of the OB does not match waht we see"""
@@ -137,7 +134,7 @@ class GeneralMarketMaker:
         if self.ignore_if_state_not_matching(ob):
             return
         top_book_without_us = self.get_top_book_without_us(ob)
-        if sides := self.top_book_moved(top_book_without_us, ob.market_ticker):
+        if sides := self.should_place_orders(top_book_without_us, ob.market_ticker):
             self.move_orders_with_top_book(top_book_without_us, ob.market_ticker, sides)
             return
 
@@ -261,7 +258,7 @@ class GeneralMarketMaker:
             )
         return ob_copy.get_top_book()
 
-    def top_book_moved(
+    def should_place_orders(
         self, top_book_without_us: TopBook, ticker: MarketTicker
     ) -> List[Side]:
         """Checks if the top of the orderbook moved from the
@@ -271,6 +268,12 @@ class GeneralMarketMaker:
         last_top_book = self._last_top_books[ticker]
         resting_orders = self._resting_top_book_orders[ticker]
         for side in Side:
+            # If we have some leftover quantity, let's try to place it
+            quantity_to_place = self.get_quantity_to_place(ticker, side)
+            if quantity_to_place is not None:
+                sides_changed.append(side)
+                continue
+
             side_resting_orders = resting_orders.get_side(side)
             level = top_book_without_us.get_side(side)
             # If prices changed
