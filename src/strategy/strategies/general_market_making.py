@@ -47,9 +47,9 @@ class TopBookOrders:
         else:
             self.no = None
 
-    def add_to_side(self, side: Side, o: Order):
+    def add_to_side(self, o: Order):
         assert o.order_id
-        if side == Side.YES:
+        if o.side == Side.YES:
             if self.yes is None:
                 self.yes = OrdersOnSide(
                     price=o.price, quantity=o.quantity, order_ids=[o.order_id]
@@ -110,7 +110,9 @@ class GeneralMarketMaker:
 
     def handle_order_fill_msg(self, msg: OrderFillRM):
         self.adjust_fill_quantities(msg)
-        self.place_top_book_orders(self._obs[msg.market_ticker], sides=[msg.side])
+        self.place_top_book_orders(
+            self._obs[msg.market_ticker], sides=[msg.side.get_other_side()]
+        )
 
     def handle_ob_update(self, ob: Orderbook):
         # We have top book orders
@@ -132,7 +134,9 @@ class GeneralMarketMaker:
         # Price we're going to place on other side
         other_side_price: Price | None = None
         for side in sides:
-            price_to_place = self.get_price_to_place(side, top_book, other_side_price)
+            price_to_place = self.get_price_to_place(
+                ob.market_ticker, side, top_book, other_side_price
+            )
             if price_to_place is None:
                 continue
             quantity_to_place = self.get_quantity_to_place(ob.market_ticker, side)
@@ -148,7 +152,6 @@ class GeneralMarketMaker:
                 is_taker=False,
                 expiration_ts=None,
             )
-            self._resting_top_book_orders[ob.market_ticker].add_to_side(side, o)
             orders_to_place.append(o)
 
         if orders_to_place:
@@ -161,6 +164,7 @@ class GeneralMarketMaker:
             for i, order in enumerate(orders_to_place):
                 order.status = OrderStatus.RESTING
                 order.order_id = order_ids_final[i]
+                self._resting_top_book_orders[ob.market_ticker].add_to_side(order)
 
     def get_quantity_to_place(
         self, ticker: MarketTicker, side: Side
@@ -180,9 +184,18 @@ class GeneralMarketMaker:
         return Quantity(num_contracts)
 
     def get_price_to_place(
-        self, side: Side, top_book: TopBook, our_price_on_other_side: Price | None
+        self,
+        ticker: MarketTicker,
+        side: Side,
+        top_book: TopBook,
+        our_price_on_other_side: Price | None,
     ) -> Price | None:
         """Returns if we should penny or join BBO"""
+        # If we already have top book orders, join on the same level
+        if ticker in self._resting_top_book_orders:
+            resting_orders = self._resting_top_book_orders[ticker].get_side(side)
+            if resting_orders:
+                return resting_orders.price
         side_top_book = top_book.get_side(side)
         if side_top_book is None:
             return None
@@ -294,7 +307,7 @@ class GeneralMarketMaker:
         if order_ids_to_canel:
             self.e.batch_cancel_orders(order_ids_to_canel)
 
-            for side in Side:
+            for side in sides:
                 self._resting_top_book_orders[ticker].clear_side(side)
 
     def adjust_fill_quantities(self, msg: OrderFillRM):
