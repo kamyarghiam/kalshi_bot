@@ -78,9 +78,13 @@ class RestingTopBookOrders:
         # Although side orders should never be none, it's possible
         # we get filled while we're cancelling
         if side_orders:
-            side_orders.quantity -= quantity
-            if side_orders.quantity == 0:
+            # Another race condition somewhere where we fill more quantity than we have
+            if quantity >= side_orders.quantity:
                 self.clear_side(side)
+            else:
+                side_orders.quantity -= quantity
+                if side_orders.quantity == 0:
+                    self.clear_side(side)
 
 
 class GeneralMarketMaker:
@@ -90,6 +94,8 @@ class GeneralMarketMaker:
 
     # How many contracts should we hold on each side (before fills)
     base_num_contracts: Quantity = Quantity(10)
+    # How many levels in front of BBO should we join? (0 joins BBO)
+    penny_amount: int = 0
 
     def __init__(self, e: ExchangeInterface):
         self.e = e
@@ -296,7 +302,7 @@ class GeneralMarketMaker:
         # Dont place orders on the edges
         if side_top_book.price < Price(10) or side_top_book.price > Price(90):
             return None
-        price_to_place = Price(side_top_book.price + Price(1))
+        price_to_place = Price(side_top_book.price + self.penny_amount)
         # Dont cross the spread
         # We have to use the top book with us so we dont self cross
         top_book_with_us = (
@@ -348,7 +354,6 @@ class GeneralMarketMaker:
         Returns the sides that moved"""
         sides_changed: List[Side] = []
         last_top_book = self._last_top_books[ticker]
-        resting_orders = self._resting_top_book_orders[ticker]
         for side in Side:
             # If we have some leftover quantity, let's try to place it
             quantity_to_place = self.get_quantity_to_place(ticker, side)
@@ -356,7 +361,6 @@ class GeneralMarketMaker:
                 sides_changed.append(side)
                 continue
 
-            side_resting_orders = resting_orders.get_side(side)
             level = top_book_without_us.get_side(side)
             # If prices changed
             last_level = last_top_book.get_side(side)
@@ -364,12 +368,7 @@ class GeneralMarketMaker:
             if level and last_level:
                 # If the price moved
                 if level.price != last_level.price:
-                    # If the price moved in front of us or several levels behind
-                    if (not side_resting_orders) or (
-                        level.price > side_resting_orders.price
-                        or level.price < side_resting_orders.price - Price(1)
-                    ):
-                        sides_changed.append(side)
+                    sides_changed.append(side)
             else:
                 # If only one of the is None, then a side has changed
                 if not (level is None and last_level is None):
@@ -406,7 +405,7 @@ class GeneralMarketMaker:
                     # Can only cancel 20 at a time
                     if len(order_ids_to_cancel) >= 17:
                         # Take a breath
-                        sleep(0.3)
+                        sleep(0.4)
                         self.e.batch_cancel_orders(order_ids_to_cancel)
                         order_ids_to_cancel = []
         if order_ids_to_cancel:
