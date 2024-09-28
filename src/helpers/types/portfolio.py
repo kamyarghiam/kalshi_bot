@@ -27,6 +27,7 @@ from helpers.types.orders import (
     Quantity,
     QuantityDelta,
     Side,
+    TradeId,
     TradeType,
 )
 from helpers.types.websockets.response import OrderFillRM
@@ -750,3 +751,28 @@ class ApiMarketPosition(ExternalApi):
 
 class GetMarketPositionsResponse(ExternalApiWithCursor):
     market_positions: List[ApiMarketPosition]
+
+
+class GetFillsRequest(ExternalApiWithCursor):
+    ticker: MarketTicker | None = None
+    order_id: OrderId | None = None
+    min_ts: datetime | None = None
+    max_ts: datetime | None = None
+    limit: int | None = None
+
+
+class OrderFill(ExternalApi):
+    action: TradeType
+    count: Quantity
+    created_time: datetime
+    is_taker: bool
+    no_price: Price
+    order_id: OrderId
+    side: Side
+    ticker: MarketTicker
+    trade_id: TradeId
+    yes_price: Price
+
+
+class GetFillsResponse(ExternalApiWithCursor):
+    fills: List[OrderFill]

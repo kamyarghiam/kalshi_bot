@@ -10,6 +10,7 @@ from exchange.connection import Connection, Websocket
 from helpers.constants import (
     BATCHED,
     EXCHANGE_STATUS_URL,
+    FILLS_URL,
     MARKETS_URL,
     ORDERBOOK_URL,
     ORDERS_URL,
@@ -51,9 +52,12 @@ from helpers.types.orders import (
 )
 from helpers.types.portfolio import (
     ApiMarketPosition,
+    GetFillsRequest,
+    GetFillsResponse,
     GetMarketPositionsRequest,
     GetMarketPositionsResponse,
     GetPortfolioBalanceResponse,
+    OrderFill,
 )
 from helpers.types.trades import GetTradesRequest, GetTradesResponse, Trade
 
@@ -268,7 +272,18 @@ class ExchangeInterface(BaseExchangeInterface):
             sleep(0.3)
             self.batch_cancel_orders(batch)
 
+    def get_fills(self, req: GetFillsRequest) -> List[OrderFill]:
+        responses = list(self._paginate_requests(self._get_fills, req))
+        return sum([resp.fills for resp in responses], [])
+
     ######## Helpers ############
+
+    def _get_fills(self, request: GetFillsRequest) -> GetFillsResponse:
+        return GetFillsResponse.model_validate(
+            self._connection.get(
+                url=FILLS_URL, params=request.model_dump(exclude_none=True)
+            )
+        )
 
     def _get_market_history(
         self, ticker: MarketTicker, request: GetMarketHistoryRequest
