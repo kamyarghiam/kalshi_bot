@@ -128,7 +128,7 @@ class Order:
     order_type: OrderType = field(default_factory=lambda: OrderType.LIMIT)
     # Use this field to specify IOC, if time is in the past
     # If it's None, then it's Good 'til Canceled
-    expiration_ts: int | None = int(time.time())
+    expiration_ts: int | None = field(default_factory=lambda: int(time.time()))
     client_order_id: ClientOrderId = field(
         default_factory=lambda: ClientOrderId(str(uuid1())), compare=False
     )
