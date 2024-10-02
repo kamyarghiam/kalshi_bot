@@ -756,8 +756,8 @@ class GetMarketPositionsResponse(ExternalApiWithCursor):
 class GetFillsRequest(ExternalApiWithCursor):
     ticker: MarketTicker | None = None
     order_id: OrderId | None = None
-    min_ts: datetime | None = None
-    max_ts: datetime | None = None
+    min_ts: int | None = None
+    max_ts: int | None = None
     limit: int | None = None
 
 
