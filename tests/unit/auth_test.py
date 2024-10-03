@@ -23,6 +23,8 @@ from helpers.types.common import URL
         "KALSHI_API_VERSION": "VERSION",
         "KALSHI_TRADING_ENV": "test",
         "DATABENTO_API_KEY": "test-key",
+        "KALSHI_API_KEY_ID": "some_key",
+        "KALSHI_PATH_TO_RSA_PRIVATE_KEY": "some_path",
     },
 )
 def test_succesful_auth():
@@ -125,6 +127,8 @@ def test_missing_creds():
         "KALSHI_API_VERSION": "VERSION",
         "KALSHI_TRADING_ENV": "demo",
         "DATABENTO_API_KEY": "test-key",
+        "KALSHI_API_KEY_ID": "some_key",
+        "KALSHI_PATH_TO_RSA_PRIVATE_KEY": "some_path",
     },
 )
 def test_valid_auth():

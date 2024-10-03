@@ -49,6 +49,8 @@ def env_vars(request):
         "KALSHI_API_PASSWORD": "some-password",
         "KALSHI_TRADING_ENV": "test",
         "DATABENTO_API_KEY": "test_databento_key",
+        "KALSHI_API_KEY_ID": "test key",
+        "KALSHI_PATH_TO_RSA_PRIVATE_KEY": "some_path",
     }
     os.environ.update(environ)
     try:

@@ -1,15 +1,19 @@
+import functools
 import os
 import typing
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from pydantic import ConfigDict, Field
 
 from helpers.constants import (
+    API_KEY_ID,
     API_VERSION_ENV_VAR,
     DATABENTO_API_KEY,
     ENV_VARS,
     KALSHI_PROD_BASE_URL,
     PASSWORD_ENV_VAR,
+    PATH_TO_RSA_PRIVATE_KEY,
     TRADING_ENV_ENV_VAR,
     URL_ENV_VAR,
     USERNAME_ENV_VAR,
@@ -41,6 +45,14 @@ class Username(NonNullStr):
 
 class DatabentoAPIKey(NonNullStr):
     """Api key for databento"""
+
+
+class ApiKeyID(NonNullStr):
+    """Api key for Kalshi"""
+
+
+class RsaPrivateKey(NonNullStr):
+    """RSA Private Key"""
 
 
 class LogInResponse(ExternalApi):  # type:ignore[call-arg]
@@ -87,6 +99,10 @@ class Auth:
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
         self.env: TradingEnv = TradingEnv(os.environ.get(TRADING_ENV_ENV_VAR))
         self._databento_api_key = DatabentoAPIKey(os.environ.get(DATABENTO_API_KEY))
+        self._api_key_id = ApiKeyID(os.environ.get(API_KEY_ID))
+        self._path_to_rsa_private_key: str | None = os.environ.get(
+            PATH_TO_RSA_PRIVATE_KEY
+        )
 
         if is_test_run and (
             self.env == TradingEnv.PROD or KALSHI_PROD_BASE_URL in self._base_url
@@ -99,6 +115,18 @@ class Auth:
         self._member_id: MemberId | None = None
         self._token: Token | None = None
         self._sign_in_time: datetime | None = None
+
+    @property
+    def api_key_id(self) -> ApiKeyID:
+        return self._api_key_id
+
+    @functools.cached_property
+    def rsa_private_key(self) -> RsaPrivateKey:
+        if self._path_to_rsa_private_key is None:
+            raise ValueError(
+                "Path to rsa prviate key is null. Did you set it in the env vars?"
+            )
+        return RsaPrivateKey(Path(self._path_to_rsa_private_key).read_text())
 
     @property
     def member_id(self) -> MemberId:
