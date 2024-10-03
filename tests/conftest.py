@@ -51,6 +51,7 @@ def env_vars(request):
         "DATABENTO_API_KEY": "test_databento_key",
         "KALSHI_API_KEY_ID": "test key",
         "KALSHI_PATH_TO_RSA_PRIVATE_KEY": "some_path",
+        "KALSHI_WALLET": "lx",
     }
     os.environ.update(environ)
     try:

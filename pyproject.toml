@@ -44,6 +44,7 @@ databento = "^0.30.0"
 pydantic = "^2.7.1"
 fastapi = "^0.111.0"
 sortedcontainers = "^2.4.0"
+cryptography = "^43.0.1"
 
 
 [tool.poetry.group.dev.dependencies]

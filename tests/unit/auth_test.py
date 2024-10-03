@@ -25,6 +25,7 @@ from helpers.types.common import URL
         "DATABENTO_API_KEY": "test-key",
         "KALSHI_API_KEY_ID": "some_key",
         "KALSHI_PATH_TO_RSA_PRIVATE_KEY": "some_path",
+        "KALSHI_WALLET": "klear",
     },
 )
 def test_succesful_auth():
@@ -129,6 +130,7 @@ def test_missing_creds():
         "DATABENTO_API_KEY": "test-key",
         "KALSHI_API_KEY_ID": "some_key",
         "KALSHI_PATH_TO_RSA_PRIVATE_KEY": "some_path",
+        "KALSHI_WALLET": "klear",
     },
 )
 def test_valid_auth():

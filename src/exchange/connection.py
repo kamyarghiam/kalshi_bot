@@ -1,5 +1,6 @@
 import ssl
 from contextlib import contextmanager
+from datetime import datetime
 from enum import Enum
 from typing import ContextManager, Dict, List, Tuple, Union
 
@@ -28,6 +29,7 @@ from helpers.types.auth import (
     LogOutResponse,
     MemberId,
     Token,
+    Wallet,
 )
 from helpers.types.common import URL
 from helpers.types.websockets.common import (
@@ -312,14 +314,31 @@ class Connection:
             "accept": "application/json",
             "content-type": "application/json",
         }
+        path = self._api_version.add(url)
         if check_auth:
-            self._check_auth()
-            headers["Authorization"] = self._auth.get_authorization_header()
+            if self._auth.wallet == Wallet.LX:
+                # We use the old method of signing in
+                self._check_auth()
+                headers["Authorization"] = self._auth.get_authorization_header()
+            else:
+                # Recommended way to get ts from kalshi
+                current_time = datetime.now()
+                timestamp = current_time.timestamp()
+                current_time_milliseconds = int(timestamp * 1000)
+                timestampt_str = str(current_time_milliseconds)
+
+                rsa_msg = timestampt_str + method.value + path.add_slash()
+                sig = self._auth.sign_pss_text(rsa_msg)
+
+                headers["KALSHI-ACCESS-KEY"] = self._auth.api_key_id
+                headers["KALSHI-ACCESS-SIGNATURE"] = sig
+                headers["KALSHI-ACCESS-TIMESTAMP"] = timestampt_str
+
         self._rate_limiter.check_limits()
         resp: requests.Response = (
             self._connection_adapter.request(  # type:ignore[assignment]
                 method=method.value,
-                url=self._api_version.add(url),
+                url=path,
                 params=params,
                 json=None if body is None else body.model_dump(exclude_none=True),
                 headers=headers,
