@@ -37,12 +37,10 @@ from helpers.types.auth import (
 from helpers.types.common import URL
 from helpers.types.exchange import ExchangeStatusResponse
 from helpers.types.markets import (
-    GetMarketHistoryResponse,
     GetMarketResponse,
     GetMarketsResponse,
     GetSeriesApiResponse,
     Market,
-    MarketHistory,
     MarketResult,
     MarketStatus,
     MarketTicker,
@@ -286,38 +284,6 @@ def kalshi_test_exchange_factory():
         return GetOrderbookResponse(
             orderbook=ApiOrderbook(yes=yes, no=no),
         )
-
-    @router.get(MARKETS_URL + "/{ticker}/history")
-    def get_market_history(ticker: MarketTicker, cursor: Cursor | None = None):
-        history: List[MarketHistory] = [
-            random_data(
-                MarketHistory,
-                custom_args={
-                    Price: lambda: Price(random.randint(1, 99)),
-                },
-            )
-            for _ in range(4)
-        ]
-
-        # We hardcode that there are 3 pages
-        if cursor is None:
-            return GetMarketHistoryResponse(
-                cursor=Cursor("1"),
-                history=history,
-                ticker=ticker,
-            )
-        elif cursor == Cursor("1"):
-            return GetMarketHistoryResponse(
-                cursor=Cursor("2"),
-                history=history,
-                ticker=ticker,
-            )
-        elif cursor == Cursor("2"):
-            return GetMarketHistoryResponse(
-                cursor=Cursor(""),
-                history=history,
-                ticker=ticker,
-            )
 
     @router.post(ORDERS_URL)
     def create_order(order: CreateOrderRequest):

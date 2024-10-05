@@ -1,5 +1,4 @@
-from datetime import datetime
-from functools import partial
+from datetime import datetime, timedelta
 from time import sleep
 from types import TracebackType
 from typing import Callable, ContextManager, Generator, List, TypeVar
@@ -9,6 +8,7 @@ from fastapi.testclient import TestClient
 from exchange.connection import Connection, Websocket
 from helpers.constants import (
     BATCHED,
+    CANDLE_URL,
     EXCHANGE_STATUS_URL,
     FILLS_URL,
     MARKETS_URL,
@@ -23,18 +23,19 @@ from helpers.types.api import ExternalApiWithCursor
 from helpers.types.common import URL
 from helpers.types.exchange import BaseExchangeInterface, ExchangeStatusResponse
 from helpers.types.markets import (
-    GetMarketHistoryRequest,
-    GetMarketHistoryResponse,
+    CandlestickWrapper,
+    GetCandlestickHistoryResponse,
+    GetMarketCandlestickRequest,
     GetMarketResponse,
     GetMarketsRequest,
     GetMarketsResponse,
     GetSeriesApiResponse,
     Market,
-    MarketHistory,
     MarketStatus,
     MarketTicker,
     Series,
     SeriesTicker,
+    to_series_ticker,
 )
 from helpers.types.orderbook import GetOrderbookRequest, GetOrderbookResponse, Orderbook
 from helpers.types.orders import (
@@ -234,27 +235,35 @@ class ExchangeInterface(BaseExchangeInterface):
         responses = list(self._paginate_requests(self._get_positions, request, pages))
         return sum([response.market_positions for response in responses], [])
 
-    def get_market_history(
+    def get_market_candlesticks(
         self,
         ticker: MarketTicker,
-        min_ts: datetime | None = None,
-        max_ts: datetime | None = None,
-        pages: int | None = None,
-    ) -> List[MarketHistory]:
-        min_ts_int: int | None = None
-        max_ts_int: int | None = None
-        if min_ts is not None:
-            min_ts_int = int(min_ts.timestamp())
-        if max_ts is not None:
-            max_ts_int = int(max_ts.timestamp())
+        min_ts: datetime,
+        max_ts: datetime,
+        period_interval: timedelta = timedelta(minutes=1),
+    ) -> List[CandlestickWrapper]:
+        min_ts_int = int(min_ts.timestamp())
+        max_ts_int = int(max_ts.timestamp())
+        # Must be in minutes
+        period_interval_int = period_interval.total_seconds() // 60
+        # Requirements from api
+        assert period_interval_int in (1, 60, 1440)
+        assert max_ts - min_ts < 5000 * period_interval
 
-        request = GetMarketHistoryRequest(min_ts=min_ts_int, max_ts=max_ts_int)
-        responses = list(
-            self._paginate_requests(
-                partial(self._get_market_history, ticker), request, pages
+        request = GetMarketCandlestickRequest(
+            start_ts=min_ts_int,
+            end_ts=max_ts_int,
+        )
+        resp = GetCandlestickHistoryResponse.model_validate(
+            self._connection.get(
+                url=SERIES_URL.add(to_series_ticker(ticker))
+                .add(MARKETS_URL)
+                .add(ticker)
+                .add(CANDLE_URL),
+                params=request.model_dump(exclude_none=True),
             )
         )
-        return sum([response.history for response in responses], [])
+        return resp.candlesticks
 
     def get_series(self, s: SeriesTicker) -> Series:
         return GetSeriesApiResponse.model_validate(
@@ -282,16 +291,6 @@ class ExchangeInterface(BaseExchangeInterface):
         return GetFillsResponse.model_validate(
             self._connection.get(
                 url=FILLS_URL, params=request.model_dump(exclude_none=True)
-            )
-        )
-
-    def _get_market_history(
-        self, ticker: MarketTicker, request: GetMarketHistoryRequest
-    ) -> GetMarketHistoryResponse:
-        return GetMarketHistoryResponse.model_validate(
-            self._connection.get(
-                url=MARKETS_URL.add(ticker).add("history"),
-                params=request.model_dump(exclude_none=True),
             )
         )
 

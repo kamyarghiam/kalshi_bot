@@ -112,26 +112,33 @@ class GetMarketResponse(ExternalApi):
     market: Market
 
 
-class GetMarketHistoryRequest(ExternalApiWithCursor):
-    min_ts: int | None = None
-    max_ts: int | None = None
+class GetMarketCandlestickRequest(ExternalApi):
+    start_ts: int
+    end_ts: int
+    # Specifies the length of each candlestick period, in minutes.
+    # Must be one minute, one hour, or one day.
+    # Defaults to 1 minute
+    period_interval: int = 1
 
 
-class MarketHistory(ExternalApi):
-    # These prices could be 0 or 100
-    no_ask: Price | int
-    no_bid: Price | int
+class CandleStick(ExternalApi):
+    close: int | None = None
+    high: int | None = None
+    low: int | None = None
+    open: int | None = None
+
+
+class CandlestickWrapper(ExternalApi):
+    end_period_ts: int
     open_interest: int
-    ts: int
+    price: CandleStick
     volume: int
-    yes_ask: Price | int
-    yes_bid: Price | int
-    yes_price: Price | int
+    yes_ask: CandleStick
+    yes_bid: CandleStick
 
 
-class GetMarketHistoryResponse(ExternalApiWithCursor):
-    history: List[MarketHistory]
-    ticker: MarketTicker
+class GetCandlestickHistoryResponse(ExternalApi):
+    candlesticks: List[CandlestickWrapper]
 
 
 class Series(ExternalApi):
