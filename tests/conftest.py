@@ -43,7 +43,7 @@ def env_vars(request):
         return
     old_environ = dict(os.environ)
     environ = {
-        "KALSHI_API_URL": "https://demo-api.kalshi.co/trade-api",
+        "KALSHI_API_URL": "https://demo-api.kalshi.co",
         "KALSHI_API_VERSION": "v2",
         "KALSHI_API_USERNAME": "your-email@email.com",
         "KALSHI_API_PASSWORD": "some-password",

@@ -20,6 +20,7 @@ ORDERS_URL = URL("/portfolio/orders")
 PORTFOLIO_BALANCE_URL = URL("/portfolio/balance")
 POSITION_URL = URL("/portfolio/positions")
 BATCHED = URL("/batched")
+TRADE_API_POST_FIX = URL("/trade-api")
 
 # ENV VARS
 USERNAME_ENV_VAR = "KALSHI_API_USERNAME"

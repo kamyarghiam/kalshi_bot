@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from exchange.interface import ExchangeInterface
@@ -20,14 +21,13 @@ def run(tickers: List[MarketTicker], e: ExchangeInterface, strat: GeneralMarketM
 
 def main():
     with ExchangeInterface(is_test_run=False) as e:
-        # now = datetime.now(timezone.utc)
-        # diff = timedelta(hours=15)
-        # tickers = [
-        #     m.ticker for m in e.get_active_markets() if m.close_time - now < diff
-        # ]
+        now = datetime.now(timezone.utc)
+        diff = timedelta(hours=15)
+        tickers = {
+            m.ticker for m in e.get_active_markets() if m.close_time - now < diff
+        }
 
         strat = GeneralMarketMaker(e)
-        tickers = {m.ticker for m in e.get_active_markets()}
         positions = e.get_positions()
         # Keep track of markets where we have a position
         for position in positions:

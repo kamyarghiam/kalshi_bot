@@ -18,7 +18,7 @@ from tenacity import (
 from websockets.sync.client import ClientConnection as ExternalWebsocket
 from websockets.sync.client import connect as external_websocket_connect
 
-from helpers.constants import LOGIN_URL, LOGOUT_URL
+from helpers.constants import LOGIN_URL, LOGOUT_URL, TRADE_API_POST_FIX
 from helpers.types.api import ExternalApi, RateLimit
 from helpers.types.auth import (
     Auth,
@@ -113,7 +113,9 @@ class Websocket:
             case SessionsWrapper():
                 # Connects to the exchange
                 self._base_url = (
-                    connection_adapter.base_url.remove_protocol().add_protocol("wss")
+                    connection_adapter.base_url.remove_protocol()
+                    .add_protocol("wss")
+                    .add(TRADE_API_POST_FIX)
                 )
             case TestClient():
                 # Connects to a local exchange
@@ -312,7 +314,7 @@ class Connection:
             "accept": "application/json",
             "content-type": "application/json",
         }
-        path = self._api_version.add(url)
+        path = (URL(TRADE_API_POST_FIX).add(self._api_version).add(url)).add_slash()
         if check_auth:
             self._check_auth()
             headers["Authorization"] = self._auth.get_authorization_header()
@@ -373,6 +375,7 @@ class Connection:
         self._check_auth()
         websocket = Websocket(self._connection_adapter, self._rate_limiter)
         websocket_url = URL("ws").add(self._api_version)
+
         return websocket.connect(
             websocket_url=websocket_url,
             member_id=self._auth.member_id,

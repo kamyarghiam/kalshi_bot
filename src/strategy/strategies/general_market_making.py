@@ -93,7 +93,7 @@ class GeneralMarketMaker:
     Pennys top book or joins bbo"""
 
     # How many contracts should we hold on each side (before fills)
-    base_num_contracts: Quantity = Quantity(10)
+    base_num_contracts: Quantity = Quantity(20)
     # How many levels in front of BBO should we join? (0 joins BBO)
     penny_amount: int = 0
 

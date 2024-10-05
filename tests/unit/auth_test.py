@@ -165,7 +165,7 @@ def test_valid_auth():
     {
         "KALSHI_API_USERNAME": "NAME",
         "KALSHI_API_PASSWORD": "PASS",
-        "KALSHI_API_URL": "https://trading-api.kalshi.com/trade-api/v2/events",
+        "KALSHI_API_URL": "https://trading-api.kalshi.com",
         "KALSHI_API_VERSION": "VERSION",
         "KALSHI_TRADING_ENV": "test",
         "DATABENTO_API_KEY": "test-key",
