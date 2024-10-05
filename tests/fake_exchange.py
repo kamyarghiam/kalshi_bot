@@ -22,7 +22,6 @@ from helpers.constants import (
     PORTFOLIO_BALANCE_URL,
     POSITION_URL,
     SERIES_URL,
-    TRADE_API_POST_FIX,
     TRADES_URL,
 )
 from helpers.types.api import Cursor
@@ -125,8 +124,8 @@ def kalshi_test_exchange_factory():
     for testing purposes and mimic the real exchange."""
 
     app = FastAPI()
-    api_version = URL(os.environ.get(API_VERSION_ENV_VAR))
-    router = APIRouter(prefix=(TRADE_API_POST_FIX.add(api_version)).add_slash())
+    api_version = URL(os.environ.get(API_VERSION_ENV_VAR)).add_slash()
+    router = APIRouter(prefix=api_version)
     storage = FakeExchangeStorage()
 
     @router.post(LOGIN_URL)
