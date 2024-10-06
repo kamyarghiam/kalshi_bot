@@ -202,13 +202,17 @@ class GeneralMarketMaker:
         self.setup_logging(msg.market_ticker)
         self.handle_ob_update(self._obs[msg.market_ticker])
         self.loggers[msg.market_ticker].info(self._obs[msg.market_ticker])
-        self.loggers[msg.market_ticker].info(self._resting_top_book_orders)
+        self.loggers[msg.market_ticker].info(
+            self._resting_top_book_orders[msg.market_ticker]
+        )
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         self.handle_ob_update(self._obs[msg.market_ticker])
         self.loggers[msg.market_ticker].info(self._obs[msg.market_ticker])
-        self.loggers[msg.market_ticker].info(self._resting_top_book_orders)
+        self.loggers[msg.market_ticker].info(
+            self._resting_top_book_orders[msg.market_ticker]
+        )
 
     def handle_trade_msg(self, msg: TradeRM):
         return
