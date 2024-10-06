@@ -326,25 +326,47 @@ class GeneralMarketMaker:
         if num_contracts <= 0:
             return None
 
+        need_to_sell = positions_holding < 0
+
         # Check to make sure there's enough quantity at this level
+        if not self.ob_meets_liquidity_requirements(
+            ticker, side, book_without_us, price_to_place
+        ):
+            if need_to_sell:
+                # If we need to sell some contracts,
+                # just lower num_contracts to what we need to sell
+                num_contracts = abs(positions_holding)
+                self.loggers[ticker].info("We need to sell %s contracts", num_contracts)
+            else:
+                # Otherwise, we just dont buy
+                return None
+
+        return Quantity(num_contracts)
+
+    def ob_meets_liquidity_requirements(
+        self,
+        ticker: MarketTicker,
+        side: Side,
+        book_without_us: Orderbook | None,
+        price_to_place: Price | None,
+    ):
+        """Checks if this orderbook has enough quantity and levels"""
         if book_without_us is not None and price_to_place is not None:
             self.loggers[ticker].info(
-                "Trying to place %s contracts at price %s",
-                num_contracts,
+                "Trying to place order at price %s",
                 price_to_place,
             )
             side_book = book_without_us.get_side(side)
             if len(side_book.levels) < self.min_num_levels_to_join:
                 self.loggers[ticker].info("Not enough levels on book")
-                return None
+                return False
 
             if price_to_place in side_book.levels:
                 qty = side_book.levels[price_to_place]
                 if qty < self.min_qty_to_join:
                     self.loggers[ticker].info("Not enough qty at level")
-                    return None
-
-        return Quantity(num_contracts)
+                    return False
+        return True
 
     def get_price_to_place(
         self,
