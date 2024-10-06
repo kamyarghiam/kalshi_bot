@@ -1,4 +1,6 @@
 import copy
+import logging
+import os
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -98,6 +100,7 @@ class GeneralMarketMaker:
     penny_amount: int = 0
 
     def __init__(self, e: ExchangeInterface):
+        self.loggers: Dict[MarketTicker, logging.Logger] = dict()
         self.e = e
         self._obs: Dict[MarketTicker, Orderbook] = dict()
         # Maps to the yes BBO
@@ -143,7 +146,7 @@ class GeneralMarketMaker:
         return False
 
     def ban_ticker(self, ticker: MarketTicker):
-        print(f"Banning ticker: {ticker}")
+        self.loggers[ticker].info("Banning ticker!")
         del self._actions_ts[ticker]
         self.cancel_resting_orders(ticker, [side for side in Side])
         self._banned_markets.add(ticker)
@@ -172,13 +175,34 @@ class GeneralMarketMaker:
         later to ban the ticker if need be"""
         self._actions_ts[ticker].append(datetime.now())
 
+    def setup_logging(self, ticker: MarketTicker):
+        if ticker not in self.loggers:
+            self.loggers[ticker] = logging.getLogger(ticker)
+            self.loggers[ticker].setLevel(logging.DEBUG)
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            log_dir = f"logs/{current_date}"
+            os.makedirs(log_dir, exist_ok=True)
+            log_file = os.path.join(log_dir, ticker)
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            file_handler.setFormatter(formatter)
+            self.loggers[ticker].addHandler(file_handler)
+
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
         self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
+        self.setup_logging(msg.market_ticker)
         self.handle_ob_update(self._obs[msg.market_ticker])
+        self.loggers[msg.market_ticker].info(self._obs[msg.market_ticker])
+        self.loggers[msg.market_ticker].info(self._resting_top_book_orders)
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
         self.handle_ob_update(self._obs[msg.market_ticker])
+        self.loggers[msg.market_ticker].info(self._obs[msg.market_ticker])
+        self.loggers[msg.market_ticker].info(self._resting_top_book_orders)
 
     def handle_trade_msg(self, msg: TradeRM):
         return
@@ -243,7 +267,7 @@ class GeneralMarketMaker:
             orders_to_place.append(o)
 
         if orders_to_place:
-            print("Placing orders: ", orders_to_place)
+            self.loggers[ticker].info("Placing orders: %s", orders_to_place)
             order_ids_final: List[OrderId] = []
             # If we're doing too much with this ticker, ban it
             if self.should_ban(ticker):
@@ -377,7 +401,9 @@ class GeneralMarketMaker:
         self._last_top_books[ticker] = top_book_without_us
 
         if sides_changed:
-            print(f"Top book changed for {ticker}: {top_book_without_us}")
+            self.loggers[ticker].info(
+                "Top book changed for %s: %s", ticker, top_book_without_us
+            )
         return sides_changed
 
     def move_orders_with_top_book(
@@ -415,7 +441,7 @@ class GeneralMarketMaker:
                 print(f"Error canceling orders, but continuing: {str(e)}")
 
     def cancel_resting_orders(self, ticker: MarketTicker, sides: List[Side]):
-        print(f"Cancelling resting orders on {ticker} for sides {str(sides)}")
+        self.loggers[ticker].info("Cancelling resting orders for sides %s", str(sides))
         order_ids_to_canel: List[OrderId] = []
         resting_orders = self._resting_top_book_orders[ticker]
         for side in sides:
@@ -434,7 +460,7 @@ class GeneralMarketMaker:
 
     def adjust_fill_quantities(self, msg: OrderFillRM):
         """Marks that orders were filled on a certain side"""
-        print(f"Recieved fill: {msg}")
+        self.loggers[msg.market_ticker].info("Recieved fill: %s", msg)
         multiplier = 1 if msg.side == Side.YES else -1
         self._holding_position_delta[msg.market_ticker] = QuantityDelta(
             self._holding_position_delta[msg.market_ticker] + multiplier * msg.count

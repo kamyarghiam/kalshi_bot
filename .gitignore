@@ -6,3 +6,4 @@
 # Don't want to store actual data in github
 /local/*
 /scripts/*
+/logs/*
