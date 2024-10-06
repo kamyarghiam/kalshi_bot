@@ -100,6 +100,10 @@ class GeneralMarketMaker:
     base_num_contracts: Quantity = Quantity(20)
     # How many levels in front of BBO should we join? (0 joins BBO)
     penny_amount: int = 0
+    # How much qty should be on the level already for us to join, if joining bbo
+    min_qty_to_join: Quantity = Quantity(50)
+    # How many levels should be on the book for us to add an order
+    min_num_levels_to_join: int = 3
 
     def __init__(self, e: ExchangeInterface):
         self.loggers: Dict[MarketTicker, logging.Logger] = dict()
@@ -233,16 +237,16 @@ class GeneralMarketMaker:
             return
         if self.ignore_if_state_not_matching(ob):
             return
-        top_book_without_us = self.get_top_book_without_us(ob)
-        if sides := self.should_place_orders(top_book_without_us, ob.market_ticker):
-            self.move_orders_with_top_book(top_book_without_us, ob.market_ticker, sides)
+        book_without_us = self.get_book_without_us(ob)
+        if sides := self.should_place_orders(book_without_us, ob.market_ticker):
+            self.move_orders_with_top_book(book_without_us, ob.market_ticker, sides)
             return
 
     def place_top_book_orders(
-        self, top_book_without_us: TopBook, ticker: MarketTicker, sides: List[Side]
+        self, book_without_us: Orderbook, ticker: MarketTicker, sides: List[Side]
     ):
         """Places orders at the top of the book for the sides requested"""
-
+        top_book_without_us = book_without_us.get_top_book()
         # Penny order or join bbo
         orders_to_place: List[Order] = []
         # Price we're going to place on other side
@@ -253,7 +257,9 @@ class GeneralMarketMaker:
             )
             if price_to_place is None:
                 continue
-            quantity_to_place = self.get_quantity_to_place(ticker, side)
+            quantity_to_place = self.get_quantity_to_place(
+                ticker, side, book_without_us, price_to_place
+            )
             if quantity_to_place is None:
                 continue
             other_side_price = price_to_place
@@ -287,8 +293,14 @@ class GeneralMarketMaker:
                 self._resting_top_book_orders[ticker].add_to_side(order)
 
     def get_quantity_to_place(
-        self, ticker: MarketTicker, side: Side
+        self,
+        ticker: MarketTicker,
+        side: Side,
+        book_without_us: Orderbook | None = None,
+        price_to_place: Price | None = None,
     ) -> Quantity | None:
+        """If book_without_us is not None, we will check if there's enough interest
+        in this side of the book to place the order"""
         multiplier = 1 if side == Side.YES else -1
         positions_holding = multiplier * self._holding_position_delta[ticker]
         if positions_holding >= self.base_num_contracts:
@@ -309,6 +321,25 @@ class GeneralMarketMaker:
             num_contracts -= resting_orders.quantity
         if num_contracts <= 0:
             return None
+
+        # Check to make sure there's enough quantity at this level
+        if book_without_us is not None and price_to_place is not None:
+            self.loggers[ticker].info(
+                "Trying to place %s contracts at price %s",
+                num_contracts,
+                price_to_place,
+            )
+            side_book = book_without_us.get_side(side)
+            if len(side_book.levels) < self.min_num_levels_to_join:
+                self.loggers[ticker].info("Not enough levels on book")
+                return None
+
+            if price_to_place in side_book.levels:
+                qty = side_book.levels[price_to_place]
+                if qty < self.min_qty_to_join:
+                    self.loggers[ticker].info("Not enough qty at level")
+                    return None
+
         return Quantity(num_contracts)
 
     def get_price_to_place(
@@ -357,7 +388,7 @@ class GeneralMarketMaker:
             return x
         return y
 
-    def get_top_book_without_us(self, ob: Orderbook) -> TopBook:
+    def get_book_without_us(self, ob: Orderbook) -> Orderbook:
         # TODO: make more efficient
         ob_copy = copy.deepcopy(ob)
         resting_orders = self._resting_top_book_orders[ob.market_ticker]
@@ -371,14 +402,15 @@ class GeneralMarketMaker:
                 resting_orders.no.price,
                 QuantityDelta(-1 * resting_orders.no.quantity),
             )
-        return ob_copy.get_top_book()
+        return ob_copy
 
     def should_place_orders(
-        self, top_book_without_us: TopBook, ticker: MarketTicker
+        self, book_without_us: Orderbook, ticker: MarketTicker
     ) -> List[Side]:
         """Checks if the top of the orderbook moved from the
         last time we saw it. Does not consider our orders.
         Returns the sides that moved"""
+        top_book_without_us = book_without_us.get_top_book()
         sides_changed: List[Side] = []
         last_top_book = self._last_top_books[ticker]
         for side in Side:
@@ -407,16 +439,17 @@ class GeneralMarketMaker:
             self.loggers[ticker].info(
                 "Top book changed for %s: %s", ticker, top_book_without_us
             )
+
         return sides_changed
 
     def move_orders_with_top_book(
-        self, top_book_without_us: TopBook, ticker: MarketTicker, sides: List[Side]
+        self, book_without_us: Orderbook, ticker: MarketTicker, sides: List[Side]
     ):
         """Moves the orders to match the new top book"""
         # First cancel the orders
         self.cancel_resting_orders(ticker, sides)
         # Then place resting orders
-        self.place_top_book_orders(top_book_without_us, ticker, sides)
+        self.place_top_book_orders(book_without_us, ticker, sides)
         return
 
     def cancel_all_orders(self) -> None:
