@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import sleep
 from typing import DefaultDict, Dict, List, Set, Tuple
+from uuid import uuid1
 
 import requests
 
@@ -14,6 +15,7 @@ from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
 from helpers.types.orderbook import Orderbook, TopBook
 from helpers.types.orders import (
+    ClientOrderId,
     Order,
     OrderId,
     OrderStatus,
@@ -263,6 +265,7 @@ class GeneralMarketMaker:
                 side=side,
                 is_taker=False,
                 expiration_ts=None,
+                client_order_id=ClientOrderId("mm-" + str(uuid1())),
             )
             orders_to_place.append(o)
 
