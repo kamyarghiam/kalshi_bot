@@ -29,12 +29,14 @@ class OrderbookSide:
 
     # Cached values
     _cached_min: Tuple[Price, Quantity] | None = field(
-        default_factory=lambda: None, compare=False
+        default_factory=lambda: None, compare=False, repr=False
     )
     _cached_max: Tuple[Price, Quantity] | None = field(
-        default_factory=lambda: None, compare=False
+        default_factory=lambda: None, compare=False, repr=False
     )
-    _cached_sum: Quantity = field(default_factory=lambda: Quantity(0), compare=False)
+    _cached_sum: Quantity = field(
+        default_factory=lambda: Quantity(0), compare=False, repr=False
+    )
 
     def _reset_cache(self):
         self._cached_min = None
