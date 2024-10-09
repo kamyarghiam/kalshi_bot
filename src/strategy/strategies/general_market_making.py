@@ -12,7 +12,7 @@ import requests
 
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
-from helpers.types.money import Price
+from helpers.types.money import Price, get_opposite_side_price
 from helpers.types.orderbook import Orderbook, TopBook
 from helpers.types.orders import (
     ClientOrderId,
@@ -261,6 +261,7 @@ class GeneralMarketMaker:
                 top_book_without_us,
                 other_side_price,
                 penny_amount=penny_amount,
+                need_to_sell=need_to_sell,
             )
             logger.info("Price to place: %s", price_to_place)
             if price_to_place is None:
@@ -381,17 +382,15 @@ class GeneralMarketMaker:
         top_book_without_us: TopBook,
         our_price_on_other_side: Price | None,
         penny_amount: int = 0,  # Default join bbo
+        need_to_sell: bool = False,
     ) -> Price | None:
         """Returns if we should penny or join BBO"""
-        side_top_book = top_book_without_us.get_side(side)
-        if side_top_book is None:
-            return None
-        # Dont place orders on the edges
-        if side_top_book.price < Price(10) or side_top_book.price > Price(90):
-            return None
-        price_to_place = Price(side_top_book.price + penny_amount)
-        # Dont cross the spread
+
         # We have to use the top book with us so we dont self cross
+        # This is used for the cross check later
+        # Also used for the case where we need to compute top book when the
+        # other side is empty. I should revisit if it's necessary to use
+        # top book with or without us in this case
         top_book_with_us = (
             self._obs[ticker].get_top_book().get_side(side.get_other_side())
         )
@@ -402,6 +401,28 @@ class GeneralMarketMaker:
         other_side_topbook_price = self.get_max_of_two_nones(
             our_price_on_other_side, other_side_topbook_price
         )
+
+        side_top_book = top_book_without_us.get_side(side)
+        if side_top_book is None:
+            if need_to_sell:
+                if other_side_topbook_price:
+                    return max(
+                        Price(
+                            get_opposite_side_price(Price(other_side_topbook_price)) - 1
+                        ),
+                        Price(1),
+                    )
+                else:
+                    return Price(1)
+            return None
+        # Dont place orders on the edges
+        if not need_to_sell and (
+            side_top_book.price < Price(10) or side_top_book.price > Price(90)
+        ):
+            return None
+        price_to_place = Price(side_top_book.price + penny_amount)
+        # Dont cross the spread
+
         if other_side_topbook_price and (
             price_to_place + other_side_topbook_price >= 100
         ):
