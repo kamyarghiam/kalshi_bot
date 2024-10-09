@@ -109,10 +109,6 @@ class GeneralMarketMaker:
         self.loggers: Dict[MarketTicker, logging.Logger] = dict()
         self.e = e
         self._obs: Dict[MarketTicker, Orderbook] = dict()
-        # Maps to the yes BBO
-        self._last_top_books: DefaultDict[MarketTicker, TopBook] = defaultdict(
-            lambda: TopBook(yes=None, no=None)
-        )
         self._resting_top_book_orders: DefaultDict[
             MarketTicker, RestingTopBookOrders
         ] = defaultdict(lambda: RestingTopBookOrders(yes=None, no=None))
@@ -200,19 +196,19 @@ class GeneralMarketMaker:
     def handle_snapshot_msg(self, msg: OrderbookSnapshotRM):
         self._obs[msg.market_ticker] = Orderbook.from_snapshot(msg)
         self.setup_logging(msg.market_ticker)
-        self.handle_ob_update(self._obs[msg.market_ticker])
         self.loggers[msg.market_ticker].info(self._obs[msg.market_ticker])
         self.loggers[msg.market_ticker].info(
             self._resting_top_book_orders[msg.market_ticker]
         )
+        self.handle_ob_update(self._obs[msg.market_ticker])
 
     def handle_delta_msg(self, msg: OrderbookDeltaRM):
         self._obs[msg.market_ticker].apply_delta(msg, in_place=True)
-        self.handle_ob_update(self._obs[msg.market_ticker])
         self.loggers[msg.market_ticker].info(self._obs[msg.market_ticker])
         self.loggers[msg.market_ticker].info(
             self._resting_top_book_orders[msg.market_ticker]
         )
+        self.handle_ob_update(self._obs[msg.market_ticker])
 
     def handle_trade_msg(self, msg: TradeRM):
         return
@@ -237,49 +233,73 @@ class GeneralMarketMaker:
         return False
 
     def handle_ob_update(self, ob: Orderbook):
+        logger = self.loggers[ob.market_ticker]
         if self.is_banned(ob.market_ticker):
+            logger.info("Ignoring this update, ticker banned")
             return
         if self.ignore_if_state_not_matching(ob):
+            logger.info("Ignoring this update, inconsistent state")
             return
         book_without_us = self.get_book_without_us(ob)
-        if sides := self.should_place_orders(book_without_us, ob.market_ticker):
-            self.move_orders_with_top_book(book_without_us, ob.market_ticker, sides)
-            return
-
-    def place_top_book_orders(
-        self, book_without_us: Orderbook, ticker: MarketTicker, sides: List[Side]
-    ):
-        """Places orders at the top of the book for the sides requested"""
         top_book_without_us = book_without_us.get_top_book()
-        # Penny order or join bbo
+        # Get orders to place
         orders_to_place: List[Order] = []
-        # Price we're going to place on other side
-        other_side_price: Price | None = None
-        for side in sides:
-            price_to_place = self.get_price_to_place(
-                ticker, side, top_book_without_us, other_side_price
-            )
-            if price_to_place is None:
-                continue
-            quantity_to_place = self.get_quantity_to_place(
-                ticker, side, book_without_us, price_to_place
-            )
-            if quantity_to_place is None:
-                continue
-            other_side_price = price_to_place
-            o = Order(
-                price=price_to_place,
-                quantity=quantity_to_place,
-                trade=TradeType.BUY,
-                ticker=ticker,
-                side=side,
-                is_taker=False,
-                expiration_ts=None,
-                client_order_id=ClientOrderId("mm-" + str(uuid1())),
-            )
-            orders_to_place.append(o)
+        resting_orders = self._resting_top_book_orders[ob.market_ticker]
 
-        if orders_to_place:
+        other_side_price: Price | None = None
+        for side in Side:
+            price_to_place = self.get_price_to_place(
+                ob.market_ticker, side, top_book_without_us, other_side_price
+            )
+            logger.info("Price to place: %s", price_to_place)
+            if price_to_place is None:
+                self.cancel_resting_orders(ob.market_ticker, [side])
+                continue
+            ob_side = resting_orders.get_side(side)
+            # If we have resting orders on that side, check if we need to cancel
+            if ob_side is not None:
+                if ob_side.price != price_to_place:
+                    # If the price changed, cancel existing orders
+                    self.cancel_resting_orders(ob.market_ticker, [side])
+
+            multiplier = 1 if side == Side.YES else -1
+            positions_holding = Quantity(
+                multiplier * self._holding_position_delta[ob.market_ticker]
+            )
+            need_to_sell = positions_holding < 0
+            meets_liquitiy_requirements = self.ob_meets_liquidity_requirements(
+                ob.market_ticker, side, book_without_us, price_to_place
+            )
+            logger.info(
+                "Meets liquidity requirements: %s. Need to sell: %s",
+                meets_liquitiy_requirements,
+                need_to_sell,
+            )
+            if not meets_liquitiy_requirements and not need_to_sell:
+                self.cancel_resting_orders(ob.market_ticker, [side])
+            else:
+                # If it meets the liqudity requirements or we need to sell, place orders
+                qty_to_place = self.get_quantity_to_place(
+                    ob.market_ticker, side, positions_holding
+                )
+                if qty_to_place is not None:
+                    other_side_price = price_to_place
+                    o = Order(
+                        price=price_to_place,
+                        quantity=qty_to_place,
+                        trade=TradeType.BUY,
+                        ticker=ob.market_ticker,
+                        side=side,
+                        is_taker=False,
+                        expiration_ts=None,
+                        client_order_id=ClientOrderId("mm-" + str(uuid1())),
+                    )
+                    orders_to_place.append(o)
+
+        self.place_orders(orders_to_place, ob.market_ticker)
+
+    def place_orders(self, orders_to_place: List[Order], ticker: MarketTicker):
+        if len(orders_to_place) > 0:
             self.loggers[ticker].info("Placing orders: %s", orders_to_place)
             order_ids_final: List[OrderId] = []
             # If we're doing too much with this ticker, ban it
@@ -300,13 +320,8 @@ class GeneralMarketMaker:
         self,
         ticker: MarketTicker,
         side: Side,
-        book_without_us: Orderbook | None = None,
-        price_to_place: Price | None = None,
+        positions_holding: Quantity,
     ) -> Quantity | None:
-        """If book_without_us is not None, we will check if there's enough interest
-        in this side of the book to place the order"""
-        multiplier = 1 if side == Side.YES else -1
-        positions_holding = multiplier * self._holding_position_delta[ticker]
         if positions_holding >= self.base_num_contracts:
             # We are holding more contracts on this side than we should, so dont buy
             return None
@@ -325,22 +340,6 @@ class GeneralMarketMaker:
             num_contracts -= resting_orders.quantity
         if num_contracts <= 0:
             return None
-
-        need_to_sell = positions_holding < 0
-
-        # Check to make sure there's enough quantity at this level
-        if not self.ob_meets_liquidity_requirements(
-            ticker, side, book_without_us, price_to_place
-        ):
-            if need_to_sell:
-                # If we need to sell some contracts,
-                # just lower num_contracts to what we need to sell
-                num_contracts = abs(positions_holding)
-                self.loggers[ticker].info("We need to sell %s contracts", num_contracts)
-            else:
-                # Otherwise, we just dont buy
-                return None
-
         return Quantity(num_contracts)
 
     def ob_meets_liquidity_requirements(
@@ -376,10 +375,6 @@ class GeneralMarketMaker:
         our_price_on_other_side: Price | None,
     ) -> Price | None:
         """Returns if we should penny or join BBO"""
-        # If we already have top book orders, join on the same level
-        resting_orders = self._resting_top_book_orders[ticker].get_side(side)
-        if resting_orders:
-            return resting_orders.price
         side_top_book = top_book_without_us.get_side(side)
         if side_top_book is None:
             return None
@@ -429,54 +424,6 @@ class GeneralMarketMaker:
                 QuantityDelta(-1 * resting_orders.no.quantity),
             )
         return ob_copy
-
-    def should_place_orders(
-        self, book_without_us: Orderbook, ticker: MarketTicker
-    ) -> List[Side]:
-        """Checks if the top of the orderbook moved from the
-        last time we saw it. Does not consider our orders.
-        Returns the sides that moved"""
-        top_book_without_us = book_without_us.get_top_book()
-        sides_changed: List[Side] = []
-        last_top_book = self._last_top_books[ticker]
-        for side in Side:
-            # If we have some leftover quantity, let's try to place it
-            quantity_to_place = self.get_quantity_to_place(ticker, side)
-            if quantity_to_place is not None:
-                sides_changed.append(side)
-                continue
-
-            level = top_book_without_us.get_side(side)
-            # If prices changed
-            last_level = last_top_book.get_side(side)
-            # If they're both not None and a price has changed, the book as moved
-            if level and last_level:
-                # If the price moved
-                if level.price != last_level.price:
-                    sides_changed.append(side)
-            else:
-                # If only one of the is None, then a side has changed
-                if not (level is None and last_level is None):
-                    sides_changed.append(side)
-
-        self._last_top_books[ticker] = top_book_without_us
-
-        if sides_changed:
-            self.loggers[ticker].info(
-                "Top book changed for %s: %s", ticker, top_book_without_us
-            )
-
-        return sides_changed
-
-    def move_orders_with_top_book(
-        self, book_without_us: Orderbook, ticker: MarketTicker, sides: List[Side]
-    ):
-        """Moves the orders to match the new top book"""
-        # First cancel the orders
-        self.cancel_resting_orders(ticker, sides)
-        # Then place resting orders
-        self.place_top_book_orders(book_without_us, ticker, sides)
-        return
 
     def cancel_all_orders(self) -> None:
         """For external use when the execution is over,
