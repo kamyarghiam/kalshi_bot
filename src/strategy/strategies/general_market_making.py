@@ -264,7 +264,8 @@ class GeneralMarketMaker:
             )
             logger.info("Price to place: %s", price_to_place)
             if price_to_place is None:
-                self.cancel_resting_orders(ob.market_ticker, [side])
+                if not need_to_sell:
+                    self.cancel_resting_orders(ob.market_ticker, [side])
                 continue
             ob_side = resting_orders.get_side(side)
             # If we have resting orders on that side, check if we need to cancel
