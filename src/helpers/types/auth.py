@@ -1,26 +1,17 @@
-import base64
-import functools
 import os
 import typing
 from datetime import datetime, timedelta
 from enum import Enum
 
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from pydantic import ConfigDict, Field
 
 from helpers.constants import (
-    API_KEY_ID,
     API_VERSION_ENV_VAR,
     DATABENTO_API_KEY,
     ENV_VARS,
     KALSHI_PROD_BASE_URL,
     KALSHI_WALLET,
     PASSWORD_ENV_VAR,
-    PATH_TO_RSA_PRIVATE_KEY,
     TRADING_ENV_ENV_VAR,
     URL_ENV_VAR,
     USERNAME_ENV_VAR,
@@ -107,10 +98,6 @@ class Auth:
         self._api_version: URL = URL(os.environ.get(API_VERSION_ENV_VAR))
         self.env: TradingEnv = TradingEnv(os.environ.get(TRADING_ENV_ENV_VAR))
         self._databento_api_key = DatabentoAPIKey(os.environ.get(DATABENTO_API_KEY))
-        self._api_key_id = ApiKeyID(os.environ.get(API_KEY_ID))
-        self._path_to_rsa_private_key: str | None = os.environ.get(
-            PATH_TO_RSA_PRIVATE_KEY
-        )
         self._wallet: str | None = os.environ.get(KALSHI_WALLET)
 
         if is_test_run and (
@@ -130,25 +117,6 @@ class Auth:
         if self._wallet is None:
             raise ValueError("Wallet not found in env vars")
         return Wallet(self._wallet)
-
-    @property
-    def api_key_id(self) -> ApiKeyID:
-        return self._api_key_id
-
-    @functools.cached_property
-    def rsa_private_key(self) -> RSAPrivateKey:
-        if self._path_to_rsa_private_key is None:
-            raise ValueError(
-                "Path to rsa prviate key is null. Did you set it in the env vars?"
-            )
-        with open(self._path_to_rsa_private_key, "rb") as key_file:
-            private_key = serialization.load_pem_private_key(
-                key_file.read(),
-                password=None,
-                backend=default_backend(),
-            )
-        assert isinstance(private_key, RSAPrivateKey)
-        return private_key
 
     @property
     def member_id(self) -> MemberId:
@@ -193,22 +161,3 @@ class Auth:
 
     def get_authorization_header(self) -> str:
         return str(self.member_id) + " " + str(self.token)
-
-    def sign_pss_text(self, text: str) -> str:
-        # Before signing, we need to hash our message.
-        # The hash is what we actually sign.
-        # Convert the text to bytes
-        message = text.encode("utf-8")
-
-        try:
-            signature = self.rsa_private_key.sign(
-                message,
-                padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.DIGEST_LENGTH,
-                ),
-                hashes.SHA256(),
-            )
-            return base64.b64encode(signature).decode("utf-8")
-        except InvalidSignature as e:
-            raise ValueError("RSA sign PSS failed") from e
