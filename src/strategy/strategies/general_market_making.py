@@ -98,8 +98,6 @@ class GeneralMarketMaker:
 
     # How many contracts should we hold on each side (before fills)
     base_num_contracts: Quantity = Quantity(20)
-    # How many levels in front of BBO should we join? (0 joins BBO)
-    penny_amount: int = 0
     # How much qty should be on the level already for us to join, if joining bbo
     min_qty_to_join: Quantity = Quantity(50)
     # How many levels should be on the book for us to add an order
@@ -248,8 +246,21 @@ class GeneralMarketMaker:
 
         other_side_price: Price | None = None
         for side in Side:
+            multiplier = 1 if side == Side.YES else -1
+            positions_holding = Quantity(
+                multiplier * self._holding_position_delta[ob.market_ticker]
+            )
+            need_to_sell = positions_holding < 0
+
+            # Join bbo if buying, try to penny if selling
+            penny_amount = 1 if need_to_sell else 0
+
             price_to_place = self.get_price_to_place(
-                ob.market_ticker, side, top_book_without_us, other_side_price
+                ob.market_ticker,
+                side,
+                top_book_without_us,
+                other_side_price,
+                penny_amount=penny_amount,
             )
             logger.info("Price to place: %s", price_to_place)
             if price_to_place is None:
@@ -262,11 +273,6 @@ class GeneralMarketMaker:
                     # If the price changed, cancel existing orders
                     self.cancel_resting_orders(ob.market_ticker, [side])
 
-            multiplier = 1 if side == Side.YES else -1
-            positions_holding = Quantity(
-                multiplier * self._holding_position_delta[ob.market_ticker]
-            )
-            need_to_sell = positions_holding < 0
             meets_liquitiy_requirements = self.ob_meets_liquidity_requirements(
                 ob.market_ticker, side, book_without_us, price_to_place
             )
@@ -373,6 +379,7 @@ class GeneralMarketMaker:
         side: Side,
         top_book_without_us: TopBook,
         our_price_on_other_side: Price | None,
+        penny_amount: int = 0,  # Default join bbo
     ) -> Price | None:
         """Returns if we should penny or join BBO"""
         side_top_book = top_book_without_us.get_side(side)
@@ -381,7 +388,7 @@ class GeneralMarketMaker:
         # Dont place orders on the edges
         if side_top_book.price < Price(10) or side_top_book.price > Price(90):
             return None
-        price_to_place = Price(side_top_book.price + self.penny_amount)
+        price_to_place = Price(side_top_book.price + penny_amount)
         # Dont cross the spread
         # We have to use the top book with us so we dont self cross
         top_book_with_us = (
