@@ -247,7 +247,7 @@ class GeneralMarketMaker:
         other_side_price: Price | None = None
         for side in Side:
             multiplier = 1 if side == Side.YES else -1
-            positions_holding = Quantity(
+            positions_holding = QuantityDelta(
                 multiplier * self._holding_position_delta[ob.market_ticker]
             )
             need_to_sell = positions_holding < 0
@@ -327,7 +327,7 @@ class GeneralMarketMaker:
         self,
         ticker: MarketTicker,
         side: Side,
-        positions_holding: Quantity,
+        positions_holding: QuantityDelta,
     ) -> Quantity | None:
         if positions_holding >= self.base_num_contracts:
             # We are holding more contracts on this side than we should, so dont buy
