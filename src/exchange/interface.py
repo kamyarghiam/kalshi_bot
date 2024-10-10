@@ -94,12 +94,7 @@ class ExchangeInterface(BaseExchangeInterface):
         order is partially filled"""
 
         request = order.to_api_request()
-
-        # Sometimes, we get issues when creating an order
-        # So for now, we print to see what happened
-        print(request.__repr__())
         raw_resp = self._connection.post(ORDERS_URL, request)
-        print(raw_resp)
 
         resp: CreateOrderResponse = CreateOrderResponse.model_validate(raw_resp)
         if (
