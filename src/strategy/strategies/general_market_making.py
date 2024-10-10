@@ -271,7 +271,9 @@ class GeneralMarketMaker:
             if ob_side is not None:
                 if ob_side.price != price_to_place:
                     # If the price changed, cancel existing orders
-                    self.cancel_resting_orders(ob.market_ticker, [side])
+                    success = self.cancel_resting_orders(ob.market_ticker, [side])
+                    if not success:
+                        continue
 
             meets_liquitiy_requirements = self.ob_meets_liquidity_requirements(
                 ob.market_ticker, side, book_without_us, price_to_place
@@ -461,7 +463,8 @@ class GeneralMarketMaker:
             except requests.exceptions.HTTPError as e:
                 print(f"Error canceling orders, but continuing: {str(e)}")
 
-    def cancel_resting_orders(self, ticker: MarketTicker, sides: List[Side]):
+    def cancel_resting_orders(self, ticker: MarketTicker, sides: List[Side]) -> bool:
+        """Returns whether cancellation successful"""
         self.loggers[ticker].info("Cancelling resting orders for sides %s", str(sides))
         order_ids_to_canel: List[OrderId] = []
         resting_orders = self._resting_top_book_orders[ticker]
@@ -470,14 +473,20 @@ class GeneralMarketMaker:
             if side_resting_orders:
                 order_ids_to_canel.extend(side_resting_orders.order_ids)
 
+        cancellation_successful = True
         if order_ids_to_canel:
             try:
                 self.e.batch_cancel_orders(order_ids_to_canel)
             except requests.exceptions.HTTPError as e:
-                print(f"Error canceling orders, but continuing: {str(e)}")
+                cancellation_successful = False
+                self.loggers[ticker].info(
+                    "Error canceling orders. Maybe it got filled. %s",
+                    str(e),
+                )
 
             for side in sides:
                 self._resting_top_book_orders[ticker].clear_side(side)
+        return cancellation_successful
 
     def adjust_fill_quantities(self, msg: OrderFillRM):
         """Marks that orders were filled on a certain side"""
