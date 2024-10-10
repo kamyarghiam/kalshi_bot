@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from exchange.connection import Connection, Websocket
 from helpers.constants import (
-    BATCHED,
+    BATCHED_URL,
     CANDLE_URL,
     EXCHANGE_STATUS_URL,
     FILLS_URL,
@@ -16,12 +16,17 @@ from helpers.constants import (
     ORDERS_URL,
     PORTFOLIO_BALANCE_URL,
     POSITION_URL,
+    SCHEDULE_URL,
     SERIES_URL,
     TRADES_URL,
 )
 from helpers.types.api import ExternalApiWithCursor
 from helpers.types.common import URL
-from helpers.types.exchange import BaseExchangeInterface, ExchangeStatusResponse
+from helpers.types.exchange import (
+    BaseExchangeInterface,
+    ExchangeSchedule,
+    ExchangeStatusResponse,
+)
 from helpers.types.markets import (
     CandlestickWrapper,
     GetCandlestickHistoryResponse,
@@ -113,7 +118,7 @@ class ExchangeInterface(BaseExchangeInterface):
             return [self.place_order(order) for order in orders]
 
         request = BatchCreateOrderRequest(orders=[o.to_api_request() for o in orders])
-        raw_resp = self._connection.post(ORDERS_URL.add(BATCHED), request)
+        raw_resp = self._connection.post(ORDERS_URL.add(BATCHED_URL), request)
         resp = BatchCreateOrderResponse.model_validate(raw_resp)
         result: List[OrderId | None] = []
         for o in resp.orders:
@@ -130,7 +135,7 @@ class ExchangeInterface(BaseExchangeInterface):
                 self.cancel_order(order_id)
             return
         request = BatchCancelOrders(ids=order_ids)
-        self._connection.delete(ORDERS_URL.add(BATCHED), request)
+        self._connection.delete(ORDERS_URL.add(BATCHED_URL), request)
 
     def get_exchange_status(self):
         return ExchangeStatusResponse.model_validate(
@@ -284,6 +289,10 @@ class ExchangeInterface(BaseExchangeInterface):
     def get_fills(self, req: GetFillsRequest) -> List[OrderFill]:
         responses = list(self._paginate_requests(self._get_fills, req))
         return sum([resp.fills for resp in responses], [])
+
+    def get_exchange_schedule(self) -> ExchangeSchedule:
+        resp = self._connection.get(url=SCHEDULE_URL)
+        return ExchangeSchedule.model_validate(resp)
 
     ######## Helpers ############
 

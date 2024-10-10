@@ -1,5 +1,8 @@
+import time
 from datetime import datetime, timedelta, timezone
 from typing import List
+
+import pytz
 
 from exchange.interface import ExchangeInterface
 from exchange.orderbook import OrderbookSubscription
@@ -14,8 +17,17 @@ def run(tickers: List[MarketTicker], e: ExchangeInterface, strat: GeneralMarketM
             ws, tickers, send_trade_updates=False, send_order_fills=True
         )
         gen = sub.continuous_receive()
+        schedule = e.get_exchange_schedule().get_today_standard_hours()
         print("Starting order gateway!")
         for raw_msg in gen:
+            now = datetime.now().astimezone(pytz.timezone("US/Eastern"))
+            if now < schedule.open:
+                wait_time_sec = (schedule.open - now).total_seconds()
+                print(f"Waiting {wait_time_sec} seconds until exchange opens")
+                time.sleep(wait_time_sec)
+            elif now > schedule.close:
+                print("Exchange started, shutdown program")
+                return
             strat.consume_next_step(raw_msg.msg)
 
 
