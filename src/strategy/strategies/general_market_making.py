@@ -185,9 +185,7 @@ class GeneralMarketMaker:
             log_file = os.path.join(log_dir, ticker)
             file_handler = logging.FileHandler(log_file)
             file_handler.setLevel(logging.DEBUG)
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
+            formatter = logging.Formatter("%(asctime)s - %(message)s")
             file_handler.setFormatter(formatter)
             self.loggers[ticker].addHandler(file_handler)
 
