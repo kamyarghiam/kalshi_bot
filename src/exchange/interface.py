@@ -143,8 +143,8 @@ class ExchangeInterface(BaseExchangeInterface):
     def get_orders(
         self, request: GetOrdersRequest, pages: int | None = None
     ) -> List[OrderAPIResponse]:
-        if request.status == OrderStatus.PENDING:
-            raise ValueError("Cannot get pending orders")
+        if request.status in (OrderStatus.PENDING, OrderStatus.IN_FLIGHT):
+            raise ValueError("Cannot get pending or in-flight orders")
 
         responses = list(self._paginate_requests(self._get_orders, request, pages))
         return sum([response.orders for response in responses], [])
