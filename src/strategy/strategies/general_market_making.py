@@ -131,6 +131,13 @@ class GeneralMarketMaker:
         # Mapping of ticker to time banned and exponent used to unban ticker
         self._ban_expo_backoff: Dict[MarketTicker, Tuple[datetime, int]] = dict()
 
+        assert self.min_qty_to_join > 2 * self.base_num_contracts, (
+            "We dont want our own contracts to make liquidity "
+            + "requirements valid. We can have at most,"
+            + "twice the number of base contracts on a side"
+            + "imagine selling the other side and buying the current side"
+        )
+
     def load_pre_existing_position(self, ticker: MarketTicker, position: QuantityDelta):
         """If you have an existing position, give the position as a quantity delta
         where positive means you're holding more Yes"""
@@ -275,8 +282,11 @@ class GeneralMarketMaker:
                     if not success:
                         continue
 
+            # We use the orderbook with our orders in it for the liqudity requirements
+            # to avoid loops where we are not meeting liquidity requirements while
+            # the book is inconsisten with our state of the world
             meets_liquitiy_requirements = self.ob_meets_liquidity_requirements(
-                ob.market_ticker, side, book_without_us, price_to_place
+                ob.market_ticker, side, ob, price_to_place
             )
             logger.info(
                 "Meets liquidity requirements: %s. Need to sell: %s",
@@ -354,16 +364,16 @@ class GeneralMarketMaker:
         self,
         ticker: MarketTicker,
         side: Side,
-        book_without_us: Orderbook | None,
+        ob: Orderbook,
         price_to_place: Price | None,
     ):
         """Checks if this orderbook has enough quantity and levels"""
-        if book_without_us is not None and price_to_place is not None:
+        if price_to_place is not None:
             self.loggers[ticker].info(
                 "Trying to place order at price %s",
                 price_to_place,
             )
-            side_book = book_without_us.get_side(side)
+            side_book = ob.get_side(side)
             if len(side_book.levels) < self.min_num_levels_to_join:
                 self.loggers[ticker].info("Not enough levels on book")
                 return False
@@ -427,16 +437,21 @@ class GeneralMarketMaker:
         # TODO: make more efficient
         ob_copy = copy.deepcopy(ob)
         resting_orders = self._resting_top_book_orders[ob.market_ticker]
-        if resting_orders.yes:
-            ob_copy.yes.apply_delta(
-                resting_orders.yes.price,
-                QuantityDelta(-1 * resting_orders.yes.quantity),
-            )
-        if resting_orders.no:
-            ob_copy.no.apply_delta(
-                resting_orders.no.price,
-                QuantityDelta(-1 * resting_orders.no.quantity),
-            )
+        for side in Side:
+            side_resting_order = resting_orders.get_side(side)
+            if side_resting_order:
+                ob_side = ob_copy.get_side(side)
+                if side_resting_order.price in ob_side.levels:
+                    ob_side_liquidity = ob_side.levels[side_resting_order.price]
+                    # We remove at most the amount of liquidity that's there
+                    # Sometimes, we remove more liquidity from the book then what's
+                    # there bc the orderbook state is not consitent with our view yet
+                    ob_side.apply_delta(
+                        side_resting_order.price,
+                        QuantityDelta(
+                            -1 * min(ob_side_liquidity, side_resting_order.quantity)
+                        ),
+                    )
         return ob_copy
 
     def cancel_all_orders(self) -> None:
