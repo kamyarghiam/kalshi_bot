@@ -262,6 +262,7 @@ class GeneralMarketMaker:
 
             side_top_book_without_us = top_book_without_us.get_side(side)
             if side_top_book_without_us is None:
+                logger.info("No side top book")
                 continue
 
             price_to_place = self.get_price_to_place(
@@ -294,9 +295,9 @@ class GeneralMarketMaker:
 
             # We use the orderbook with our orders in it for the liqudity requirements
             # to avoid loops where we are not meeting liquidity requirements while
-            # the book is inconsisten with our state of the world
+            # the book is inconsistent with our state of the world
             meets_liquitiy_requirements = self.ob_meets_liquidity_requirements(
-                ob.market_ticker, side, ob, price_to_place
+                ob.market_ticker, side, ob, side_top_book_without_us.price
             )
             logger.info(
                 "Meets liquidity requirements: %s. Need to sell: %s",
@@ -375,24 +376,26 @@ class GeneralMarketMaker:
         ticker: MarketTicker,
         side: Side,
         ob: Orderbook,
-        price_to_place: Price | None,
+        top_book: Price,
     ):
         """Checks if this orderbook has enough quantity and levels"""
-        if price_to_place is not None:
-            self.loggers[ticker].info(
-                "Trying to place order at price %s",
-                price_to_place,
-            )
-            side_book = ob.get_side(side)
-            if len(side_book.levels) < self.min_num_levels_to_join:
-                self.loggers[ticker].info("Not enough levels on book")
-                return False
+        self.loggers[ticker].info(
+            "Checking liquidity requirements at price %s on side %s",
+            top_book,
+            side,
+        )
+        side_book = ob.get_side(side)
+        if len(side_book.levels) < self.min_num_levels_to_join:
+            self.loggers[ticker].info("Not enough levels on book")
+            return False
 
-            if price_to_place in side_book.levels:
-                qty = side_book.levels[price_to_place]
-                if qty < self.min_qty_to_join:
-                    self.loggers[ticker].info("Not enough qty at level")
-                    return False
+        if top_book in side_book.levels:
+            qty = side_book.levels[top_book]
+            if qty < self.min_qty_to_join:
+                self.loggers[ticker].info("Not enough qty at level")
+                return False
+        else:
+            raise ValueError("Price to place not found %s", top_book)
         return True
 
     def get_price_to_place(
