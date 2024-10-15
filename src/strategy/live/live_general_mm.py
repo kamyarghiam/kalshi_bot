@@ -34,7 +34,7 @@ def run(tickers: List[MarketTicker], e: ExchangeInterface, strat: GeneralMarketM
 def main():
     with ExchangeInterface(is_test_run=False) as e:
         now = datetime.now(timezone.utc)
-        diff = timedelta(hours=15)
+        diff = timedelta(hours=20)
         tickers = {
             m.ticker for m in e.get_active_markets() if m.close_time - now < diff
         }

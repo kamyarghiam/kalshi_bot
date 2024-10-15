@@ -498,20 +498,19 @@ class GeneralMarketMaker:
             if side_resting_orders:
                 order_ids_to_canel.extend(side_resting_orders.order_ids)
 
-        cancellation_successful = True
         if order_ids_to_canel:
             try:
                 self.e.batch_cancel_orders(order_ids_to_canel)
             except requests.exceptions.HTTPError as e:
-                cancellation_successful = False
                 self.loggers[ticker].info(
                     "Error canceling orders. Maybe it got filled. %s",
                     str(e),
                 )
+                return False
 
             for side in sides:
                 self._resting_top_book_orders[ticker].clear_side(side)
-        return cancellation_successful
+        return True
 
     def adjust_fill_quantities(self, msg: OrderFillRM):
         """Marks that orders were filled on a certain side"""
