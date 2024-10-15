@@ -26,7 +26,7 @@ def run(tickers: List[MarketTicker], e: ExchangeInterface, strat: GeneralMarketM
                 print(f"Waiting {wait_time_sec} seconds until exchange opens")
                 time.sleep(wait_time_sec)
             elif now > schedule.close:
-                print("Exchange started, shutdown program")
+                print("Exchange closed, shutdown program")
                 return
             strat.consume_next_step(raw_msg.msg)
 
