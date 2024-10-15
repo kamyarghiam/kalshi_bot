@@ -220,28 +220,10 @@ class GeneralMarketMaker:
         self.adjust_fill_quantities(msg)
         # Wait until next delta to fill side
 
-    def ignore_if_state_not_matching(self, ob: Orderbook) -> bool:
-        """Ignores an update if the state of the OB does not match waht we see"""
-        resting_orders = self._resting_top_book_orders[ob.market_ticker]
-        for side in Side:
-            side_resting_orders = resting_orders.get_side(side)
-            if side_resting_orders:
-                # If we don't have the price level or the quantity is not up to date
-                level_qty = ob.get_side(side).levels.get(
-                    side_resting_orders.price, None
-                )
-                if not level_qty or level_qty < side_resting_orders.quantity:
-                    return True
-
-        return False
-
     def handle_ob_update(self, ob: Orderbook):
         logger = self.loggers[ob.market_ticker]
         if self.is_banned(ob.market_ticker):
             logger.info("Ignoring this update, ticker banned")
-            return
-        if self.ignore_if_state_not_matching(ob):
-            logger.info("Ignoring this update, inconsistent state")
             return
         book_without_us = self.get_book_without_us(ob)
         top_book_without_us = book_without_us.get_top_book()
