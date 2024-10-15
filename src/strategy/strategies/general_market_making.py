@@ -282,10 +282,12 @@ class GeneralMarketMaker:
             if ob_side is not None:
                 # In the sell case, if we're not pennying or at the bbo, cancel
                 # In the buy case, if we're not right under or at the bbo, cancel
-                if side_top_book_without_us.price - ob_side.price not in (
+                price_diff = ob_side.price - side_top_book_without_us.price
+                if price_diff not in (
                     penny_amount,
                     0,
                 ):
+                    logger.info("Cancelling because price diff is %s", price_diff)
                     success = self.cancel_resting_orders(ob.market_ticker, [side])
                     if not success:
                         continue
