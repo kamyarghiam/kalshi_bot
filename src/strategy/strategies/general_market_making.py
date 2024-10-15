@@ -13,7 +13,7 @@ import requests
 from exchange.interface import ExchangeInterface
 from helpers.types.markets import MarketTicker
 from helpers.types.money import Price
-from helpers.types.orderbook import Orderbook, TopBook
+from helpers.types.orderbook import Orderbook
 from helpers.types.orders import (
     ClientOrderId,
     Order,
@@ -257,13 +257,17 @@ class GeneralMarketMaker:
             )
             need_to_sell = positions_holding < 0
 
-            # Join bbo if buying, try to penny if selling
-            penny_amount = 1 if need_to_sell else 0
+            # If selling, penny. If buying, go behind the top book
+            penny_amount = 1 if need_to_sell else -1
+
+            side_top_book_without_us = top_book_without_us.get_side(side)
+            if side_top_book_without_us is None:
+                continue
 
             price_to_place = self.get_price_to_place(
                 ob.market_ticker,
                 side,
-                top_book_without_us,
+                side_top_book_without_us.price,
                 other_side_price,
                 penny_amount=penny_amount,
                 need_to_sell=need_to_sell,
@@ -276,8 +280,12 @@ class GeneralMarketMaker:
             ob_side = resting_orders.get_side(side)
             # If we have resting orders on that side, check if we need to cancel
             if ob_side is not None:
-                if ob_side.price != price_to_place:
-                    # If the price changed, cancel existing orders
+                # In the sell case, if we're not pennying or at the bbo, cancel
+                # In the buy case, if we're not right under or at the bbo, cancel
+                if side_top_book_without_us.price - ob_side.price not in (
+                    penny_amount,
+                    0,
+                ):
                     success = self.cancel_resting_orders(ob.market_ticker, [side])
                     if not success:
                         continue
@@ -389,22 +397,19 @@ class GeneralMarketMaker:
         self,
         ticker: MarketTicker,
         side: Side,
-        top_book_without_us: TopBook,
+        top_book_price: Price,
         our_price_on_other_side: Price | None,
         penny_amount: int = 0,  # Default join bbo
         need_to_sell: bool = False,
     ) -> Price | None:
         """Returns if we should penny or join BBO"""
 
-        side_top_book = top_book_without_us.get_side(side)
-        if side_top_book is None:
-            return None
         # Dont place orders on the edges
         if not need_to_sell and (
-            side_top_book.price < Price(10) or side_top_book.price > Price(90)
+            top_book_price < Price(10) or top_book_price > Price(90)
         ):
             return None
-        price_to_place = Price(min(side_top_book.price + penny_amount, 99))
+        price_to_place = Price(max(min(top_book_price + penny_amount, 99), 1))
         # Dont cross the spread
         # We have to use the top book with us so we dont self cross
         top_book_with_us = (
@@ -422,7 +427,7 @@ class GeneralMarketMaker:
             price_to_place + other_side_topbook_price >= 100
         ):
             # Just join bbo
-            price_to_place = side_top_book.price
+            price_to_place = top_book_price
         return price_to_place
 
     @staticmethod
