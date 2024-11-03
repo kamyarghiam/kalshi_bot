@@ -773,6 +773,10 @@ class OrderFill(ExternalApi):
     trade_id: TradeId
     yes_price: Price
 
+    @property
+    def price(self):
+        return self.yes_price if self.side == Side.YES else self.no_price
+
 
 class GetFillsResponse(ExternalApiWithCursor):
     fills: List[OrderFill]
