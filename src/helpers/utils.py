@@ -60,8 +60,8 @@ def compute_pnl(buy_price: Price, sell_price: Price, quantity: Quantity):
 
 def send_alert_email(message: str):
     # TODO: put this in the auth class
-    sender_email = "kamyarkalshibot@gmail.com"
-    password = "joofgqmczbeoqolb"
+    sender_email = ""
+    password = ""
     receiver_email = "kamyarghiam@gmail.com"
     subject = "Alert from Kalshi bot"
 
