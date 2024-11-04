@@ -92,13 +92,13 @@ def plot_dual_candlestick():
             f"{f.count} {f.side.value} {f.price}. Net position: {net_position}"
         )
 
-    e.get_market(ticker)
+    m = e.get_market(ticker)
 
     # Update layout for better readability
     fig.update_layout(
         title=(
             f"Fills in Yes prices. Final net position: {net_position}."
-            + " Settled: {m.result.value}"
+            + f" Settled: {m.result.value}, close at {m.close_time}"
         ),
         xaxis_title="Timestamp",
         yaxis_title="Price",
