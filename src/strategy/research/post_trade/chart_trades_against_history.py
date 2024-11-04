@@ -1,3 +1,10 @@
+"""
+This is a very useful chart that lets you see the fills
+made on a market overlayed with the market history of the chart.
+The y axis of the chart is in yes prices, and it's shown based on the
+yes bid and the yes ask candelsticks per minute buckets
+"""
+
 from datetime import datetime
 
 import pandas as pd
@@ -97,7 +104,7 @@ def plot_dual_candlestick():
     # Update layout for better readability
     fig.update_layout(
         title=(
-            f"Fills in Yes prices. Final net position: {net_position}."
+            f"Final net position: {net_position}."
             + f" Settled: {m.result.value}, close at {m.close_time}"
         ),
         xaxis_title="Timestamp",
