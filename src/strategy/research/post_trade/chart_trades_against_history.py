@@ -14,6 +14,8 @@ e = ExchangeInterface(is_test_run=False)
 ticker = MarketTicker("HIGHMIA-24OCT15-B86.5")
 start = datetime(2024, 10, 14).astimezone(pytz.UTC)
 end = datetime(2024, 10, 17).astimezone(pytz.UTC)
+
+
 fills = e.get_fills(
     GetFillsRequest(
         ticker=ticker, min_ts=int(start.timestamp()), max_ts=int(end.timestamp())
@@ -74,19 +76,34 @@ def plot_dual_candlestick():
         )
     )
 
+    # Show fills
+    fill_times = []
+    fill_prices = []
+    fill_colors = []
+    net_position = 0
+    fill_str = []
+
+    for f in fills:
+        fill_times.append(f.created_time)
+        fill_prices.append(f.yes_price)
+        fill_colors.append("green" if f.side == Side.YES else "red")
+        net_position += f.count if f.side == Side.YES else -1 * f.count
+        fill_str.append(
+            f"{f.count} {f.side.value} {f.price}. Net position: {net_position}"
+        )
+
+    e.get_market(ticker)
+
     # Update layout for better readability
     fig.update_layout(
-        title="Dual Candlestick Chart (Yes Ask and Yes Bid)",
+        title=(
+            f"Fills in Yes prices. Final net position: {net_position}."
+            + " Settled: {m.result.value}"
+        ),
         xaxis_title="Timestamp",
         yaxis_title="Price",
         xaxis_rangeslider_visible=False,
     )
-
-    # Show fills
-    fill_times = [fill.created_time for fill in fills]
-    fill_prices = [fill.yes_price for fill in fills]
-    fill_colors = ["green" if fill.side == Side.YES else "red" for fill in fills]
-    fill_str = [f"{f.count} {f.side.value} {f.price}" for f in fills]
 
     fig.add_trace(
         go.Scatter(
