@@ -1,10 +1,11 @@
-This library provides an interface with the Kalshi exchange. You can find the Kalshi API
-documentation here: https://trading-api.readme.io/reference/getting-started/.
-Kalshi has a demo env (https://demo.kalshi.co) where we can test our code.
-We also currently have a local "fake" instance of the Kalshi exchange that mocks the Kalshi
-endpoints. Please do not use production credentials unless we are legally cleared for trading.
-We do not intend to trade real money for the forseeable future; therefore, this repository
-is currently only for educational and research purposes unless there is a change in the
-direction of the project.
+This library provides an interface with the Kalshi exchange. It is currnetly
+not set up for public use, but I decided to make this repo public so that people
+can take ideas from what I'm working on. Note: I am no longer affiliated with
+Kalshi and this is my own project. The most useful files for external viewing are under
+src/exchange. Feel free to reach out to me if you have any questions or ideas.
 
-You need to set up some authorization. See the Auth class for what env vars and files you need.
+You can find the Kalshi API
+documentation here: https://trading-api.readme.io/reference/getting-started/.
+Kalshi has a demo env (https://demo.kalshi.co) where I test my code.
+I also currently have a local "fake" instance of the Kalshi exchange that mocks the Kalshi
+endpoints.
