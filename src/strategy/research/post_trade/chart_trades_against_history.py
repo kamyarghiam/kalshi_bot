@@ -18,7 +18,7 @@ from helpers.types.portfolio import GetFillsRequest
 
 # Pull trades
 e = ExchangeInterface(is_test_run=False)
-ticker = MarketTicker("HIGHMIA-24OCT15-B86.5")
+ticker = MarketTicker("HIGHNY-24OCT15-B58.5")
 start = datetime(2024, 10, 14).astimezone(pytz.UTC)
 end = datetime(2024, 10, 17).astimezone(pytz.UTC)
 
@@ -29,6 +29,8 @@ fills = e.get_fills(
     )
 )
 fills.sort(key=lambda x: x.created_time)
+
+other_trades = e.get_trades(ticker=ticker, min_ts=start, max_ts=end)
 
 # Get market history
 candlesticks = e.get_market_candlesticks(ticker, min_ts=start, max_ts=end)
@@ -83,6 +85,28 @@ def plot_dual_candlestick():
         )
     )
 
+    # Show other people's trades
+    trade_times = []
+    trade_yes_price = []
+    trade_text = []
+    for trade in other_trades:
+        trade_times.append(trade.created_time)
+        trade_yes_price.append(trade.yes_price)
+        trade_text.append(
+            f"{trade.count} at {trade.yes_price}. Taker side: {trade.taker_side.value}."
+        )
+
+    fig.add_trace(
+        go.Scatter(
+            x=trade_times,
+            y=trade_yes_price,
+            mode="markers",
+            marker=dict(color=["black"] * len(trade_yes_price), size=10),
+            name="Other trades",
+            text=trade_text,
+        )
+    )
+
     # Show fills
     fill_times = []
     fill_prices = []
@@ -118,7 +142,7 @@ def plot_dual_candlestick():
             y=fill_prices,
             mode="markers",
             marker=dict(color=fill_colors, size=10),
-            name="Fills",
+            name="Our fills",
             text=fill_str,
         )
     )
