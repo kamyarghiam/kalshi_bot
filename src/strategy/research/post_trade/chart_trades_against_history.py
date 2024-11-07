@@ -18,7 +18,7 @@ from helpers.types.portfolio import GetFillsRequest
 
 # Pull trades
 e = ExchangeInterface(is_test_run=False)
-ticker = MarketTicker("HIGHNY-24OCT15-B58.5")
+ticker = MarketTicker("HIGHNY-24OCT15-B56.5")
 start = datetime(2024, 10, 14).astimezone(pytz.UTC)
 end = datetime(2024, 10, 17).astimezone(pytz.UTC)
 
@@ -89,9 +89,11 @@ def plot_dual_candlestick():
     trade_times = []
     trade_yes_price = []
     trade_text = []
+    trade_colors = []
     for trade in other_trades:
         trade_times.append(trade.created_time)
         trade_yes_price.append(trade.yes_price)
+        trade_colors.append("green" if trade.taker_side == Side.YES else "red")
         trade_text.append(
             f"{trade.count} at {trade.yes_price}. Taker side: {trade.taker_side.value}."
         )
@@ -101,7 +103,7 @@ def plot_dual_candlestick():
             x=trade_times,
             y=trade_yes_price,
             mode="markers",
-            marker=dict(color=["black"] * len(trade_yes_price), size=10),
+            marker=dict(color=trade_colors, symbol="circle-open", size=10),
             name="Other trades",
             text=trade_text,
         )
